@@ -9,45 +9,55 @@ import (
 	"strings"
 )
 
-const PORT = 7007
+const port = 7007
+
+var (
+	name string
+)
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("\n\n")
-	fmt.Println("-----CHAT CLIENT-----")
-	fmt.Println("---------------------")
+	fmt.Println("---------CHATROOM--------")
+	fmt.Println("-------------------------")
 
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", PORT))
+	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, name := askForUsername("-> NAME: ")
 	defer conn.Close()
 
+	_, name = askForUsername("-> NAME: ")
+
+	//Clears screen
+	fmt.Print("\033[H\033[2J")
+
+	// Starts a goroutine to read messages from the server
+	go func() {
+		for {
+			message, err := bufio.NewReader(conn).ReadString('\n')
+			if err != nil {
+				log.Println("Error reading message:", err)
+				return
+			}
+			printIncomingMessage(message)
+		}
+	}()
+
+	// Main loop to send messages to the server
 	for {
-		fmt.Printf("-> %s: ", name)
+		askForInput()
 		text, _ := reader.ReadString('\n')
-		// convert CRLF to LF
+		// Convert CRLF to LF
 		text = strings.Replace(text, "\n", "", -1)
 		if strings.Compare("quit", text) == 0 {
 			break
 		}
 
-		// Send the message to the server
 		_, err = conn.Write([]byte(fmt.Sprintf("%s: %s\n", name, text)))
 		if err != nil {
 			log.Fatal(err)
 		}
-
-	}
-
-	for {
-		// Read the response from the server
-		_, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			log.Fatal(err)
-		}
-		// fmt.Print("-> " + message)
 	}
 }
 
@@ -62,7 +72,7 @@ func askForUsername(s string) (bool, string) {
 			log.Fatal(err)
 		}
 
-		response = strings.ToLower(strings.TrimSpace(response))
+		response = strings.TrimSpace(response)
 
 		if response != "" {
 			return true, response
@@ -70,4 +80,13 @@ func askForUsername(s string) (bool, string) {
 
 		fmt.Println("Input cannot be empty. Please try again.")
 	}
+}
+
+func printIncomingMessage(message string) {
+	fmt.Printf("\r-> %s", message)
+	askForInput()
+}
+
+func askForInput() {
+	fmt.Printf("-> %s: ", name)
 }
