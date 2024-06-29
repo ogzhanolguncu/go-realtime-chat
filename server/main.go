@@ -40,10 +40,10 @@ func handleConnection(c net.Conn) {
 			log.Println(err)
 			break
 		}
-		request := strings.TrimSpace(string(data))
+		message := strings.TrimSpace(string(data))
 
-		log.Printf("Request from %s: %s\n", c.RemoteAddr().String(), request)
-		if request == "STOP" {
+		log.Printf("Request from %s: %s\n", c.RemoteAddr().String(), message)
+		if message == "quit" {
 			break
 		}
 		c.Write([]byte(data))
