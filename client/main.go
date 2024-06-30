@@ -18,22 +18,34 @@ var (
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("\n\n")
-	fmt.Println("---------CHATROOM--------")
-	fmt.Println("-------------------------")
+	printHeader()
 
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		log.Fatal(err)
+	conn, internalError := net.Dial("tcp", fmt.Sprintf(":%d", port))
+	if internalError != nil {
+		log.Fatal(internalError)
 	}
 	defer conn.Close()
 
-	_, name = askForUsername("-> NAME: ")
+	// Waits for "USERNAME_REQUIRED" from the server
+	// Asks for and send username to the server
+	// Waits for "USERNAME_SET_SUCCESSFULLY" message from the server
+	handleNameSet(conn, reader)
 
-	//Clears screen
-	fmt.Print("\033[H\033[2J")
+	// Start a goroutine to read messages from the server
+	readMessagesFromServer(conn)
 
-	// Starts a goroutine to read messages from the server
+	// Main loop to send messages to the server
+	sendMessagesToServer(reader, conn)
+}
+
+func printHeader() {
+	fmt.Printf("\n\n")
+	fmt.Println("---------CHATROOM--------")
+	fmt.Println("-------------------------")
+}
+
+func readMessagesFromServer(conn net.Conn) {
+	// Start a goroutine to read messages from the server
 	go func() {
 		for {
 			message, err := bufio.NewReader(conn).ReadString('\n')
@@ -44,59 +56,92 @@ func main() {
 			printIncomingMessage(message)
 		}
 	}()
+}
 
-	// Main loop to send messages to the server
+// sendMessagesToServer reads user input and sends messages to the server
+func sendMessagesToServer(reader *bufio.Reader, conn net.Conn) {
 	for {
 		askForInput()
-		text, _ := reader.ReadString('\n')
-		// Convert CRLF to LF
-		text = strings.Replace(text, "\n", "", -1)
-		if strings.Compare("quit", text) == 0 {
-			break
-		}
-
-		if strings.Contains(text, "/w") {
-			re := regexp.MustCompile(`^\/w\s+(\S+)\s+(.*)$`)
-
-			// Find the submatches
-			matches := re.FindStringSubmatch(text)
-			recipient := matches[1]
-			msg := matches[2]
-
-			// MessageType#SENDER#CONTENT#RECIPIENT
-			_, err = conn.Write([]byte(fmt.Sprintf("WHISPER#%s#%s#%s\n", name, msg, recipient)))
-			if err != nil {
-				log.Fatal(err)
-			}
+		text, err := reader.ReadString('\n')
+		if err != nil {
+			log.Println("Error reading input:", err)
 			continue
 		}
 
-		// MessageType#SENDER#CONTENT
-		_, err = conn.Write([]byte(fmt.Sprintf("GROUP_MESSAGE#%s#%s\n", name, text)))
-		if err != nil {
-			log.Fatal(err)
+		text = strings.TrimSpace(text)
+		if text == "quit" {
+			break
+		}
+
+		if strings.HasPrefix(text, "/w ") {
+			handleWhisperCommand(conn, text)
+		} else {
+			sendGroupMessage(conn, text)
 		}
 	}
 }
 
-func askForUsername(s string) (bool, string) {
-	reader := bufio.NewReader(os.Stdin)
+// handleNameSet manages the username setup process with the server
+func handleNameSet(conn net.Conn, reader *bufio.Reader) {
+	serverReader := bufio.NewReader(conn)
 
-	for {
-		fmt.Printf("%s", s)
+	// Wait for "USERNAME_REQUIRED" from the server
+	message, err := serverReader.ReadString('\n')
+	if err != nil {
+		log.Fatal("Error reading from server:", err)
+	}
+	if strings.TrimSpace(message) != "USERNAME_REQUIRED" {
+		log.Fatal("Expected USERNAME_REQUIRED message from server")
+	}
 
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatal(err)
-		}
+	// Ask for and send username to the server
+	fmt.Print("Enter your username: ")
+	nameInput, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatal("Error reading username input:", err)
+	}
+	nameInput = strings.TrimSpace(nameInput)
+	conn.Write([]byte(nameInput + "\n"))
 
-		response = strings.TrimSpace(response)
+	// Wait for "USERNAME_SET_SUCCESSFULLY" message from the server
+	message, err = serverReader.ReadString('\n')
+	if err != nil {
+		log.Fatal("Error reading from server:", err)
+	}
+	if strings.HasPrefix(strings.TrimSpace(message), "USERNAME_SET_SUCCESSFULLY#") {
+		name = strings.Split(strings.TrimSpace(message), "#")[1]
+		fmt.Printf("Username successfully set to: %s\n\n", name)
+	} else {
+		log.Fatal("Expected USERNAME_SET_SUCCESSFULLY message from server")
+	}
+}
 
-		if response != "" {
-			return true, response
-		}
+// handleWhisperCommand processes and sends a whisper message
+func handleWhisperCommand(conn net.Conn, text string) {
+	re := regexp.MustCompile(`^\/w\s+(\S+)\s+(.*)$`)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) == 3 {
+		recipient := matches[1]
+		msg := matches[2]
+		sendWhisperMessage(conn, recipient, msg)
+	} else {
+		fmt.Println("Invalid whisper command format")
+	}
+}
 
-		fmt.Println("Input cannot be empty. Please try again.")
+// sendWhisperMessage sends a whisper message to the server
+func sendWhisperMessage(conn net.Conn, recipient, msg string) {
+	_, err := conn.Write([]byte(fmt.Sprintf("WHISPER#%s#%s#%s\n", name, msg, recipient)))
+	if err != nil {
+		log.Fatal("Error sending whisper message:", err)
+	}
+}
+
+// sendGroupMessage sends a group message to the server
+func sendGroupMessage(conn net.Conn, text string) {
+	_, err := conn.Write([]byte(fmt.Sprintf("GROUP_MESSAGE#%s#%s\n", name, text)))
+	if err != nil {
+		log.Fatal("Error sending group message:", err)
 	}
 }
 

@@ -60,16 +60,10 @@ CONNECTION_LOOP:
 			break
 		}
 
-		//TODO: if messageType is whisper only send message to receiver
-		//TODO: if message type is history simple echo back history to client
-
 		rawMessage := strings.TrimSpace(string(data))
 		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 
 		msgPayload, err := RequestType.ParseMessage(rawMessage)
-
-		// Handle case where c is not found in ConnectionMap
-		updateConnectionOwner(s, c, msgPayload)
 
 		if err != nil {
 			// Write back to client that his message is malformed
@@ -81,7 +75,6 @@ CONNECTION_LOOP:
 			s.broadcastMessage(msgPayload, c)
 		case RequestType.WHISPER:
 			s.sendWhisper(msgPayload, c)
-
 		case RequestType.QUIT:
 			break CONNECTION_LOOP // Exit the loop if QUIT message received
 		default:
@@ -152,9 +145,29 @@ func main() {
 			continue
 		}
 
+		conn.Write([]byte("USERNAME_REQUIRED\n"))
+		connReader := bufio.NewReader(conn)
+
+		var name string
+		for {
+			data, err := connReader.ReadString('\n')
+			log.Printf(data, "NAME DATA")
+			if err != nil {
+				break
+			}
+			if data == "" {
+				continue
+			} else {
+				name = data
+				conn.Write([]byte(fmt.Sprintf("USERNAME_SET_SUCCESSFULLY#%s\n", data)))
+				break
+			}
+
+		}
+
 		server.ConnLock.Lock()
 		color := server.getColorForConnection()
-		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, Color: color, OwnerName: "Unknown"}
+		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, Color: color, OwnerName: name}
 		server.ConnLock.Unlock()
 
 		go server.handleConnection(conn)
@@ -172,14 +185,4 @@ func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool)
 	}
 
 	return nil, false
-}
-
-func updateConnectionOwner(s *TCPServer, c net.Conn, msgPayload RequestType.Message) {
-	s.ConnLock.Lock()
-	if info, ok := s.ConnectionMap[c]; ok {
-		info.OwnerName = msgPayload.MessageSender
-	} else {
-		log.Printf("Connection not found for %s\n", c.RemoteAddr().String())
-	}
-	s.ConnLock.Unlock()
 }
