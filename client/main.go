@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -54,6 +55,23 @@ func main() {
 			break
 		}
 
+		if strings.Contains(text, "/w") {
+			re := regexp.MustCompile(`^\/w\s+(\S+)\s+(.*)$`)
+
+			// Find the submatches
+			matches := re.FindStringSubmatch(text)
+			recipient := matches[1]
+			msg := matches[2]
+
+			// MessageType#SENDER#CONTENT#RECIPIENT
+			_, err = conn.Write([]byte(fmt.Sprintf("WHISPER#%s#%s#%s\n", name, msg, recipient)))
+			if err != nil {
+				log.Fatal(err)
+			}
+			continue
+		}
+
+		// MessageType#SENDER#CONTENT
 		_, err = conn.Write([]byte(fmt.Sprintf("GROUP_MESSAGE#%s#%s\n", name, text)))
 		if err != nil {
 			log.Fatal(err)
@@ -88,5 +106,5 @@ func printIncomingMessage(message string) {
 }
 
 func askForInput() {
-	fmt.Printf("\033[33m-> ME: ")
+	fmt.Printf("\033[0;37m-> ME: ")
 }

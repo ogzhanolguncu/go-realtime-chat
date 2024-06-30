@@ -16,6 +16,7 @@ const port = 7007
 // connectionInfo holds connection-related information and color per client.
 type ConnectionInfo struct {
 	Connection net.Conn
+	OwnerName  string
 	Color      string
 }
 
@@ -25,7 +26,7 @@ type TCPServer struct {
 	Colors        []string
 }
 
-func NewTCPServer() *TCPServer {
+func newTCPServer() *TCPServer {
 	return &TCPServer{
 		ConnectionMap: make(map[net.Conn]*ConnectionInfo),
 		ConnLock:      sync.Mutex{},
@@ -39,7 +40,7 @@ func NewTCPServer() *TCPServer {
 	}
 }
 
-func (s *TCPServer) HandleConnection(c net.Conn) {
+func (s *TCPServer) handleConnection(c net.Conn) {
 	defer func() {
 		s.ConnLock.Lock()
 		delete(s.ConnectionMap, c)
@@ -65,37 +66,61 @@ CONNECTION_LOOP:
 		rawMessage := strings.TrimSpace(string(data))
 		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 
-		messagePayload, err := RequestType.ParseMessage(rawMessage)
+		msgPayload, err := RequestType.ParseMessage(rawMessage)
+
+		// Handle case where c is not found in ConnectionMap
+		updateConnectionOwner(s, c, msgPayload)
+
 		if err != nil {
 			// Write back to client that his message is malformed
 			c.Write([]byte(err.Error()))
 		}
 
-		switch messagePayload.MessageType {
-		//If messageType is group message call broadcast message
+		switch msgPayload.MessageType {
 		case RequestType.GROUP_MESSAGE:
-			s.BroadcastMessage(messagePayload, c)
-		//If client requests a quit we break out of CONNECTION_LOOP
-		case RequestType.QUIT:
-			break CONNECTION_LOOP
-		}
+			s.broadcastMessage(msgPayload, c)
+		case RequestType.WHISPER:
+			s.sendWhisper(msgPayload, c)
 
+		case RequestType.QUIT:
+			break CONNECTION_LOOP // Exit the loop if QUIT message received
+		default:
+			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
+		}
 	}
 	log.Printf("Connection closed for %s\n", c.RemoteAddr().String())
 }
 
-func (s *TCPServer) BroadcastMessage(msgPayload RequestType.Message, sender net.Conn) {
+func (s *TCPServer) sendWhisper(msgPayload RequestType.Message, sender net.Conn) {
+	fmtedMsg := fmt.Sprintf("Whisper from %s: %s\n", msgPayload.MessageSender, msgPayload.MessageContent)
+	recipientConn, found := s.findConnectionByOwnerName(msgPayload.MessageRecipient)
+
+	if !found || recipientConn == nil {
+		_, err := sender.Write([]byte("Recipient not found or connection lost\n"))
+		if err != nil {
+			log.Println("Error sending recipient not found message:", err)
+		}
+		return
+	}
+
+	_, err := recipientConn.Write([]byte(fmtedMsg))
+	if err != nil {
+		log.Println("Error sending whisper:", err)
+	}
+}
+
+func (s *TCPServer) broadcastMessage(msgPayload RequestType.Message, sender net.Conn) {
 	s.ConnLock.Lock()
 	defer s.ConnLock.Unlock()
 
-	fmtMsg := fmt.Sprintf("%s: %s\n", msgPayload.Name, msgPayload.Message)
+	fmtedMsg := fmt.Sprintf("%s: %s\n", msgPayload.MessageSender, msgPayload.MessageContent)
 	senderInfo := s.ConnectionMap[sender]
 
-	coloredMessage := fmt.Sprintf("%s%s\033[0m\n", senderInfo.Color, fmtMsg)
+	msg := fmt.Sprintf("%s%s\033[0m\n", senderInfo.Color, fmtedMsg)
 
 	for conn := range s.ConnectionMap {
 		if conn != sender {
-			_, err := conn.Write([]byte(coloredMessage))
+			_, err := conn.Write([]byte(msg))
 			if err != nil {
 				log.Println("Error broadcasting message:", err)
 			}
@@ -103,14 +128,14 @@ func (s *TCPServer) BroadcastMessage(msgPayload RequestType.Message, sender net.
 	}
 }
 
-func (s *TCPServer) GetColorForConnection() string {
+func (s *TCPServer) getColorForConnection() string {
 	connCount := len(s.ConnectionMap)
 	colorIndex := connCount % len(s.Colors)
 	return s.Colors[colorIndex]
 }
 
 func main() {
-	server := NewTCPServer()
+	server := newTCPServer()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -128,11 +153,33 @@ func main() {
 		}
 
 		server.ConnLock.Lock()
-		color := server.GetColorForConnection()
-		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, Color: color}
+		color := server.getColorForConnection()
+		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, Color: color, OwnerName: "Unknown"}
 		server.ConnLock.Unlock()
 
-		go server.HandleConnection(conn)
+		go server.handleConnection(conn)
+	}
+}
+
+func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool) {
+	s.ConnLock.Lock()
+	defer s.ConnLock.Unlock()
+
+	for conn, info := range s.ConnectionMap {
+		if info.OwnerName == ownerName {
+			return conn, true
+		}
 	}
 
+	return nil, false
+}
+
+func updateConnectionOwner(s *TCPServer, c net.Conn, msgPayload RequestType.Message) {
+	s.ConnLock.Lock()
+	if info, ok := s.ConnectionMap[c]; ok {
+		info.OwnerName = msgPayload.MessageSender
+	} else {
+		log.Printf("Connection not found for %s\n", c.RemoteAddr().String())
+	}
+	s.ConnLock.Unlock()
 }

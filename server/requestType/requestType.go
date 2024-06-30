@@ -8,10 +8,10 @@ import (
 
 type RequestType int32
 
-const (
-	messageSeparator string = "#"
+const messageSeparator string = "#"
 
-	GROUP_MESSAGE RequestType = iota + 1
+const (
+	GROUP_MESSAGE RequestType = iota
 	WHISPER
 	CHAT_HISTORY
 	QUIT
@@ -24,12 +24,13 @@ var requestTypeMap = map[string]RequestType{
 }
 
 type Message struct {
-	MessageType RequestType
-	Name        string
-	Message     string
+	MessageType      RequestType
+	MessageSender    string
+	MessageContent   string
+	MessageRecipient string
 }
 
-// ParseMessage parses a message string formatted as "GROUP_MESSAGE#Name#Content" into a Message object.
+// ParseMessage parses a message string formatted as "GROUP_MESSAGE#Name#Content#[Recipient - OPTIONAL]" into a Message object.
 // It sanitizes the name and message fields, determines the message type (GROUP_MESSAGE, WHISPER, etc.),
 // and returns a Message struct containing these sanitized values.
 // If the message format is invalid or the message type is unknown, an error is returned.
@@ -38,13 +39,19 @@ func ParseMessage(msg string) (Message, error) {
 	log.Printf("Parsed message: %v", parsedMessage)
 
 	if len(parsedMessage) < 3 {
-		return Message{}, fmt.Errorf("invalid message format")
+		return Message{}, fmt.Errorf("invalid message format: expected at least 3 parts, got %d", len(parsedMessage))
 	}
 
 	// Trim any whitespace around the parsed elements
 	messageTypeStr := strings.TrimSpace(parsedMessage[0])
-	name := strings.TrimSpace(parsedMessage[1])
-	message := strings.TrimSpace(parsedMessage[2])
+	messageSender := strings.TrimSpace(parsedMessage[1])
+	messageContent := strings.TrimSpace(parsedMessage[2])
+
+	// Check if there is a recipient
+	var recipient string
+	if len(parsedMessage) > 3 {
+		recipient = strings.TrimSpace(parsedMessage[3])
+	}
 
 	messageType, ok := requestTypeMap[messageTypeStr]
 	if !ok {
@@ -52,6 +59,6 @@ func ParseMessage(msg string) (Message, error) {
 		return Message{}, fmt.Errorf("unknown message type: '%s'", messageTypeStr)
 	}
 
-	log.Printf("Returning values - messageType: %d, name: '%s', message: '%s'", messageType, name, message)
-	return Message{messageType, name, message}, nil
+	log.Printf("Returning values - messageType: %d, name: '%s', message: '%s', recipient: '%s'", messageType, messageSender, messageContent, recipient)
+	return Message{messageType, messageSender, messageContent, recipient}, nil
 }
