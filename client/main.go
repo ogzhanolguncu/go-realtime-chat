@@ -54,7 +54,7 @@ func main() {
 			break
 		}
 
-		_, err = conn.Write([]byte(fmt.Sprintf("%s: %s\n", name, text)))
+		_, err = conn.Write([]byte(fmt.Sprintf("GROUP_MESSAGE#%s#%s\n", name, text)))
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -7,6 +7,8 @@ import (
 	"net"
 	"strings"
 	"sync"
+
+	RequestType "github.com/ogzhanolguncu/go-chat/server/requestType"
 )
 
 const port = 7007
@@ -48,29 +50,48 @@ func (s *TCPServer) HandleConnection(c net.Conn) {
 	connReader := bufio.NewReader(c)
 
 	log.Printf("Connection from %s\n", c.RemoteAddr().String())
+
+CONNECTION_LOOP:
 	for {
 		data, err := connReader.ReadString('\n')
 		if err != nil {
 			log.Printf("Error reading from %s: %v\n", c.RemoteAddr().String(), err)
 			break
 		}
-		message := strings.TrimSpace(string(data))
 
-		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), message)
-		if message == "quit" {
-			break
+		//TODO: if messageType is whisper only send message to receiver
+		//TODO: if message type is history simple echo back history to client
+
+		rawMessage := strings.TrimSpace(string(data))
+		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
+
+		messagePayload, err := RequestType.ParseMessage(rawMessage)
+		if err != nil {
+			// Write back to client that his message is malformed
+			c.Write([]byte(err.Error()))
 		}
-		s.BroadcastMessage(message, c)
+
+		switch messagePayload.MessageType {
+		//If messageType is group message call broadcast message
+		case RequestType.GROUP_MESSAGE:
+			s.BroadcastMessage(messagePayload, c)
+		//If client requests a quit we break out of CONNECTION_LOOP
+		case RequestType.QUIT:
+			break CONNECTION_LOOP
+		}
+
 	}
 	log.Printf("Connection closed for %s\n", c.RemoteAddr().String())
 }
 
-func (s *TCPServer) BroadcastMessage(message string, sender net.Conn) {
+func (s *TCPServer) BroadcastMessage(msgPayload RequestType.Message, sender net.Conn) {
 	s.ConnLock.Lock()
 	defer s.ConnLock.Unlock()
 
+	fmtMsg := fmt.Sprintf("%s: %s\n", msgPayload.Name, msgPayload.Message)
 	senderInfo := s.ConnectionMap[sender]
-	coloredMessage := fmt.Sprintf("%s%s\033[0m\n", senderInfo.Color, message)
+
+	coloredMessage := fmt.Sprintf("%s%s\033[0m\n", senderInfo.Color, fmtMsg)
 
 	for conn := range s.ConnectionMap {
 		if conn != sender {
