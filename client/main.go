@@ -88,5 +88,5 @@ func printIncomingMessage(message string) {
 }
 
 func askForInput() {
-	fmt.Printf("-> %s: ", name)
+	fmt.Printf("\033[33m-> ME: ")
 }
