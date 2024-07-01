@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const port = 7007
@@ -26,15 +27,8 @@ func main() {
 	}
 	defer conn.Close()
 
-	// Waits for "USERNAME_REQUIRED" from the server
-	// Asks for and send username to the server
-	// Waits for "USERNAME_SET_SUCCESSFULLY" message from the server
 	handleNameSet(conn, reader)
-
-	// Start a goroutine to read messages from the server
 	readMessagesFromServer(conn)
-
-	// Main loop to send messages to the server
 	sendMessagesToServer(reader, conn)
 }
 
@@ -45,7 +39,6 @@ func printHeader() {
 }
 
 func readMessagesFromServer(conn net.Conn) {
-	// Start a goroutine to read messages from the server
 	go func() {
 		for {
 			message, err := bufio.NewReader(conn).ReadString('\n')
@@ -58,7 +51,6 @@ func readMessagesFromServer(conn net.Conn) {
 	}()
 }
 
-// sendMessagesToServer reads user input and sends messages to the server
 func sendMessagesToServer(reader *bufio.Reader, conn net.Conn) {
 	for {
 		askForInput()
@@ -81,11 +73,9 @@ func sendMessagesToServer(reader *bufio.Reader, conn net.Conn) {
 	}
 }
 
-// handleNameSet manages the username setup process with the server
 func handleNameSet(conn net.Conn, reader *bufio.Reader) {
 	serverReader := bufio.NewReader(conn)
 
-	// Wait for "USERNAME_REQUIRED" from the server
 	message, err := serverReader.ReadString('\n')
 	if err != nil {
 		log.Fatal("Error reading from server:", err)
@@ -94,7 +84,6 @@ func handleNameSet(conn net.Conn, reader *bufio.Reader) {
 		log.Fatal("Expected USERNAME_REQUIRED message from server")
 	}
 
-	// Ask for and send username to the server
 	fmt.Print("Enter your username: ")
 	nameInput, err := reader.ReadString('\n')
 	if err != nil {
@@ -103,20 +92,18 @@ func handleNameSet(conn net.Conn, reader *bufio.Reader) {
 	nameInput = strings.TrimSpace(nameInput)
 	conn.Write([]byte(nameInput + "\n"))
 
-	// Wait for "USERNAME_SET_SUCCESSFULLY" message from the server
 	message, err = serverReader.ReadString('\n')
 	if err != nil {
 		log.Fatal("Error reading from server:", err)
 	}
 	if strings.HasPrefix(strings.TrimSpace(message), "USERNAME_SET_SUCCESSFULLY#") {
 		name = strings.Split(strings.TrimSpace(message), "#")[1]
-		fmt.Printf("Username successfully set to: %s\n\n", name)
+		fmt.Printf("\033[32mUsername successfully set to: %s\033[0m\n\n", name)
 	} else {
 		log.Fatal("Expected USERNAME_SET_SUCCESSFULLY message from server")
 	}
 }
 
-// handleWhisperCommand processes and sends a whisper message
 func handleWhisperCommand(conn net.Conn, text string) {
 	re := regexp.MustCompile(`^\/w\s+(\S+)\s+(.*)$`)
 	matches := re.FindStringSubmatch(text)
@@ -129,7 +116,6 @@ func handleWhisperCommand(conn net.Conn, text string) {
 	}
 }
 
-// sendWhisperMessage sends a whisper message to the server
 func sendWhisperMessage(conn net.Conn, recipient, msg string) {
 	_, err := conn.Write([]byte(fmt.Sprintf("WHISPER#%s#%s#%s\n", name, msg, recipient)))
 	if err != nil {
@@ -137,7 +123,6 @@ func sendWhisperMessage(conn net.Conn, recipient, msg string) {
 	}
 }
 
-// sendGroupMessage sends a group message to the server
 func sendGroupMessage(conn net.Conn, text string) {
 	_, err := conn.Write([]byte(fmt.Sprintf("GROUP_MESSAGE#%s#%s\n", name, text)))
 	if err != nil {
@@ -146,10 +131,15 @@ func sendGroupMessage(conn net.Conn, text string) {
 }
 
 func printIncomingMessage(message string) {
-	fmt.Printf("\r-> %s", message)
+	timestamp := time.Now().Format("[15:04]")
+	if strings.HasPrefix(message, "Whisper from") {
+		fmt.Printf("\r\033[35m%s %s\033[0m", timestamp, message)
+	} else {
+		fmt.Printf("\r\033[34m%s %s\033[0m", timestamp, message)
+	}
 	askForInput()
 }
 
 func askForInput() {
-	fmt.Printf("\033[0;37m-> ME: ")
+	fmt.Printf("\033[33m[%.2d:%.2d] You:\033[0m ", time.Now().Hour(), time.Now().Minute())
 }

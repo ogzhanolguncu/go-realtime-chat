@@ -27,7 +27,7 @@ This project implements a simple real-time chat server and client using Go. The 
 ### TODOs
 
 - [x] Private message: Allow passing private messages with the format /w [name] [message].
-- [] Reply functionality: Implement reply functionality with /r [message].
+- [x] Reply functionality: Implement reply functionality with /r [message].
 - [x] Make names unique: Ensure usernames are unique across all connected clients.
 - [x] Group message: Allow passing public messages.
 - Chat history
@@ -37,3 +37,4 @@ This project implements a simple real-time chat server and client using Go. The 
 - [] Client re-establish connection with exponential retry: Implement exponential retry logic for re-establishing connections.
 - [] Send active user list: When a client establishes a connection, send them the list of active users.
 - [] Check whisper logic: Ensure the logic for handling whispers is robust and correct.
+- [x] Consider adding timestamps to messages for better context.

@@ -26,6 +26,56 @@ type TCPServer struct {
 	Colors        []string
 }
 
+func main() {
+	server := newTCPServer()
+
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+	defer listener.Close()
+
+	log.Printf("Chat server started on port %d\n", port)
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Error accepting connection: %v\n", err)
+			continue
+		}
+
+		conn.Write([]byte("USERNAME_REQUIRED\n"))
+		connReader := bufio.NewReader(conn)
+
+		var name string
+		for {
+			data, err := connReader.ReadString('\n')
+			if err != nil {
+				break
+			}
+			if data == "" {
+				continue
+			} else {
+				name = strings.TrimSuffix(data, "\n")
+				conn.Write([]byte(fmt.Sprintf("USERNAME_SET_SUCCESSFULLY#%s\n", data)))
+				break
+			}
+
+		}
+
+		server.ConnLock.Lock()
+		color := server.getColorForConnection()
+		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, Color: color, OwnerName: name}
+		server.ConnLock.Unlock()
+
+		connectedUsers := len(server.ConnectionMap)
+		log.Printf("Connection from %s\n", conn.RemoteAddr().String())
+		log.Printf("Connected users: %d\n", connectedUsers)
+
+		go server.handleConnection(conn)
+	}
+}
+
 func newTCPServer() *TCPServer {
 	return &TCPServer{
 		ConnectionMap: make(map[net.Conn]*ConnectionInfo),
@@ -49,8 +99,6 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 	}()
 
 	connReader := bufio.NewReader(c)
-
-	log.Printf("Connection from %s\n", c.RemoteAddr().String())
 
 CONNECTION_LOOP:
 	for {
@@ -125,53 +173,6 @@ func (s *TCPServer) getColorForConnection() string {
 	connCount := len(s.ConnectionMap)
 	colorIndex := connCount % len(s.Colors)
 	return s.Colors[colorIndex]
-}
-
-func main() {
-	server := newTCPServer()
-
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
-	defer listener.Close()
-
-	log.Printf("Server started on port %d\n", port)
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Printf("Error accepting connection: %v\n", err)
-			continue
-		}
-
-		conn.Write([]byte("USERNAME_REQUIRED\n"))
-		connReader := bufio.NewReader(conn)
-
-		var name string
-		for {
-			data, err := connReader.ReadString('\n')
-			log.Printf(data, "NAME DATA")
-			if err != nil {
-				break
-			}
-			if data == "" {
-				continue
-			} else {
-				name = data
-				conn.Write([]byte(fmt.Sprintf("USERNAME_SET_SUCCESSFULLY#%s\n", data)))
-				break
-			}
-
-		}
-
-		server.ConnLock.Lock()
-		color := server.getColorForConnection()
-		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, Color: color, OwnerName: name}
-		server.ConnLock.Unlock()
-
-		go server.handleConnection(conn)
-	}
 }
 
 func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool) {
