@@ -26,6 +26,20 @@ type TCPServer struct {
 	Colors        []string
 }
 
+func newTCPServer() *TCPServer {
+	return &TCPServer{
+		ConnectionMap: make(map[net.Conn]*ConnectionInfo),
+		ConnLock:      sync.Mutex{},
+		Colors: []string{
+			"\033[31m", // Red
+			"\033[32m", // Green
+			"\033[33m", // Yellow
+			"\033[34m", // Blue
+			"\033[35m", // Purple
+		},
+	}
+}
+
 func main() {
 	server := newTCPServer()
 
@@ -72,21 +86,9 @@ func main() {
 		log.Printf("Connection from %s\n", conn.RemoteAddr().String())
 		log.Printf("Connected users: %d\n", connectedUsers)
 
+		// Make this function more generic and support both join and leave message for now.
+		go server.sendSystemNotice(name, conn)
 		go server.handleConnection(conn)
-	}
-}
-
-func newTCPServer() *TCPServer {
-	return &TCPServer{
-		ConnectionMap: make(map[net.Conn]*ConnectionInfo),
-		ConnLock:      sync.Mutex{},
-		Colors: []string{
-			"\033[31m", // Red
-			"\033[32m", // Green
-			"\033[33m", // Yellow
-			"\033[34m", // Blue
-			"\033[35m", // Purple
-		},
 	}
 }
 
@@ -158,6 +160,22 @@ func (s *TCPServer) broadcastMessage(msgPayload RequestType.Message, sender net.
 	senderInfo := s.ConnectionMap[sender]
 
 	msg := fmt.Sprintf("%s%s\033[0m\n", senderInfo.Color, fmtedMsg)
+
+	for conn := range s.ConnectionMap {
+		if conn != sender {
+			_, err := conn.Write([]byte(msg))
+			if err != nil {
+				log.Println("Error broadcasting message:", err)
+			}
+		}
+	}
+}
+
+func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn) {
+	s.ConnLock.Lock()
+	defer s.ConnLock.Unlock()
+
+	msg := fmt.Sprintf("System: %s has joined the chat.\033[0m\n", senderName)
 
 	for conn := range s.ConnectionMap {
 		if conn != sender {
