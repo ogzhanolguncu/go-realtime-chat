@@ -13,30 +13,21 @@ import (
 
 const port = 7007
 
-// connectionInfo holds connection-related information and color per client.
+// ConnectionInfo holds connection-related information.
 type ConnectionInfo struct {
 	Connection net.Conn
 	OwnerName  string
-	Color      string
 }
 
 type TCPServer struct {
 	ConnectionMap map[net.Conn]*ConnectionInfo
 	ConnLock      sync.Mutex
-	Colors        []string
 }
 
 func newTCPServer() *TCPServer {
 	return &TCPServer{
 		ConnectionMap: make(map[net.Conn]*ConnectionInfo),
 		ConnLock:      sync.Mutex{},
-		Colors: []string{
-			"\033[31m", // Red
-			"\033[32m", // Green
-			"\033[33m", // Yellow
-			"\033[34m", // Blue
-			"\033[35m", // Purple
-		},
 	}
 }
 
@@ -74,20 +65,17 @@ func main() {
 				conn.Write([]byte(fmt.Sprintf("USERNAME_SET_SUCCESSFULLY#%s\n", data)))
 				break
 			}
-
 		}
 
 		server.ConnLock.Lock()
-		color := server.getColorForConnection()
-		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, Color: color, OwnerName: name}
+		server.ConnectionMap[conn] = &ConnectionInfo{Connection: conn, OwnerName: name}
 		server.ConnLock.Unlock()
 
 		connectedUsers := len(server.ConnectionMap)
 		log.Printf("Connection from %s\n", conn.RemoteAddr().String())
 		log.Printf("Connected users: %d\n", connectedUsers)
 
-		// Make this function more generic and support both join and leave message for now.
-		go server.sendSystemNotice(name, conn)
+		go server.sendSystemNotice(name, conn, "joined")
 		go server.handleConnection(conn)
 	}
 }
@@ -95,8 +83,10 @@ func main() {
 func (s *TCPServer) handleConnection(c net.Conn) {
 	defer func() {
 		s.ConnLock.Lock()
+		ownerName := s.ConnectionMap[c].OwnerName
 		delete(s.ConnectionMap, c)
-		s.ConnLock.Unlock()
+		defer s.ConnLock.Unlock()
+		s.sendSystemNotice(ownerName, nil, "left")
 		c.Close()
 	}()
 
@@ -110,13 +100,12 @@ CONNECTION_LOOP:
 			break
 		}
 
-		rawMessage := strings.TrimSpace(string(data))
+		rawMessage := strings.TrimSpace(data)
 		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 
 		msgPayload, err := RequestType.ParseMessage(rawMessage)
-
 		if err != nil {
-			// Write back to client that his message is malformed
+			// Write back to client that their message is malformed
 			c.Write([]byte(err.Error()))
 		}
 
@@ -157,13 +146,10 @@ func (s *TCPServer) broadcastMessage(msgPayload RequestType.Message, sender net.
 	defer s.ConnLock.Unlock()
 
 	fmtedMsg := fmt.Sprintf("%s: %s\n", msgPayload.MessageSender, msgPayload.MessageContent)
-	senderInfo := s.ConnectionMap[sender]
-
-	msg := fmt.Sprintf("%s%s\033[0m\n", senderInfo.Color, fmtedMsg)
 
 	for conn := range s.ConnectionMap {
 		if conn != sender {
-			_, err := conn.Write([]byte(msg))
+			_, err := conn.Write([]byte(fmtedMsg))
 			if err != nil {
 				log.Println("Error broadcasting message:", err)
 			}
@@ -171,32 +157,20 @@ func (s *TCPServer) broadcastMessage(msgPayload RequestType.Message, sender net.
 	}
 }
 
-func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn) {
-	s.ConnLock.Lock()
-	defer s.ConnLock.Unlock()
-
-	msg := fmt.Sprintf("System: %s has joined the chat.\033[0m\n", senderName)
+func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
+	msg := fmt.Sprintf("System: %s has %s the chat.\n", senderName, action)
 
 	for conn := range s.ConnectionMap {
 		if conn != sender {
 			_, err := conn.Write([]byte(msg))
 			if err != nil {
-				log.Println("Error broadcasting message:", err)
+				log.Println("Error sending system notice:", err)
 			}
 		}
 	}
-}
-
-func (s *TCPServer) getColorForConnection() string {
-	connCount := len(s.ConnectionMap)
-	colorIndex := connCount % len(s.Colors)
-	return s.Colors[colorIndex]
 }
 
 func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool) {
-	s.ConnLock.Lock()
-	defer s.ConnLock.Unlock()
-
 	for conn, info := range s.ConnectionMap {
 		if info.OwnerName == ownerName {
 			return conn, true

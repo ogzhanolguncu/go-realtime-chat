@@ -38,3 +38,5 @@ This project implements a simple real-time chat server and client using Go. The 
 - [] Send active user list: When a client establishes a connection, send them the list of active users.
 - [] Check whisper logic: Ensure the logic for handling whispers is robust and correct.
 - [x] Consider adding timestamps to messages for better context.
+- [] When two users join at the same time server locks, which shouldn't
+- [] Send messages from server with prefix so client can decide how to show them like SYSTEM_MESSAGE, CHAT_MESSAGE(whisper and group)

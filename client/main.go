@@ -132,11 +132,15 @@ func sendGroupMessage(conn net.Conn, text string) {
 
 func printIncomingMessage(message string) {
 	timestamp := time.Now().Format("[15:04]")
-	if strings.HasPrefix(message, "Whisper from") {
-		fmt.Printf("\r\033[35m%s %s\033[0m", timestamp, message)
+
+	if strings.HasPrefix(message, "System:") {
+		fmt.Printf("\r\033[36m%s %s\033[0m\n", timestamp, message) // Cyan for system messages
+	} else if strings.HasPrefix(message, "Whisper from") {
+		fmt.Printf("\r\033[35m%s %s\033[0m\n", timestamp, message) // Purple for whisper messages
 	} else {
-		fmt.Printf("\r\033[34m%s %s\033[0m", timestamp, message)
+		fmt.Printf("\r\033[34m%s %s\033[0m\n", timestamp, message) // Blue for group messages
 	}
+
 	askForInput()
 }
 
