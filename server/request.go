@@ -1,4 +1,4 @@
-package RequestType
+package main
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ type Message struct {
 // It sanitizes the name and message fields, determines the message type (GROUP_MESSAGE, WHISPER, etc.),
 // and returns a Message struct containing these sanitized values.
 // If the message format is invalid or the message type is unknown, an error is returned.
-func ParseMessage(msg string) (Message, error) {
+func parseMessage(msg string) (Message, error) {
 	parsedMessage := strings.Split(msg, messageSeparator)
 	log.Printf("Parsed message: %v", parsedMessage)
 

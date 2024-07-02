@@ -84,24 +84,44 @@ func handleNameSet(conn net.Conn, reader *bufio.Reader) {
 		log.Fatal("Expected USERNAME_REQUIRED message from server")
 	}
 
-	fmt.Print("Enter your username: ")
-	nameInput, err := reader.ReadString('\n')
-	if err != nil {
-		log.Fatal("Error reading username input:", err)
-	}
-	nameInput = strings.TrimSpace(nameInput)
-	conn.Write([]byte(nameInput + "\n"))
+	retries := 0
+	for retries < 3 {
+		fmt.Print("Enter your username: ")
+		nameInput, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal("Error reading username input:", err)
+		}
+		nameInput = strings.TrimSpace(nameInput)
+		conn.Write([]byte(nameInput + "\n"))
 
-	message, err = serverReader.ReadString('\n')
-	if err != nil {
-		log.Fatal("Error reading from server:", err)
+		message, err = serverReader.ReadString('\n')
+		if err != nil {
+			log.Fatal("Error reading from server:", err)
+		}
+
+		if strings.Contains(message, "SYSTEM_FAILURE_MESSAGE") {
+			timestamp := time.Now().Format("[15:04]")
+			errorMessage := strings.Split(strings.TrimSpace(message), "#")[1]
+			fmt.Printf("\r\033[36m%s %s\033[0m\n", timestamp, errorMessage)
+			retries++
+			continue
+		}
+
+		if strings.HasPrefix(strings.TrimSpace(message), "USERNAME_SET_SUCCESSFULLY#") {
+			message := strings.Split(strings.TrimSpace(message), "#")[1]
+
+			timestamp := time.Now().Format("[15:04]")
+			fmt.Printf("\r\033[36m%s System: Username successfully set to: %s\033[0m\n", timestamp, message)
+			name = strings.TrimSpace(message)
+			return
+		}
+
+		fmt.Println("Unexpected response from server. Please try again.")
+		retries++
 	}
-	if strings.HasPrefix(strings.TrimSpace(message), "USERNAME_SET_SUCCESSFULLY#") {
-		name = strings.Split(strings.TrimSpace(message), "#")[1]
-		fmt.Printf("\033[32mUsername successfully set to: %s\033[0m\n\n", name)
-	} else {
-		log.Fatal("Expected USERNAME_SET_SUCCESSFULLY message from server")
-	}
+
+	fmt.Println("Max retries reached. Exiting.")
+	conn.Close() // Close the connection
 }
 
 func handleWhisperCommand(conn net.Conn, text string) {
@@ -134,11 +154,11 @@ func printIncomingMessage(message string) {
 	timestamp := time.Now().Format("[15:04]")
 
 	if strings.HasPrefix(message, "System:") {
-		fmt.Printf("\r\033[36m%s %s\033[0m\n", timestamp, message) // Cyan for system messages
+		fmt.Printf("\r\033[36m%s %s\033[0m", timestamp, message) // Cyan for system messages
 	} else if strings.HasPrefix(message, "Whisper from") {
-		fmt.Printf("\r\033[35m%s %s\033[0m\n", timestamp, message) // Purple for whisper messages
+		fmt.Printf("\r\033[35m%s %s\033[0m", timestamp, message) // Purple for whisper messages
 	} else {
-		fmt.Printf("\r\033[34m%s %s\033[0m\n", timestamp, message) // Blue for group messages
+		fmt.Printf("\r\033[34m%s %s\033[0m", timestamp, message) // Blue for group messages
 	}
 
 	askForInput()
