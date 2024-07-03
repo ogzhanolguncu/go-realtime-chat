@@ -39,5 +39,7 @@ This project implements a simple real-time chat server and client using Go. The 
 - [] Check whisper logic: Ensure the logic for handling whispers is robust and correct.
 - [x] Consider adding timestamps to messages for better context.
 - [] When two users join at the same time server locks, which shouldn't
-- [] Send messages from server with prefix so client can decide how to show them like SYSTEM_MESSAGE, CHAT_MESSAGE(whisper and group)
+- [x] Send messages from server with prefix so client can decide how to show them like SYSTEM_MESSAGE, CHAT_MESSAGE(whisper and group)
+  - [x] Add Protocol
+  - [] Implement protocol
 - [x] Validate username. If username is less than 2 char or empty. Retry 3 times.
