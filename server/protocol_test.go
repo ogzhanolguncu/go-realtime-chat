@@ -55,13 +55,14 @@ func TestEncodeSystemMessage(t *testing.T) {
 	t.Run("should encode whisper message successfully", func(t *testing.T) {
 		tests := []struct {
 			content  string
+			status   string
 			expected string
 		}{
-			{"John has left the chat!", "SYS|23|John has left the chat!\r\n"},
+			{"John has left the chat!", "left", "SYS|23|John has left the chat!|left\r\n"},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, encodeSystemMessage(test.content))
+			assert.Equal(t, test.expected, encodeSystemMessage(test.content, test.status))
 		}
 	})
 

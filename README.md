@@ -42,4 +42,7 @@ This project implements a simple real-time chat server and client using Go. The 
 - [x] Send messages from server with prefix so client can decide how to show them like SYSTEM_MESSAGE, CHAT_MESSAGE(whisper and group)
   - [x] Add Protocol
   - [] Implement protocol
+    - [x] Client read
+    - [x] Server sent
+    - [] Client sent
 - [x] Validate username. If username is less than 2 char or empty. Retry 3 times.

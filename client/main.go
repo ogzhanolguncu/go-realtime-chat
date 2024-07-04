@@ -8,7 +8,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
+
+	"github.com/ogzhanolguncu/go-chat/client/color"
 )
 
 const port = 7007
@@ -46,7 +47,7 @@ func readMessagesFromServer(conn net.Conn) {
 				log.Println("Error reading message:", err)
 				return
 			}
-			printIncomingMessage(message)
+			handleIncomingMessage(message, askForInput)
 		}
 	}()
 }
@@ -98,21 +99,17 @@ func handleNameSet(conn net.Conn, reader *bufio.Reader) {
 		if err != nil {
 			log.Fatal("Error reading from server:", err)
 		}
+		decodedMessage, _ := decodeMessage(message)
 
-		if strings.Contains(message, "SYSTEM_FAILURE_MESSAGE") {
-			timestamp := time.Now().Format("[15:04]")
-			errorMessage := strings.Split(strings.TrimSpace(message), "#")[1]
-			fmt.Printf("\r\033[36m%s %s\033[0m\n", timestamp, errorMessage)
+		if strings.Contains(decodedMessage.sysStatus, "fail") {
+			colorifyAndFormatContent(decodedMessage)
 			retries++
 			continue
 		}
 
-		if strings.HasPrefix(strings.TrimSpace(message), "USERNAME_SET_SUCCESSFULLY#") {
-			message := strings.Split(strings.TrimSpace(message), "#")[1]
-
-			timestamp := time.Now().Format("[15:04]")
-			fmt.Printf("\r\033[36m%s System: Username successfully set to: %s\033[0m\n", timestamp, message)
-			name = strings.TrimSpace(message)
+		if strings.Contains(decodedMessage.sysStatus, "success") {
+			colorifyAndFormatContent(decodedMessage)
+			name = strings.Split(strings.TrimSpace(decodedMessage.content), ":")[1]
 			return
 		}
 
@@ -150,20 +147,7 @@ func sendGroupMessage(conn net.Conn, text string) {
 	}
 }
 
-func printIncomingMessage(message string) {
-	timestamp := time.Now().Format("[15:04]")
-
-	if strings.HasPrefix(message, "System:") {
-		fmt.Printf("\r\033[36m%s %s\033[0m", timestamp, message) // Cyan for system messages
-	} else if strings.HasPrefix(message, "Whisper from") {
-		fmt.Printf("\r\033[35m%s %s\033[0m", timestamp, message) // Purple for whisper messages
-	} else {
-		fmt.Printf("\r\033[34m%s %s\033[0m", timestamp, message) // Blue for group messages
-	}
-
-	askForInput()
-}
-
 func askForInput() {
-	fmt.Printf("\033[33m[%.2d:%.2d] You:\033[0m ", time.Now().Hour(), time.Now().Minute())
+	coloredPrompt := color.ColorifyWithTimestamp("You:", color.Yellow)
+	fmt.Printf("%s ", coloredPrompt)
 }

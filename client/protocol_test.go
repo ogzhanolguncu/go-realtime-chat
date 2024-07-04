@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"testing"
-	"time"
 
+	"github.com/ogzhanolguncu/go-chat/client/color"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,40 +25,31 @@ func TestEncodeGeneralMessage(t *testing.T) {
 }
 
 func TestColorifyAndFormatContent(t *testing.T) {
-	timestamp := time.Now().Format("[15:04]")
-
 	t.Run("should format system message with timestamp", func(t *testing.T) {
 		payload := Payload{content: "System message", contentType: MessageTypeSYS}
-		expectedOutput := fmt.Sprintf("\r\x1b[36m%s System: System message\n\x1b[0m", timestamp)
-
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
 
-		assert.Equal(t, stdout, expectedOutput)
+		assert.Equal(t, stdout, color.ColorifyWithTimestamp("System: System message\n", color.Cyan))
 	})
 
 	t.Run("should format whisper message with timestamp", func(t *testing.T) {
 		payload := Payload{content: "Hello!", contentType: MessageTypeWSP, sender: "Alice"}
-
-		expectedOutput := fmt.Sprintf("\r\x1b[35m%s Whisper from Alice: Hello!\n", timestamp)
-
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
 
-		assert.Contains(t, stdout, expectedOutput)
+		assert.Contains(t, stdout, color.ColorifyWithTimestamp("Whisper from Alice: Hello!\n", color.Purple))
 	})
 
 	t.Run("should format group message with timestamp", func(t *testing.T) {
 		payload := Payload{content: "Hey everyone!", contentType: MessageTypeMSG, sender: "Bob"}
-		expectedOutput := fmt.Sprintf("\r\x1b[34m%s Bob: Hey everyone!\n", timestamp)
-
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
 
-		assert.Contains(t, stdout, expectedOutput)
+		assert.Contains(t, stdout, color.ColorifyWithTimestamp("Bob: Hey everyone!\n", color.Blue))
 	})
 }
 
