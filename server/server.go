@@ -16,24 +16,72 @@ type ConnectionInfo struct {
 }
 
 type TCPServer struct {
-	ConnectionMap map[net.Conn]*ConnectionInfo
-	ConnLock      sync.Mutex
+	connectionMap sync.Map
 }
 
 func newServer() *TCPServer {
-	return &TCPServer{
-		ConnectionMap: make(map[net.Conn]*ConnectionInfo),
-		ConnLock:      sync.Mutex{},
+	return &TCPServer{}
+}
+
+func (s *TCPServer) addConnection(c net.Conn, info *ConnectionInfo) {
+	s.connectionMap.Store(c, info)
+}
+
+func (s *TCPServer) getConnectedUsersCount() int {
+	count := 0
+	s.connectionMap.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+func (s *TCPServer) getConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, bool) {
+	value, ok := s.connectionMap.LoadAndDelete(c)
+	if !ok {
+		return nil, false
 	}
+	info, ok := value.(*ConnectionInfo)
+	return info, ok
+}
+
+func (s *TCPServer) handleNewConnection(c net.Conn) {
+	name := handleUsernameSet(c)
+	log.Printf("Recently joined user's name: %s\n", name)
+	s.addConnection(c, &ConnectionInfo{Connection: c, OwnerName: name})
+
+	connectedUsers := s.getConnectedUsersCount()
+	log.Printf("Connection from %s\n", c.RemoteAddr().String())
+	log.Printf("Connected users: %d\n", connectedUsers)
+
+	s.sendSystemNotice(name, c, "joined")
+	s.handleConnection(c)
+}
+
+func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool) {
+	var foundConn net.Conn
+	var found bool
+
+	s.connectionMap.Range(func(key, value interface{}) bool {
+		conn := key.(net.Conn)
+		info := value.(*ConnectionInfo)
+
+		if info.OwnerName == ownerName {
+			foundConn = conn
+			found = true
+			return false
+		}
+		return true
+	})
+	return foundConn, found
 }
 
 func (s *TCPServer) handleConnection(c net.Conn) {
 	defer func() {
-		s.ConnLock.Lock()
-		ownerName := s.ConnectionMap[c].OwnerName
-		delete(s.ConnectionMap, c)
-		defer s.ConnLock.Unlock()
-		s.sendSystemNotice(ownerName, nil, "left")
+		info, _ := s.getConnectionInfoAndDelete(c)
+		if info != nil {
+			s.sendSystemNotice(info.OwnerName, nil, "left")
+		}
 		c.Close()
 	}()
 
@@ -81,7 +129,6 @@ func (s *TCPServer) sendWhisper(msgPayload Message, sender net.Conn) {
 		// Encode and send a system message indicating the recipient was not found or the connection was lost
 		_, err := sender.Write([]byte(encodeSystemMessage("Recipient not found or connection lost", "fail")))
 		if err != nil {
-			// Log any error that occurs while sending the system message
 			log.Println("Error sending recipient not found message:", err)
 		}
 		return
@@ -96,44 +143,27 @@ func (s *TCPServer) sendWhisper(msgPayload Message, sender net.Conn) {
 
 // broadcastMessage sends a message to all connections except the sender
 func (s *TCPServer) broadcastMessage(msgPayload Message, sender net.Conn) {
-	// Iterate over all connections in the connection map
-	for conn := range s.ConnectionMap {
-		// Skip the sender's connection
-		if conn != sender {
-			// Send the message to the current connection
-			_, err := conn.Write([]byte(encodeGeneralMessage(msgPayload.MessageContent, msgPayload.MessageSender)))
-			if err != nil {
-				log.Println("Error broadcasting message:", err)
-			}
-		}
-	}
+	msg := []byte(encodeGeneralMessage(msgPayload.MessageContent, msgPayload.MessageSender))
+	s.broadcastToAll(msg, "Error broadcasting message", sender)
 }
 
 // sendSystemNotice sends a system notice to all connections except the sender.
 // The notice informs about an action performed by the sender (e.g., joining or leaving the chat).
 func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
-	// Iterate over all connections in the connection map
-	for conn := range s.ConnectionMap {
-		// Skip the sender's connection
-		if conn != sender {
-			_, err := conn.Write([]byte(encodeSystemMessage(fmt.Sprintf("%s has %s the chat.", senderName, action), "success")))
-			if err != nil {
-				log.Println("Error sending system notice:", err)
-			}
-		}
-	}
+	msg := []byte(encodeSystemMessage(fmt.Sprintf("%s has %s the chat.", senderName, action), "success"))
+	s.broadcastToAll(msg, "Error sending system notice", sender)
 }
 
-// findConnectionByOwnerName searches for a connection by the owner's name in the connection map.
-// It returns the connection and true if found, otherwise returns nil and false.
-func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool) {
-	// Iterate over all connections in the connection map
-	for conn, info := range s.ConnectionMap {
-		// Check if the current connection's owner name matches the specified owner name
-		if info.OwnerName == ownerName {
-			// Return the matching connection and true
-			return conn, true
+// broadcastMessage sends a message to all connections except the sender
+func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn net.Conn) {
+	s.connectionMap.Range(func(key, value interface{}) bool {
+		conn := key.(net.Conn)
+		if conn != excludeConn {
+			_, err := conn.Write(b)
+			if err != nil {
+				log.Printf("%s %s\n", errLog, err)
+			}
 		}
-	}
-	return nil, false
+		return true
+	})
 }
