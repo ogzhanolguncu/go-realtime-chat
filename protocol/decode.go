@@ -1,4 +1,4 @@
-package main
+package protocol
 
 import (
 	"fmt"
@@ -6,30 +6,10 @@ import (
 	"strings"
 )
 
-// Group/General Message (MSG): MSG|sender|message_length|message_content\r\n
-// Whisper/DM Message (WSP): 	WSP|recipient|message_length|message_content\r\n
-// System Notice (SYS): 		SYS|message_length|message_content|status \r\n status = "fail" | "success"
-// Error Message (ERR): 		ERR|message_length|error_message\r\n
-const separator = "|"
-
-const (
-	MessageTypeMSG = "MSG"
-	MessageTypeWSP = "WSP"
-	MessageTypeSYS = "SYS"
-	MessageTypeERR = "ERR"
-)
-
-type Payload struct {
-	content     string
-	contentType string
-	sender      string
-	sysStatus   string
-}
-
-func decodeMessage(message string) (Payload, error) {
+func DecodeMessage(message string) (Payload, error) {
 	sanitizedMessage := strings.TrimSpace(message) // Messages from server comes with \r\n, so we have to trim it
 
-	parts := strings.Split(sanitizedMessage, separator)
+	parts := strings.Split(sanitizedMessage, Separator)
 	messageType := parts[0]
 
 	switch messageType {
@@ -50,7 +30,7 @@ func decodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in MSG message")
 		}
 
-		return Payload{content: messageContent, sender: sender, contentType: messageType}, nil
+		return Payload{Content: messageContent, Sender: sender, ContentType: messageType}, nil
 
 	case MessageTypeWSP:
 		if len(parts) < 4 {
@@ -70,7 +50,7 @@ func decodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in WSP message")
 		}
 
-		return Payload{content: messageContent, sender: recipient, contentType: messageType}, nil
+		return Payload{Content: messageContent, Sender: recipient, ContentType: messageType}, nil
 
 	case MessageTypeSYS:
 		if len(parts) < 3 {
@@ -89,7 +69,7 @@ func decodeMessage(message string) (Payload, error) {
 		if len(messageContent) != expectedLength {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in SYS message")
 		}
-		return Payload{content: messageContent, contentType: messageType, sysStatus: status}, nil
+		return Payload{Content: messageContent, ContentType: messageType, SysStatus: status}, nil
 
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)

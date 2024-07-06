@@ -1,4 +1,4 @@
-package main
+package protocol
 
 import (
 	"testing"
@@ -20,12 +20,12 @@ func TestEncodeGeneralMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, encodeGeneralMessage(test.content, test.sender))
+			assert.Equal(t, test.expected, EncodeMessage(MessageTypeMSG, test.content, test.sender, ""))
 		}
 	})
 
 	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "MSG|John|5|HeyHey\r\n", encodeGeneralMessage("HeyHey", "John"))
+		assert.NotEqual(t, "MSG|John|5|HeyHey\r\n", EncodeMessage(MessageTypeMSG, "HeyHey", "John", ""))
 	})
 }
 
@@ -42,12 +42,12 @@ func TestEncodeWhisperMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, encodeWhisperMessage(test.content, test.recipient))
+			assert.Equal(t, test.expected, EncodeMessage(MessageTypeWSP, test.content, test.recipient, ""))
 		}
 	})
 
 	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "WSP|5|HeyHey\r\n", encodeWhisperMessage("HeyHey", "John"))
+		assert.NotEqual(t, "WSP|5|HeyHey\r\n", EncodeMessage(MessageTypeWSP, "HeyHey", "John", ""))
 	})
 }
 
@@ -62,7 +62,7 @@ func TestEncodeSystemMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, encodeSystemMessage(test.content, test.status))
+			assert.Equal(t, test.expected, EncodeMessage(MessageTypeSYS, test.content, "", test.status))
 		}
 	})
 
@@ -78,7 +78,7 @@ func TestEncodeErrMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, encodeErrorMessage(test.content))
+			assert.Equal(t, test.expected, EncodeMessage(MessageTypeERR, test.content, "", ""))
 		}
 	})
 

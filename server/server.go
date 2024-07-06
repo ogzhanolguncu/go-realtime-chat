@@ -7,6 +7,8 @@ import (
 	"net"
 	"strings"
 	"sync"
+
+	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 // ConnectionInfo holds connection-related information.
@@ -127,7 +129,7 @@ func (s *TCPServer) sendWhisper(msgPayload Message, sender net.Conn) {
 	// If the recipient is not found or their connection is lost, send a system failure message to the sender
 	if !found || recipientConn == nil {
 		// Encode and send a system message indicating the recipient was not found or the connection was lost
-		_, err := sender.Write([]byte(encodeSystemMessage("Recipient not found or connection lost", "fail")))
+		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeSYS, "Recipient not found or connection lost", "", "fail")))
 		if err != nil {
 			log.Println("Error sending recipient not found message:", err)
 		}
@@ -135,7 +137,7 @@ func (s *TCPServer) sendWhisper(msgPayload Message, sender net.Conn) {
 	}
 
 	// If the recipient's connection is found, send the whisper message to the recipient
-	_, err := recipientConn.Write([]byte(encodeWhisperMessage(msgPayload.MessageContent, msgPayload.MessageSender)))
+	_, err := recipientConn.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeWSP, msgPayload.MessageContent, msgPayload.MessageSender, "")))
 	if err != nil {
 		log.Println("Error sending whisper:", err)
 	}
@@ -143,14 +145,14 @@ func (s *TCPServer) sendWhisper(msgPayload Message, sender net.Conn) {
 
 // broadcastMessage sends a message to all connections except the sender
 func (s *TCPServer) broadcastMessage(msgPayload Message, sender net.Conn) {
-	msg := []byte(encodeGeneralMessage(msgPayload.MessageContent, msgPayload.MessageSender))
+	msg := []byte(protocol.EncodeMessage(protocol.MessageTypeMSG, msgPayload.MessageContent, msgPayload.MessageSender, ""))
 	s.broadcastToAll(msg, "Error broadcasting message", sender)
 }
 
 // sendSystemNotice sends a system notice to all connections except the sender.
 // The notice informs about an action performed by the sender (e.g., joining or leaving the chat).
 func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
-	msg := []byte(encodeSystemMessage(fmt.Sprintf("%s has %s the chat.", senderName, action), "success"))
+	msg := []byte(protocol.EncodeMessage(protocol.MessageTypeSYS, fmt.Sprintf("%s has %s the chat.", senderName, action), "", "success"))
 	s.broadcastToAll(msg, "Error sending system notice", sender)
 }
 

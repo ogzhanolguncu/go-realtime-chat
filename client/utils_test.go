@@ -6,27 +6,15 @@ import (
 	"testing"
 
 	"github.com/ogzhanolguncu/go-chat/client/color"
+	protocol "github.com/ogzhanolguncu/go-chat/protocol"
+
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEncodeGeneralMessage(t *testing.T) {
-	t.Run("should decode server message into payload successfully", func(t *testing.T) {
-		payload, _ := decodeMessage("MSG|Frey|6|HeyHey\r\n")
-		assert.Equal(t, Payload{content: "HeyHey", contentType: "MSG", sender: "Frey"}, payload)
-	})
-	t.Run("should check against content length", func(t *testing.T) {
-		_, err := decodeMessage("MSG|Frey|5|HeyHey\r\n")
-		assert.EqualError(t, err, "message content length does not match expected length in MSG message")
-	})
-	t.Run("should check for at least 4 parts of message MSG", func(t *testing.T) {
-		_, err := decodeMessage("MSG|Frey|5\r\n")
-		assert.EqualError(t, err, "insufficient parts in MSG message")
-	})
-}
-
 func TestColorifyAndFormatContent(t *testing.T) {
+
 	t.Run("should format system message with timestamp", func(t *testing.T) {
-		payload := Payload{content: "System message", contentType: MessageTypeSYS}
+		payload := protocol.Payload{Content: "System message", ContentType: protocol.MessageTypeSYS}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
@@ -35,7 +23,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	})
 
 	t.Run("should format whisper message with timestamp", func(t *testing.T) {
-		payload := Payload{content: "Hello!", contentType: MessageTypeWSP, sender: "Alice"}
+		payload := protocol.Payload{Content: "Hello!", ContentType: protocol.MessageTypeWSP, Sender: "Alice"}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
@@ -44,7 +32,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	})
 
 	t.Run("should format group message with timestamp", func(t *testing.T) {
-		payload := Payload{content: "Hey everyone!", contentType: MessageTypeMSG, sender: "Bob"}
+		payload := protocol.Payload{Content: "Hey everyone!", ContentType: protocol.MessageTypeMSG, Sender: "Bob"}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})

@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 type Config struct {
@@ -75,19 +77,19 @@ func (c *Client) setUsername() error {
 			return fmt.Errorf("error reading server response: %w", err)
 		}
 
-		decodedMessage, err := decodeMessage(message)
+		decodedMessage, err := protocol.DecodeMessage(message)
 		if err != nil {
 			return fmt.Errorf("error decoding server message: %w", err)
 		}
 
-		if strings.Contains(decodedMessage.sysStatus, "fail") {
+		if strings.Contains(decodedMessage.SysStatus, "fail") {
 			colorifyAndFormatContent(decodedMessage)
 			continue
 		}
 
-		if strings.Contains(decodedMessage.sysStatus, "success") {
+		if strings.Contains(decodedMessage.SysStatus, "success") {
 			colorifyAndFormatContent(decodedMessage)
-			c.name = strings.Split(strings.TrimSpace(decodedMessage.content), "=>")[1]
+			c.name = strings.Split(strings.TrimSpace(decodedMessage.Content), "=>")[1]
 			return nil
 		}
 

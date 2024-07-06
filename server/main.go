@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"strings"
+
+	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 const port = 7007
@@ -44,9 +46,9 @@ func handleUsernameSet(conn net.Conn) string {
 
 		name = strings.TrimSuffix(data, "\n")
 		if len(name) < 2 {
-			conn.Write([]byte(encodeSystemMessage("Username cannot be empty or less than two characters", "fail")))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeSYS, "Username cannot be empty or less than two characters", "", "fail")))
 		} else {
-			conn.Write([]byte(encodeSystemMessage(fmt.Sprintf("Username successfully set to => %s", name), "success")))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeSYS, fmt.Sprintf("Username successfully set to => %s", name), "", "success")))
 			break
 		}
 	}

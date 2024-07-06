@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/ogzhanolguncu/go-chat/client/color"
+	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 func (c *Client) readMessages(conn net.Conn) {
@@ -16,7 +17,7 @@ func (c *Client) readMessages(conn net.Conn) {
 			log.Println("Error reading message:", err)
 			return
 		}
-		payload, err := decodeMessage(message)
+		payload, err := protocol.DecodeMessage(message)
 		if err != nil {
 			fmt.Print(color.ColorifyWithTimestamp(err.Error(), color.Red))
 		}
