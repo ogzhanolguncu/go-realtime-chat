@@ -49,6 +49,14 @@ func (s *TCPServer) getConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, boo
 
 func (s *TCPServer) handleNewConnection(c net.Conn) {
 	name := handleUsernameSet(c)
+
+	// If the username is an empty string after exhausting retries,
+	// close the connection to prevent clients with no username from connecting.
+	if len(name) == 0 {
+		c.Close()
+		return
+	}
+
 	log.Printf("Recently joined user's name: %s\n", name)
 	s.addConnection(c, &ConnectionInfo{Connection: c, OwnerName: name})
 

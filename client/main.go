@@ -21,8 +21,7 @@ func main() {
 
 	client.printHeader()
 
-	err = client.setUsername()
-	if err != nil {
+	if err := client.setUsername(); err != nil {
 		log.Fatalf("Failed to set username: %v", err)
 	}
 
