@@ -12,10 +12,13 @@
     ☐ Check whisper logic: Ensure the logic for handling whispers is robust and correct.
     ✔ Consider adding timestamps to messages for better context. @done(24-07-06 14:40)
     ☐ When two users join at the same time server locks, which shouldn't
-    [x] Send messages from server with prefix so client can decide how to show them like SYSTEM_MESSAGE, CHAT_MESSAGE(whisper and group)
-    [x] Add Protocol
+    ✔ Send messages from server with prefix so client can decide how to show them like SYSTEM_MESSAGE, CHAT_MESSAGE(whisper and group) @done(24-07-06 16:40)
+    ✔ Add Protocol @done(24-07-06 16:40)
     Implement protocol:
         ✔ Client read @done(24-07-06 14:41)
         ✔ Server sent @done(24-07-06 14:41)
         [] Client sent
-    ☐ Validate username. If username is less than 2 char or empty. Retry 3 times.
+    ✔ Validate username. If username is less than 2 char or empty. Retry 3 times. @done(24-07-06 17:12)
+    ☐ When someone joins client should print allowed commands alongside welcome text
+    ☐ Client errors should have Client: prefix maybe with a different color
+    ☐ Make usernames unique and return error if new comer tries to enter already selected name
