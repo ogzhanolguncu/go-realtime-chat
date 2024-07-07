@@ -82,12 +82,12 @@ func (c *Client) setUsername() error {
 			return fmt.Errorf("error decoding server message: %w", err)
 		}
 
-		if strings.Contains(decodedMessage.SysStatus, "fail") {
+		if strings.Contains(decodedMessage.Status, "fail") {
 			colorifyAndFormatContent(decodedMessage)
 			continue
 		}
 
-		if strings.Contains(decodedMessage.SysStatus, "success") {
+		if strings.Contains(decodedMessage.Status, "success") {
 			colorifyAndFormatContent(decodedMessage)
 			log.Print(len(decodedMessage.Content))
 			c.name = strings.TrimSpace(strings.Split(decodedMessage.Content, "=>")[1])

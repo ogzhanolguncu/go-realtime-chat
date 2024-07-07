@@ -25,7 +25,7 @@ func TestDecodeGeneralMessage(t *testing.T) {
 func TestDecodeWhisperMessage(t *testing.T) {
 	t.Run("should decode server message into payload successfully", func(t *testing.T) {
 		payload, _ := DecodeMessage("WSP|Oz|John|6|HeyHey\r\n")
-		assert.Equal(t, Payload{ContentType: MessageTypeWSP, Content: "HeyHey", Sender: "Oz", Recipient: "John", SysStatus: ""}, payload)
+		assert.Equal(t, Payload{ContentType: MessageTypeWSP, Content: "HeyHey", Sender: "Oz", Recipient: "John", Status: ""}, payload)
 	})
 
 }

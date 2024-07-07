@@ -4,6 +4,7 @@ package protocol
 // Whisper/DM Message (WSP): 	WSP|sender|recipient|message_length|message_content\r\n
 // System Notice (SYS): 		SYS|message_length|message_content|status \r\n status = "fail" | "success"
 // Error Message (ERR): 		ERR|message_length|error_message\r\n
+// Username Message: 			USR|name_length|name_content|status\r\n status = "fail | "success"
 const Separator = "|"
 
 const (
@@ -11,6 +12,7 @@ const (
 	MessageTypeWSP = "WSP"
 	MessageTypeSYS = "SYS"
 	MessageTypeERR = "ERR"
+	MessageTypeUSR = "USR"
 )
 
 type Payload struct {
@@ -18,5 +20,6 @@ type Payload struct {
 	ContentType string
 	Sender      string
 	Recipient   string
-	SysStatus   string
+	Status      string
+	Username    string
 }

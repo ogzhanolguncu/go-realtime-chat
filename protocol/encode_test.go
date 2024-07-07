@@ -20,12 +20,12 @@ func TestEncodeGeneralMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeMSG, Content: test.content, Sender: test.sender, SysStatus: ""}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeMSG, Content: test.content, Sender: test.sender, Status: ""}))
 		}
 	})
 
 	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "MSG|John|5|HeyHey\r\n", EncodeMessage(Payload{ContentType: MessageTypeMSG, Content: "HeyHey", Sender: "John", SysStatus: ""}))
+		assert.NotEqual(t, "MSG|John|5|HeyHey\r\n", EncodeMessage(Payload{ContentType: MessageTypeMSG, Content: "HeyHey", Sender: "John", Status: ""}))
 	})
 }
 
@@ -43,12 +43,12 @@ func TestEncodeWhisperMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeWSP, Content: test.content, Sender: test.sender, Recipient: test.recipient, SysStatus: ""}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeWSP, Content: test.content, Sender: test.sender, Recipient: test.recipient, Status: ""}))
 		}
 	})
 
 	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "WSP|5|HeyHey\r\n", EncodeMessage(Payload{ContentType: MessageTypeWSP, Content: "HeyHey", Sender: "John", Recipient: "Oz", SysStatus: ""}))
+		assert.NotEqual(t, "WSP|5|HeyHey\r\n", EncodeMessage(Payload{ContentType: MessageTypeWSP, Content: "HeyHey", Sender: "John", Recipient: "Oz", Status: ""}))
 	})
 }
 
@@ -63,7 +63,7 @@ func TestEncodeSystemMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeSYS, Content: test.content, SysStatus: test.status}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeSYS, Content: test.content, Status: test.status}))
 		}
 	})
 

@@ -11,7 +11,7 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 	switch payload.ContentType {
 	case protocol.MessageTypeSYS:
 		fmtedMsg := fmt.Sprintf("System: %s\n", payload.Content)
-		if payload.SysStatus == "fail" {
+		if payload.Status == "fail" {
 			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Red)) // Red fail messages
 		} else {
 			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Cyan)) // Cyan for system messages

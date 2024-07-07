@@ -70,7 +70,7 @@ func DecodeMessage(message string) (Payload, error) {
 		if len(content) != expectedLength {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in SYS message")
 		}
-		return Payload{Content: content, ContentType: messageType, SysStatus: status}, nil
+		return Payload{Content: content, ContentType: messageType, Status: status}, nil
 
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)

@@ -134,7 +134,7 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 	// If the recipient is not found or their connection is lost, send a system failure message to the sender
 	if !found || recipientConn == nil {
 		// Encode and send a system message indicating the recipient was not found or the connection was lost
-		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: "Recipient not found or connection lost", SysStatus: "fail"})))
+		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: "Recipient not found or connection lost", Status: "fail"})))
 		if err != nil {
 			log.Println("Error sending recipient not found message:", err)
 		}
@@ -157,7 +157,7 @@ func (s *TCPServer) broadcastMessage(msgPayload protocol.Payload, sender net.Con
 // sendSystemNotice sends a system notice to all connections except the sender.
 // The notice informs about an action performed by the sender (e.g., joining or leaving the chat).
 func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
-	msg := []byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), SysStatus: "success"}))
+	msg := []byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), Status: "success"}))
 	s.broadcastToAll(msg, "Error sending system notice", sender)
 }
 
