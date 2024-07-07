@@ -46,9 +46,9 @@ func handleUsernameSet(conn net.Conn) string {
 
 		name = strings.TrimSuffix(data, "\n")
 		if len(name) < 2 {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeSYS, "Username cannot be empty or less than two characters", "", "fail")))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: "Username cannot be empty or less than two characters", SysStatus: "fail"})))
 		} else {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeSYS, fmt.Sprintf("Username successfully set to => %s", name), "", "success")))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: fmt.Sprintf("Username successfully set to => %s", name), SysStatus: "success"})))
 			break
 		}
 	}

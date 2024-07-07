@@ -29,7 +29,8 @@ Chat Application Todo List:
         ✔ Add Protocol
         ✔ Implement protocol: Client read
         ✔ Implement protocol: Server sent
-        ☐ Implement protocol: Client sent
+        ✔ Implement protocol: Client sent @done(24-07-07 12:38)
+        ✔ Implement protocol: Server read @done(24-07-07 12:38)
         ☐ Message encryption: Implement end-to-end encryption using golang.org/x/crypto
     Advanced Features:
         Chatrooms:

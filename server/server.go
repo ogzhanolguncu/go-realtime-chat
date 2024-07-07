@@ -97,7 +97,6 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 
 	connReader := bufio.NewReader(c)
 
-CONNECTION_LOOP:
 	for {
 		data, err := connReader.ReadString('\n')
 		if err != nil {
@@ -108,19 +107,17 @@ CONNECTION_LOOP:
 		rawMessage := strings.TrimSpace(data)
 		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 
-		msgPayload, err := parseMessage(rawMessage)
+		msgPayload, err := protocol.DecodeMessage(rawMessage)
 		if err != nil {
 			// Write back to client that their message is malformed
 			c.Write([]byte(err.Error()))
 		}
 
-		switch msgPayload.MessageType {
-		case GROUP_MESSAGE:
+		switch msgPayload.ContentType {
+		case protocol.MessageTypeMSG:
 			s.broadcastMessage(msgPayload, c)
-		case WHISPER:
+		case protocol.MessageTypeWSP:
 			s.sendWhisper(msgPayload, c)
-		case QUIT:
-			break CONNECTION_LOOP // Exit the loop if QUIT message received
 		default:
 			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
 		}
@@ -130,14 +127,14 @@ CONNECTION_LOOP:
 
 // sendWhisper looks up the recipient's connection in the connectionList. If found, it sends a whisper message to the recipient.
 // If not found, it sends a system failure message back to the sender.
-func (s *TCPServer) sendWhisper(msgPayload Message, sender net.Conn) {
+func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 	// Look up the recipient's connection by their name in the connectionList
-	recipientConn, found := s.findConnectionByOwnerName(msgPayload.MessageRecipient)
+	recipientConn, found := s.findConnectionByOwnerName(msgPayload.Recipient)
 
 	// If the recipient is not found or their connection is lost, send a system failure message to the sender
 	if !found || recipientConn == nil {
 		// Encode and send a system message indicating the recipient was not found or the connection was lost
-		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeSYS, "Recipient not found or connection lost", "", "fail")))
+		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: "Recipient not found or connection lost", SysStatus: "fail"})))
 		if err != nil {
 			log.Println("Error sending recipient not found message:", err)
 		}
@@ -145,22 +142,22 @@ func (s *TCPServer) sendWhisper(msgPayload Message, sender net.Conn) {
 	}
 
 	// If the recipient's connection is found, send the whisper message to the recipient
-	_, err := recipientConn.Write([]byte(protocol.EncodeMessage(protocol.MessageTypeWSP, msgPayload.MessageContent, msgPayload.MessageSender, "")))
+	_, err := recipientConn.Write([]byte(protocol.EncodeMessage(msgPayload)))
 	if err != nil {
 		log.Println("Error sending whisper:", err)
 	}
 }
 
 // broadcastMessage sends a message to all connections except the sender
-func (s *TCPServer) broadcastMessage(msgPayload Message, sender net.Conn) {
-	msg := []byte(protocol.EncodeMessage(protocol.MessageTypeMSG, msgPayload.MessageContent, msgPayload.MessageSender, ""))
+func (s *TCPServer) broadcastMessage(msgPayload protocol.Payload, sender net.Conn) {
+	msg := []byte(protocol.EncodeMessage(msgPayload))
 	s.broadcastToAll(msg, "Error broadcasting message", sender)
 }
 
 // sendSystemNotice sends a system notice to all connections except the sender.
 // The notice informs about an action performed by the sender (e.g., joining or leaving the chat).
 func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
-	msg := []byte(protocol.EncodeMessage(protocol.MessageTypeSYS, fmt.Sprintf("%s has %s the chat.", senderName, action), "", "success"))
+	msg := []byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), SysStatus: "success"}))
 	s.broadcastToAll(msg, "Error sending system notice", sender)
 }
 

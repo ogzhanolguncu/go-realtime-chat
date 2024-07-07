@@ -8,6 +8,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 func (c *Client) sendMessages(conn net.Conn) {
@@ -26,7 +28,7 @@ func (c *Client) sendMessages(conn net.Conn) {
 			break
 		}
 
-		if strings.HasPrefix(text, "/w ") {
+		if strings.HasPrefix(text, "/whisper ") {
 			c.sendWhisper(conn, text)
 		} else {
 			c.sendPublicMessage(conn, text)
@@ -34,13 +36,15 @@ func (c *Client) sendMessages(conn net.Conn) {
 	}
 }
 
-func (c *Client) sendWhisper(conn net.Conn, text string) {
-	re := regexp.MustCompile(`^\/w\s+(\S+)\s+(.*)$`)
-	matches := re.FindStringSubmatch(text)
+func (c *Client) sendWhisper(conn net.Conn, rawInput string) {
+	re := regexp.MustCompile(`^\/whisper\s+(\S+)\s+(.*)$`)
+	matches := re.FindStringSubmatch(rawInput)
 	if len(matches) == 3 {
 		recipient := matches[1]
 		msg := matches[2]
-		_, err := conn.Write([]byte(fmt.Sprintf("WHISPER#%s#%s#%s\n", c.name, msg, recipient)))
+		message := protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeWSP, Recipient: recipient, Sender: c.name, Content: msg})
+
+		_, err := conn.Write([]byte(message))
 		if err != nil {
 			log.Fatal("Error sending whisper message:", err)
 		}
@@ -49,8 +53,9 @@ func (c *Client) sendWhisper(conn net.Conn, text string) {
 	}
 }
 
-func (c *Client) sendPublicMessage(conn net.Conn, text string) {
-	_, err := conn.Write([]byte(fmt.Sprintf("GROUP_MESSAGE#%s#%s\n", c.name, text)))
+func (c *Client) sendPublicMessage(conn net.Conn, rawInput string) {
+	message := protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeMSG, Sender: c.name, Content: rawInput})
+	_, err := conn.Write([]byte(message))
 	if err != nil {
 		log.Fatal("Error sending group message:", err)
 	}

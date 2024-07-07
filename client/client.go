@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -67,7 +68,6 @@ func (c *Client) setUsername() error {
 			return fmt.Errorf("error reading username input: %w", err)
 		}
 		nameInput = strings.TrimSpace(nameInput)
-
 		if _, err := c.conn.Write([]byte(nameInput + "\n")); err != nil {
 			return fmt.Errorf("error sending username to server: %w", err)
 		}
@@ -89,7 +89,8 @@ func (c *Client) setUsername() error {
 
 		if strings.Contains(decodedMessage.SysStatus, "success") {
 			colorifyAndFormatContent(decodedMessage)
-			c.name = strings.Split(strings.TrimSpace(decodedMessage.Content), "=>")[1]
+			log.Print(len(decodedMessage.Content))
+			c.name = strings.TrimSpace(strings.Split(decodedMessage.Content, "=>")[1])
 			return nil
 		}
 
