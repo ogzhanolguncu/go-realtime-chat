@@ -1,24 +1,58 @@
-  Todos:
-    ✔ Private message: Allow passing private messages with the format /w [name] [message]. @done(24-07-06 14:39)
-    ☐ Reply functionality: Implement reply functionality with /r [message].
-    ✔ Make names unique: Ensure usernames are unique across all connected clients. @done(24-07-06 14:39)
-    ✔ Group message: Allow passing public messages. @done(24-07-06 14:39)
-    Chat history:
-        ☐ Implement chat history for clients who join late. After ~100 server should delete some of the messages.
-        ☐ Server should download history and restore when restarted
-    ☐ Active people list: Display a list of active users.
-    ☐ Client re-establish connection with exponential retry: Implement exponential retry logic for re-establishing connections.
-    ☐ Send active user list: When a client establishes a connection, send them the list of active users.
-    ☐ Check whisper logic: Ensure the logic for handling whispers is robust and correct.
-    ✔ Consider adding timestamps to messages for better context. @done(24-07-06 14:40)
-    ☐ When two users join at the same time server locks, which shouldn't
-    ✔ Send messages from server with prefix so client can decide how to show them like SYSTEM_MESSAGE, CHAT_MESSAGE(whisper and group) @done(24-07-06 16:40)
-    ✔ Add Protocol @done(24-07-06 16:40)
-    Implement protocol:
-        ✔ Client read @done(24-07-06 14:41)
-        ✔ Server sent @done(24-07-06 14:41)
-        [] Client sent
-    ✔ Validate username. If username is less than 2 char or empty. Retry 3 times. @done(24-07-06 17:12)
-    ☐ When someone joins client should print allowed commands alongside welcome text
-    ☐ Client errors should have Client: prefix maybe with a different color
-    ☐ Make usernames unique and return error if new comer tries to enter already selected name
+Chat Application Todo List:
+    Core Functionality:
+        ✔ Group message: Allow passing public messages
+        ✔ Private message: Allow passing private messages with the format /w [name] [message]
+        ☐ Make names unique: Ensure usernames are unique across all connected clients
+        ✔ Validate username: If username is less than 2 char or empty, retry 3 times
+        ✔ Add timestamps to messages for better context
+        ☐ Reply functionality: Implement reply functionality with /reply [message]
+        ☐ Client re-establish connection with exponential retry
+    User Interface:
+        ✔ Send messages from server with prefix (SYSTEM_MESSAGE, CHAT_MESSAGE)
+        ☐ Display allowed commands when someone joins
+        ☐ Client errors should have "Client:" prefix with a different color
+        ☐ Implement Active User display:
+        ```
+        Active Users (25): Alice, Bob, Charlie [+22 more] (Use /users for full list)
+        ----------------------------------
+        [Chat messages appear here]
+        ----------------------------------
+        Your message:
+        ```
+
+    Chat History:
+        ☐ Implement /history command
+        ☐ Store chat history for late-joining clients (limit to ~100 messages)
+        ☐ Server should persist history to file and restore on restart
+        ☐ Implement full-text search for chat history
+    Protocol and Security:
+        ✔ Add Protocol
+        ✔ Implement protocol: Client read
+        ✔ Implement protocol: Server sent
+        ☐ Implement protocol: Client sent
+        ☐ Message encryption: Implement end-to-end encryption using golang.org/x/crypto
+    Advanced Features:
+        Chatrooms:
+            ☐ Allow users to create and join different chatrooms
+            ☐ Allow clients to switch between private chats and group chat
+            ☐ Implement commands: /create, /join, /leave
+        Presence System:
+            ☐ Show user statuses (online, away, busy, etc.)
+            ☐ Allow users to set custom status messages
+        Typing Indicators:
+            ☐ Show when other users are typing
+            ☐ Implement in a non-intrusive way in the terminal UI
+        Command System:
+            ☐ Create a robust command system (e.g., /help, /mute, /unmute, /block)
+        Notification System:
+        ☐   Notify users of mentions or important messages when not actively viewing chat
+        Active User Management:
+            ☐ Server: Maintain list/map of all active users
+            ☐ Server: Send updates with total count and subset of names
+            ☐ Client: Store full list of users
+            ☐ Client: Implement /users command to show full list
+        Performance and Security:
+            ☐ Implement rate limiting to prevent spam and abuse
+    Bug Fixes:
+        ✔ Fix: Server locks when two users join simultaneously
+        ✔ Check whisper logic: Ensure robustness and correctness
