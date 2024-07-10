@@ -25,6 +25,6 @@ func main() {
 		log.Fatalf("Failed to set username: %v", err)
 	}
 
-	go client.readMessages(client.conn)
-	client.sendMessages(client.conn)
+	go client.readMessages()
+	client.sendMessages()
 }

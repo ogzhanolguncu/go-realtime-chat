@@ -17,10 +17,11 @@ type Config struct {
 }
 
 type Client struct {
-	conn   net.Conn
-	name   string
-	reader *bufio.Reader
-	config Config
+	conn                       net.Conn
+	name                       string
+	reader                     *bufio.Reader
+	config                     Config
+	lastWhispererFromGroupChat string
 }
 
 func newClient(config Config) (*Client, error) {
