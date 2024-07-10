@@ -189,9 +189,11 @@ func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
 			break
 		}
 		payload, err := protocol.DecodeMessage(data)
-
+		_, nameIsAlreadyInUse := s.findConnectionByOwnerName(payload.Username)
 		if err != nil || len(payload.Username) < 2 {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: "Username cannot be empty or less than two characters", Status: "fail"})))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' cannot be empty or less than two characters.", payload.Username), Status: "fail"})))
+		} else if nameIsAlreadyInUse {
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' is already in use.", payload.Username), Status: "fail"})))
 		} else {
 			name = payload.Username
 			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))

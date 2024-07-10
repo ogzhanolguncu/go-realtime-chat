@@ -2,14 +2,14 @@ Chat Application Todo List:
     Core Functionality:
         ✔ Group message: Allow passing public messages
         ✔ Private message: Allow passing private messages with the format /w [name] [message]
-        ☐ Make names unique: Ensure usernames are unique across all connected clients
+        ✔ Make names unique: Ensure usernames are unique across all connected clients @done(24-07-10 09:51)
         ✔ Validate username: If username is less than 2 char or empty, retry 3 times
         ✔ Add timestamps to messages for better context
         ☐ Reply functionality: Implement reply functionality with /reply [message]
         ☐ Client re-establish connection with exponential retry
     User Interface:
-        ✔ Send messages from server with prefix (SYSTEM_MESSAGE, CHAT_MESSAGE)
-        ☐ Display allowed commands when someone joins
+        ✔ Send messages from server with prefix (MSG, WSP)
+        ☐ Display allowed commands when someone joins. This should be handled on client side.
         ☐ Client errors should have "Client:" prefix with a different color
         ☐ Implement Active User display:
         ```
