@@ -7,17 +7,19 @@ package protocol
 // Username Message: 			USR|name_length|name_content|status\r\n status = "fail | "success"
 const Separator = "|"
 
+type MessageType string
+
 const (
-	MessageTypeMSG = "MSG"
-	MessageTypeWSP = "WSP"
-	MessageTypeSYS = "SYS"
-	MessageTypeERR = "ERR"
-	MessageTypeUSR = "USR"
+	MessageTypeMSG MessageType = "MSG"
+	MessageTypeWSP MessageType = "WSP"
+	MessageTypeSYS MessageType = "SYS"
+	MessageTypeERR MessageType = "ERR"
+	MessageTypeUSR MessageType = "USR"
 )
 
 type Payload struct {
 	Content     string
-	ContentType string
+	ContentType MessageType
 	Sender      string
 	Recipient   string
 	Status      string

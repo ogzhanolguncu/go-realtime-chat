@@ -48,7 +48,7 @@ func (s *TCPServer) getConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, boo
 }
 
 func (s *TCPServer) handleNewConnection(c net.Conn) {
-	name := handleUsernameSet(c)
+	name := s.handleUsernameSet(c)
 
 	// If the username is an empty string after exhausting retries,
 	// close the connection to prevent clients with no username from connecting.
@@ -173,4 +173,30 @@ func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn net.Conn
 		}
 		return true
 	})
+}
+
+func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
+	requiredMsg := protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Status: "required"})
+	conn.Write([]byte(requiredMsg))
+	connReader := bufio.NewReader(conn)
+
+	var name string
+
+	for {
+		data, err := connReader.ReadString('\n')
+
+		if err != nil {
+			break
+		}
+		payload, err := protocol.DecodeMessage(data)
+
+		if err != nil || len(payload.Username) < 2 {
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: "Username cannot be empty or less than two characters", Status: "fail"})))
+		} else {
+			name = payload.Username
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
+			break
+		}
+	}
+	return name
 }

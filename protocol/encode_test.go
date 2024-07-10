@@ -53,7 +53,7 @@ func TestEncodeWhisperMessage(t *testing.T) {
 }
 
 func TestEncodeSystemMessage(t *testing.T) {
-	t.Run("should encode whisper message successfully", func(t *testing.T) {
+	t.Run("should encode system message successfully", func(t *testing.T) {
 		tests := []struct {
 			content  string
 			status   string
@@ -70,7 +70,7 @@ func TestEncodeSystemMessage(t *testing.T) {
 }
 
 func TestEncodeErrMessage(t *testing.T) {
-	t.Run("should encode whisper message successfully", func(t *testing.T) {
+	t.Run("should encode error message successfully", func(t *testing.T) {
 		tests := []struct {
 			content  string
 			expected string
@@ -80,6 +80,22 @@ func TestEncodeErrMessage(t *testing.T) {
 
 		for _, test := range tests {
 			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeERR, Content: "Errr!"}))
+		}
+	})
+
+}
+
+func TestEncodeUsrMessage(t *testing.T) {
+	t.Run("should encode username message successfully", func(t *testing.T) {
+		tests := []struct {
+			content  string
+			expected string
+		}{
+			{"Oz", "USR|2|Oz|success\r\n"},
+		}
+
+		for _, test := range tests {
+			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeUSR, Username: "Oz", Status: "success"}))
 		}
 	})
 

@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net"
-	"strings"
-
-	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 const port = 7007
@@ -30,27 +26,4 @@ func main() {
 		}
 		go s.handleNewConnection(c)
 	}
-}
-
-func handleUsernameSet(conn net.Conn) string {
-	conn.Write([]byte("USERNAME_REQUIRED\n"))
-	connReader := bufio.NewReader(conn)
-	var name string
-
-	for {
-		data, err := connReader.ReadString('\n')
-
-		if err != nil {
-			break
-		}
-
-		name = strings.TrimSuffix(data, "\n")
-		if len(name) < 2 {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: "Username cannot be empty or less than two characters", Status: "fail"})))
-		} else {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: fmt.Sprintf("Username successfully set to => %s", name), Status: "success"})))
-			break
-		}
-	}
-	return name
 }

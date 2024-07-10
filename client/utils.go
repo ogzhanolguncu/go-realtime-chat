@@ -19,6 +19,15 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 	case protocol.MessageTypeWSP:
 		fmtedMsg := fmt.Sprintf("Whisper from %s: %s\n", payload.Sender, payload.Content)
 		fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Purple)) // Purple for whisper messages
+	case protocol.MessageTypeUSR:
+		var fmtedMsg string
+		if payload.Status == "success" {
+			fmtedMsg = fmt.Sprintf("Username successfully set to %s\n", payload.Username)
+			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Yellow)) // Purple for username messages
+		} else {
+			fmtedMsg = fmt.Sprintf("%s\n", payload.Username)
+			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Red)) // Purple for username messages
+		}
 	default:
 		fmtedMsg := fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)
 		fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Blue)) // Blue for group messages
