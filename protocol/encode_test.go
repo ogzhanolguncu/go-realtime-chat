@@ -20,12 +20,12 @@ func TestEncodeGeneralMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeMSG, Content: test.content, Sender: test.sender, Status: ""}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeMSG, Content: test.content, Sender: test.sender, Status: ""}))
 		}
 	})
 
 	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "MSG|John|5|HeyHey\r\n", EncodeMessage(Payload{ContentType: MessageTypeMSG, Content: "HeyHey", Sender: "John", Status: ""}))
+		assert.NotEqual(t, "MSG|John|5|HeyHey\r\n", EncodeMessage(Payload{MessageType: MessageTypeMSG, Content: "HeyHey", Sender: "John", Status: ""}))
 	})
 }
 
@@ -43,12 +43,12 @@ func TestEncodeWhisperMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeWSP, Content: test.content, Sender: test.sender, Recipient: test.recipient, Status: ""}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeWSP, Content: test.content, Sender: test.sender, Recipient: test.recipient, Status: ""}))
 		}
 	})
 
 	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "WSP|5|HeyHey\r\n", EncodeMessage(Payload{ContentType: MessageTypeWSP, Content: "HeyHey", Sender: "John", Recipient: "Oz", Status: ""}))
+		assert.NotEqual(t, "WSP|5|HeyHey\r\n", EncodeMessage(Payload{MessageType: MessageTypeWSP, Content: "HeyHey", Sender: "John", Recipient: "Oz", Status: ""}))
 	})
 }
 
@@ -63,7 +63,7 @@ func TestEncodeSystemMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeSYS, Content: test.content, Status: test.status}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeSYS, Content: test.content, Status: test.status}))
 		}
 	})
 
@@ -79,7 +79,7 @@ func TestEncodeErrMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeERR, Content: "Errr!"}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeERR, Content: "Errr!"}))
 		}
 	})
 
@@ -95,7 +95,7 @@ func TestEncodeUsrMessage(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{ContentType: MessageTypeUSR, Username: "Oz", Status: "success"}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeUSR, Username: "Oz", Status: "success"}))
 		}
 	})
 

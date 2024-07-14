@@ -19,7 +19,7 @@ const (
 
 type Payload struct {
 	Content     string
-	ContentType MessageType
+	MessageType MessageType
 	Sender      string
 	Recipient   string
 	Status      string

@@ -14,7 +14,7 @@ import (
 func TestColorifyAndFormatContent(t *testing.T) {
 
 	t.Run("should format system message with timestamp", func(t *testing.T) {
-		payload := protocol.Payload{Content: "System message", ContentType: protocol.MessageTypeSYS}
+		payload := protocol.Payload{Content: "System message", MessageType: protocol.MessageTypeSYS}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
@@ -23,7 +23,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	})
 
 	t.Run("should format whisper message with timestamp", func(t *testing.T) {
-		payload := protocol.Payload{Content: "Hello!", ContentType: protocol.MessageTypeWSP, Sender: "Alice"}
+		payload := protocol.Payload{Content: "Hello!", MessageType: protocol.MessageTypeWSP, Sender: "Alice"}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
@@ -32,7 +32,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	})
 
 	t.Run("should format group message with timestamp", func(t *testing.T) {
-		payload := protocol.Payload{Content: "Hey everyone!", ContentType: protocol.MessageTypeMSG, Sender: "Bob"}
+		payload := protocol.Payload{Content: "Hey everyone!", MessageType: protocol.MessageTypeMSG, Sender: "Bob"}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})

@@ -67,8 +67,8 @@ func TestClientReadMessages(t *testing.T) {
 		input    string
 		expected protocol.Payload
 	}{
-		{"Normal message", "MSG|John|5|Hello\r\n", protocol.Payload{ContentType: protocol.MessageTypeMSG, Sender: "John", Content: "Hello"}},
-		{"Whisper", "WSP|Oz|TestUser|5|Hello\r\n", protocol.Payload{ContentType: protocol.MessageTypeWSP, Sender: "Oz", Content: "Hello", Recipient: "TestUser"}},
+		{"Normal message", "MSG|John|5|Hello\r\n", protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: "John", Content: "Hello"}},
+		{"Whisper", "WSP|Oz|TestUser|5|Hello\r\n", protocol.Payload{MessageType: protocol.MessageTypeWSP, Sender: "Oz", Content: "Hello", Recipient: "TestUser"}},
 	}
 
 	for _, tc := range testCases {

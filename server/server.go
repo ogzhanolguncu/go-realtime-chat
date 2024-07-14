@@ -113,7 +113,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			c.Write([]byte(err.Error()))
 		}
 
-		switch msgPayload.ContentType {
+		switch msgPayload.MessageType {
 		case protocol.MessageTypeMSG:
 			s.broadcastMessage(msgPayload, c)
 		case protocol.MessageTypeWSP:
@@ -134,7 +134,7 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 	// If the recipient is not found or their connection is lost, send a system failure message to the sender
 	if !found || recipientConn == nil {
 		// Encode and send a system message indicating the recipient was not found or the connection was lost
-		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: "Recipient not found or connection lost", Status: "fail"})))
+		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeSYS, Content: "Recipient not found or connection lost", Status: "fail"})))
 		if err != nil {
 			log.Println("Error sending recipient not found message:", err)
 		}
@@ -157,7 +157,7 @@ func (s *TCPServer) broadcastMessage(msgPayload protocol.Payload, sender net.Con
 // sendSystemNotice sends a system notice to all connections except the sender.
 // The notice informs about an action performed by the sender (e.g., joining or leaving the chat).
 func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
-	msg := []byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), Status: "success"}))
+	msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), Status: "success"}))
 	s.broadcastToAll(msg, "Error sending system notice", sender)
 }
 
@@ -176,7 +176,7 @@ func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn net.Conn
 }
 
 func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
-	requiredMsg := protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Status: "required"})
+	requiredMsg := protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Status: "required"})
 	conn.Write([]byte(requiredMsg))
 	connReader := bufio.NewReader(conn)
 
@@ -191,12 +191,12 @@ func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
 		payload, err := protocol.DecodeMessage(data)
 		_, nameIsAlreadyInUse := s.findConnectionByOwnerName(payload.Username)
 		if err != nil || len(payload.Username) < 2 {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' cannot be empty or less than two characters.", payload.Username), Status: "fail"})))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' cannot be empty or less than two characters.", payload.Username), Status: "fail"})))
 		} else if nameIsAlreadyInUse {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' is already in use.", payload.Username), Status: "fail"})))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' is already in use.", payload.Username), Status: "fail"})))
 		} else {
 			name = payload.Username
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
+			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
 			break
 		}
 	}

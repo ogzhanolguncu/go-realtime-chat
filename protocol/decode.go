@@ -30,7 +30,7 @@ func DecodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in MSG message")
 		}
 
-		return Payload{Content: content, Sender: sender, ContentType: MessageTypeMSG}, nil
+		return Payload{Content: content, Sender: sender, MessageType: MessageTypeMSG}, nil
 
 	case MessageTypeWSP:
 		if len(parts) < 5 {
@@ -51,7 +51,7 @@ func DecodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in WSP message")
 		}
 
-		return Payload{ContentType: MessageTypeWSP, Content: content, Sender: sender, Recipient: recipient}, nil
+		return Payload{MessageType: MessageTypeWSP, Content: content, Sender: sender, Recipient: recipient}, nil
 	// SYS|message_length|message_content|status \r\n status = "fail" | "success"
 	case MessageTypeSYS:
 		if len(parts) < 4 {
@@ -70,7 +70,7 @@ func DecodeMessage(message string) (Payload, error) {
 		if len(content) != expectedLength {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in SYS message")
 		}
-		return Payload{Content: content, ContentType: MessageTypeSYS, Status: status}, nil
+		return Payload{Content: content, MessageType: MessageTypeSYS, Status: status}, nil
 
 	// USR|name_length|name_content|status\r\n status = "fail | "success"
 	case MessageTypeUSR:
@@ -90,7 +90,7 @@ func DecodeMessage(message string) (Payload, error) {
 		if len(name) != expectedLength {
 			return Payload{}, fmt.Errorf("name length does not match expected length in USR message")
 		}
-		return Payload{ContentType: MessageTypeUSR, Username: name, Status: status}, nil
+		return Payload{MessageType: MessageTypeUSR, Username: name, Status: status}, nil
 
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)

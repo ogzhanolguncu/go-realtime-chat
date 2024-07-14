@@ -33,7 +33,7 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 		colorCode string
 	)
 
-	switch payload.ContentType {
+	switch payload.MessageType {
 	case protocol.MessageTypeSYS:
 		message = fmt.Sprintf("System: %s\n", payload.Content)
 		if payload.Status == "fail" {

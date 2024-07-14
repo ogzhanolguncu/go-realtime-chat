@@ -56,7 +56,7 @@ func (c *Client) readAndValidateInitialMessage(reader *bufio.Reader) error {
 		return fmt.Errorf("error reading server response: %w", err)
 	}
 
-	if decodedMessage.ContentType != protocol.MessageTypeUSR || decodedMessage.Status != "required" {
+	if decodedMessage.MessageType != protocol.MessageTypeUSR || decodedMessage.Status != "required" {
 		return fmt.Errorf("expected username required message from server, got: %s", message)
 	}
 
@@ -66,7 +66,7 @@ func (c *Client) readAndValidateInitialMessage(reader *bufio.Reader) error {
 var errRetry = errors.New("retry username")
 
 func (c *Client) sendUsernameAndHandleResponse(username string, reader *bufio.Reader) error {
-	if _, err := c.conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeUSR, Username: username}))); err != nil {
+	if _, err := c.conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: username}))); err != nil {
 		return fmt.Errorf("error sending username to server: %w", err)
 	}
 

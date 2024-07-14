@@ -76,7 +76,7 @@ func handleReply(input, sender, recipient string) (string, error) {
 		return "", fmt.Errorf("no one to reply to")
 	}
 	return protocol.EncodeMessage(protocol.Payload{
-		ContentType: protocol.MessageTypeWSP,
+		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
 		Sender:      sender,
@@ -92,7 +92,7 @@ func handleWhisper(input, sender, _ string) (string, error) {
 	message := parts[2]
 
 	return protocol.EncodeMessage(protocol.Payload{
-		ContentType: protocol.MessageTypeWSP,
+		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
 		Sender:      sender,
@@ -100,7 +100,7 @@ func handleWhisper(input, sender, _ string) (string, error) {
 }
 
 func handlePublicMessage(input, sender string) (message string) {
-	return protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeMSG, Sender: sender, Content: input})
+	return protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: input})
 }
 
 //RECEIVER
@@ -137,7 +137,7 @@ func (c *Client) MessageLoop(incomingChan <-chan protocol.Payload, outgoingChan 
 			if !ok {
 				return nil // Channel closed, exit loop
 			}
-			if incMessage.ContentType == protocol.MessageTypeWSP {
+			if incMessage.MessageType == protocol.MessageTypeWSP {
 				c.lastWhispererFromGroupChat = incMessage.Sender
 			}
 			colorifyAndFormatContent(incMessage)
