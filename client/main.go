@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -21,7 +22,7 @@ func main() {
 			if err.Error() == "EOF" {
 				err = fmt.Errorf("server is not responding")
 			}
-			fmt.Println(color.ColorifyWithTimestamp(fmt.Sprintf("Retry attempt %d: %v", n+1, err), color.Red))
+			fmt.Println(color.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but : %v", err), color.Red))
 		}),
 	)
 
@@ -51,30 +52,60 @@ func runClient() error {
 
 	incomingChan := make(chan protocol.Payload)
 	outgoingChan := make(chan string)
-	errChan := make(chan error)
+	errChan := make(chan error, 1) // Buffered channel to prevent goroutine leak
+	done := make(chan struct{})
 
-	go client.readMessages(incomingChan, errChan)
-	go client.sendMessages(outgoingChan)
+	var wg sync.WaitGroup
+	wg.Add(2) // Add 2 for readMessages and sendMessages goroutines
 
-	return client.messageLoop(incomingChan, outgoingChan, errChan)
+	go func() {
+		defer wg.Done()
+		client.readMessages(incomingChan, errChan, done)
+	}()
+
+	go func() {
+		defer wg.Done()
+		client.sendMessages(outgoingChan, done)
+	}()
+
+	err = client.messageLoop(incomingChan, outgoingChan, errChan, done)
+
+	// Signal to stop goroutines
+	close(done)
+
+	// Wait for goroutines to finish
+	wg.Wait()
+
+	return err
 }
 
-func (c *Client) messageLoop(incomingChan chan protocol.Payload, outgoingChan chan string, errChan chan error) error {
+func (c *Client) messageLoop(incomingChan <-chan protocol.Payload, outgoingChan <-chan string, errChan <-chan error, done chan struct{}) error {
 	for {
 		select {
-		case incMessage := <-incomingChan:
+		case incMessage, ok := <-incomingChan:
+			if !ok {
+				return nil // Channel closed, exit loop
+			}
 			if incMessage.ContentType == protocol.MessageTypeWSP {
 				c.lastWhispererFromGroupChat = incMessage.Sender
 			}
 			colorifyAndFormatContent(incMessage)
 			askForInput()
-		case outMessage := <-outgoingChan:
+		case outMessage, ok := <-outgoingChan:
+			if !ok {
+				return nil // Channel closed, exit loop
+			}
 			_, err := c.conn.Write([]byte(outMessage))
 			if err != nil {
 				return fmt.Errorf("error sending message: %v", err)
 			}
-		case err := <-errChan:
+		case err, ok := <-errChan:
+			if !ok {
+				return nil // Channel closed, exit loop
+			}
 			return err
+		case <-done:
+			return nil // Done signal received, exit loop
 		}
 	}
 }

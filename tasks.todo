@@ -6,7 +6,7 @@ Chat Application Todo List:
         ✔ Validate username: If username is less than 2 char or empty, retry 3 times
         ✔ Add timestamps to messages for better context
         ✔ Reply functionality: Implement reply functionality with /reply [message] @started(24-07-10 09:51) @done(24-07-10 10:11) @lasted(20m24s)
-        ☐ Client re-establish connection with exponential retry
+        ✔ Client re-establish connection with exponential retry @done(24-07-14 15:38)
     User Interface:
         ✔ Send messages from server with prefix (MSG, WSP)
         ☐ Display allowed commands when someone joins. This should be handled on client side.
@@ -57,3 +57,5 @@ Chat Application Todo List:
     Bug Fixes:
         ✔ Fix: Server locks when two users join simultaneously
         ✔ Check whisper logic: Ensure robustness and correctness
+        ✔ When client reconnects after successful connection it required one more extra input before sending username. @done(24-07-14 16:04)
+            Make sure all goroutines are closed before retrying using waitGroups and additional channel called done @Solution

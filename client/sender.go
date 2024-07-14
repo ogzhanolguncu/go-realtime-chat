@@ -11,7 +11,7 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func (c *Client) sendMessages(outgoingChan chan string) {
+func (c *Client) sendMessages(outgoingChan chan<- string, done <-chan struct{}) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -24,26 +24,28 @@ func (c *Client) sendMessages(outgoingChan chan string) {
 
 		text = strings.TrimSpace(text)
 		if text == "quit" {
-			break
+			return
 		}
 
+		var message string
 		if strings.HasPrefix(text, "/reply") {
-			message, err := c.sendReply(text)
-			if err != nil {
-				log.Fatal("Error sending reply message:", err)
-			}
-			outgoingChan <- message
-		}
-		if strings.HasPrefix(text, "/whisper") {
-			message, err := c.sendWhisper(text)
-			if err != nil {
-				log.Fatal("Error sending whisper message:", err)
-			}
-			outgoingChan <- message
-
+			message, err = c.sendReply(text)
+		} else if strings.HasPrefix(text, "/whisper") {
+			message, err = c.sendWhisper(text)
 		} else {
-			message := c.sendPublicMessage(text)
-			outgoingChan <- message
+			message = c.sendPublicMessage(text)
+		}
+
+		if err != nil {
+			log.Println("Error preparing message:", err)
+			continue
+		}
+
+		select {
+		case outgoingChan <- message:
+			// Message sent successfully
+		case <-done:
+			return
 		}
 	}
 }
