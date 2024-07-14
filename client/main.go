@@ -7,12 +7,19 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	"github.com/joho/godotenv"
 	"github.com/ogzhanolguncu/go-chat/client/color"
+	"github.com/ogzhanolguncu/go-chat/client/internal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 func main() {
-	err := retry.Do(
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	err = retry.Do(
 		func() error {
 			return runClient()
 		},
@@ -22,7 +29,7 @@ func main() {
 			if err.Error() == "EOF" {
 				err = fmt.Errorf("server is not responding")
 			}
-			fmt.Println(color.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but : %v", err), color.Red))
+			fmt.Println(color.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but %v", err), color.Red))
 		}),
 	)
 
@@ -32,21 +39,18 @@ func main() {
 }
 
 func runClient() error {
-	config := Config{
-		Port: 7007,
-	}
-	client, err := newClient(config)
+	client, err := internal.NewClient(internal.NewConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
-	defer client.close()
+	defer client.Close()
 
-	if err := client.connect(); err != nil {
+	if err := client.Connect(); err != nil {
 		return fmt.Errorf("failed to connect: %v", err)
 	}
 
-	client.printHeader()
-	if err := client.setUsername(); err != nil {
+	client.PrintHeader()
+	if err := client.SetUsername(); err != nil {
 		return fmt.Errorf("failed to set username: %v", err)
 	}
 
@@ -60,15 +64,15 @@ func runClient() error {
 
 	go func() {
 		defer wg.Done()
-		client.readMessages(incomingChan, errChan, done)
+		client.ReadMessages(incomingChan, errChan, done)
 	}()
 
 	go func() {
 		defer wg.Done()
-		client.sendMessages(outgoingChan, done)
+		client.SendMessages(outgoingChan, done)
 	}()
 
-	err = client.messageLoop(incomingChan, outgoingChan, errChan, done)
+	err = client.MessageLoop(incomingChan, outgoingChan, errChan, done)
 
 	// Signal to stop goroutines
 	close(done)
@@ -77,35 +81,4 @@ func runClient() error {
 	wg.Wait()
 
 	return err
-}
-
-func (c *Client) messageLoop(incomingChan <-chan protocol.Payload, outgoingChan <-chan string, errChan <-chan error, done chan struct{}) error {
-	for {
-		select {
-		case incMessage, ok := <-incomingChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			if incMessage.ContentType == protocol.MessageTypeWSP {
-				c.lastWhispererFromGroupChat = incMessage.Sender
-			}
-			colorifyAndFormatContent(incMessage)
-			askForInput()
-		case outMessage, ok := <-outgoingChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			_, err := c.conn.Write([]byte(outMessage))
-			if err != nil {
-				return fmt.Errorf("error sending message: %v", err)
-			}
-		case err, ok := <-errChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			return err
-		case <-done:
-			return nil // Done signal received, exit loop
-		}
-	}
 }

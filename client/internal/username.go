@@ -1,56 +1,17 @@
-package main
+package internal
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"strings"
 
 	"github.com/ogzhanolguncu/go-chat/client/color"
-	protocol "github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-type Config struct {
-	Port int
-}
-
-type Client struct {
-	conn                       net.Conn
-	config                     Config
-	name                       string
-	lastWhispererFromGroupChat string
-}
-
-func newClient(config Config) (*Client, error) {
-	return &Client{
-		config: config,
-	}, nil
-}
-
-func (c *Client) connect() error {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", c.config.Port))
-	if err != nil {
-		return fmt.Errorf("failed to connect: %w", err)
-	}
-	c.conn = conn
-	return nil
-}
-
-func (c *Client) close() {
-	if c.conn != nil {
-		c.conn.Close()
-	}
-}
-
-func (c *Client) printHeader() {
-	fmt.Printf("\n\n")
-	fmt.Println("---------CHATROOM--------")
-	fmt.Println("-------------------------")
-}
-
-func (c *Client) setUsername() error {
+func (c *Client) SetUsername() error {
 	reader := bufio.NewReader(os.Stdin)
 	serverReader := bufio.NewReader(c.conn)
 

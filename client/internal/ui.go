@@ -1,11 +1,22 @@
-package main
+package internal
 
 import (
 	"fmt"
 
 	"github.com/ogzhanolguncu/go-chat/client/color"
-	protocol "github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/protocol"
 )
+
+func (c *Client) PrintHeader() {
+	fmt.Printf("\n\n")
+	fmt.Println("---------CHATROOM--------")
+	fmt.Println("-------------------------")
+}
+
+func askForInput() {
+	coloredPrompt := color.ColorifyWithTimestamp("You:", color.Yellow)
+	fmt.Printf("%s ", coloredPrompt)
+}
 
 func colorifyAndFormatContent(payload protocol.Payload) {
 	switch payload.ContentType {
@@ -32,9 +43,4 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 		fmtedMsg := fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)
 		fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Blue)) // Blue for group messages
 	}
-}
-
-func askForInput() {
-	coloredPrompt := color.ColorifyWithTimestamp("You:", color.Yellow)
-	fmt.Printf("%s ", coloredPrompt)
 }
