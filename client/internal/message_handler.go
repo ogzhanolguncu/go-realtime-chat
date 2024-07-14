@@ -5,12 +5,21 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/ogzhanolguncu/go-chat/client/color"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
+
+type Command struct {
+	name    string
+	handler func(message, sender, recipient string) (string, error)
+}
+
+var commands = []Command{
+	{name: "/whisper", handler: handleWhisper},
+	{name: "/reply", handler: handleReply},
+}
 
 func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) {
 	reader := bufio.NewReader(os.Stdin)
@@ -28,15 +37,7 @@ func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) 
 			return
 		}
 
-		var message string
-		if strings.HasPrefix(text, "/reply") {
-			message, err = c.sendReply(text)
-		} else if strings.HasPrefix(text, "/whisper") {
-			message, err = c.sendWhisper(text)
-		} else {
-			message = c.sendPublicMessage(text)
-		}
-
+		message, err := processInput(text, c.name, c.lastWhispererFromGroupChat)
 		if err != nil {
 			log.Println("Error preparing message:", err)
 			continue
@@ -51,25 +52,51 @@ func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) 
 	}
 }
 
-func (c *Client) sendReply(text string) (message string, err error) {
-	return c.sendWhisper(fmt.Sprintf("/whisper %s %s", c.lastWhispererFromGroupChat, strings.TrimSpace(strings.Split(text, "/reply")[1])))
-}
+func processInput(input, sender, recipient string) (string, error) {
+	for _, cmd := range commands {
+		if strings.HasPrefix(input, cmd.name) {
+			return cmd.handler(input, sender, recipient)
+		}
 
-func (c *Client) sendWhisper(text string) (message string, err error) {
-	re := regexp.MustCompile(`^\/whisper\s+(\S+)\s+(.*)$`)
-	matches := re.FindStringSubmatch(text)
-	if len(matches) == 3 {
-		recipient := matches[1]
-		msg := matches[2]
-		return protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeWSP, Recipient: recipient, Sender: c.name, Content: msg}), nil
-	} else {
-		fmt.Println("Invalid whisper command format")
-		return "", nil
 	}
+	return handlePublicMessage(input, sender), nil
 }
 
-func (c *Client) sendPublicMessage(rawInput string) (message string) {
-	return protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeMSG, Sender: c.name, Content: rawInput})
+func handleReply(input, sender, recipient string) (string, error) {
+	parts := strings.SplitN(input, " ", 2)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid reply format. Use: /reply <message>")
+	}
+	message := parts[1]
+	if recipient == "" {
+		return "", fmt.Errorf("no one to reply to")
+	}
+	return protocol.EncodeMessage(protocol.Payload{
+		ContentType: protocol.MessageTypeWSP,
+		Recipient:   recipient,
+		Content:     message,
+		Sender:      sender,
+	}), nil
+}
+
+func handleWhisper(input, sender, _ string) (string, error) {
+	parts := strings.SplitN(input, " ", 3)
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid whisper format. Use: /whisper <recipient> <message>")
+	}
+	recipient := parts[1]
+	message := parts[2]
+
+	return protocol.EncodeMessage(protocol.Payload{
+		ContentType: protocol.MessageTypeWSP,
+		Recipient:   recipient,
+		Content:     message,
+		Sender:      sender,
+	}), nil
+}
+
+func handlePublicMessage(input, sender string) (message string) {
+	return protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeMSG, Sender: sender, Content: input})
 }
 
 //RECEIVER

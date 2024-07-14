@@ -19,28 +19,33 @@ func askForInput() {
 }
 
 func colorifyAndFormatContent(payload protocol.Payload) {
+	var (
+		message   string
+		colorCode string
+	)
+
 	switch payload.ContentType {
 	case protocol.MessageTypeSYS:
-		fmtedMsg := fmt.Sprintf("System: %s\n", payload.Content)
+		message = fmt.Sprintf("System: %s\n", payload.Content)
 		if payload.Status == "fail" {
-			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Red)) // Red fail messages
+			colorCode = color.Red
 		} else {
-			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Cyan)) // Cyan for system messages
+			colorCode = color.Cyan
 		}
 	case protocol.MessageTypeWSP:
-		fmtedMsg := fmt.Sprintf("Whisper from %s: %s\n", payload.Sender, payload.Content)
-		fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Purple)) // Purple for whisper messages
+		message = fmt.Sprintf("Whisper from %s: %s\n", payload.Sender, payload.Content)
+		colorCode = color.Purple
 	case protocol.MessageTypeUSR:
-		var fmtedMsg string
 		if payload.Status == "success" {
-			fmtedMsg = fmt.Sprintf("Username successfully set to %s\n", payload.Username)
-			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Yellow)) // Purple for username messages
+			message = fmt.Sprintf("Username successfully set to %s\n", payload.Username)
+			colorCode = color.Yellow
 		} else {
-			fmtedMsg = fmt.Sprintf("%s\n", payload.Username)
-			fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Red)) // Purple for username messages
+			message = fmt.Sprintf("%s\n", payload.Username)
+			colorCode = color.Red
 		}
 	default:
-		fmtedMsg := fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)
-		fmt.Print(color.ColorifyWithTimestamp(fmtedMsg, color.Blue)) // Blue for group messages
+		message = fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)
+		colorCode = color.Blue
 	}
+	fmt.Print(color.ColorifyWithTimestamp(message, colorCode))
 }
