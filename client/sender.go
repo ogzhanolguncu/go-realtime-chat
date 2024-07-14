@@ -11,7 +11,7 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func (c *Client) sendMessages() {
+func (c *Client) sendMessages(outgoingChan chan string) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -28,42 +28,43 @@ func (c *Client) sendMessages() {
 		}
 
 		if strings.HasPrefix(text, "/reply") {
-			c.sendReply(text)
+			message, err := c.sendReply(text)
+			if err != nil {
+				log.Fatal("Error sending reply message:", err)
+			}
+			outgoingChan <- message
 		}
 		if strings.HasPrefix(text, "/whisper") {
-			c.sendWhisper(text)
+			message, err := c.sendWhisper(text)
+			if err != nil {
+				log.Fatal("Error sending whisper message:", err)
+			}
+			outgoingChan <- message
+
 		} else {
-			c.sendPublicMessage(text)
+			message := c.sendPublicMessage(text)
+			outgoingChan <- message
 		}
 	}
 }
 
-func (c *Client) sendReply(text string) {
-	message := strings.TrimSpace(strings.Split(text, "/reply")[1])
-	c.sendWhisper(fmt.Sprintf("/whisper %s %s", c.lastWhispererFromGroupChat, message))
+func (c *Client) sendReply(text string) (message string, err error) {
+	return c.sendWhisper(fmt.Sprintf("/whisper %s %s", c.lastWhispererFromGroupChat, strings.TrimSpace(strings.Split(text, "/reply")[1])))
 }
 
-func (c *Client) sendWhisper(text string) {
+func (c *Client) sendWhisper(text string) (message string, err error) {
 	re := regexp.MustCompile(`^\/whisper\s+(\S+)\s+(.*)$`)
 	matches := re.FindStringSubmatch(text)
 	if len(matches) == 3 {
 		recipient := matches[1]
 		msg := matches[2]
-		message := protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeWSP, Recipient: recipient, Sender: c.name, Content: msg})
-
-		_, err := c.conn.Write([]byte(message))
-		if err != nil {
-			log.Fatal("Error sending whisper message:", err)
-		}
+		return protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeWSP, Recipient: recipient, Sender: c.name, Content: msg}), nil
 	} else {
 		fmt.Println("Invalid whisper command format")
+		return "", nil
 	}
 }
 
-func (c *Client) sendPublicMessage(rawInput string) {
-	message := protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeMSG, Sender: c.name, Content: rawInput})
-	_, err := c.conn.Write([]byte(message))
-	if err != nil {
-		log.Fatal("Error sending group message:", err)
-	}
+func (c *Client) sendPublicMessage(rawInput string) (message string) {
+	return protocol.EncodeMessage(protocol.Payload{ContentType: protocol.MessageTypeMSG, Sender: c.name, Content: rawInput})
 }
