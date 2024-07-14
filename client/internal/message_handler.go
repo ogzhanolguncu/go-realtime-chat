@@ -33,8 +33,12 @@ func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) 
 		}
 
 		text = strings.TrimSpace(text)
-		if text == "quit" {
-			return
+		if text == "/quit" {
+			os.Exit(0)
+		}
+		if text == "/clear" {
+			fmt.Print("\033[H\033[2J")
+			askForInput()
 		}
 
 		message, err := processInput(text, c.name, c.lastWhispererFromGroupChat)

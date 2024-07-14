@@ -24,7 +24,8 @@ func main() {
 			return runClient()
 		},
 		retry.Attempts(5),
-		retry.Delay(5*time.Second),
+		retry.Delay(time.Second),
+		retry.DelayType(retry.BackOffDelay),
 		retry.OnRetry(func(n uint, err error) {
 			if err.Error() == "EOF" {
 				err = fmt.Errorf("server is not responding")
@@ -34,7 +35,7 @@ func main() {
 	)
 
 	if err != nil {
-		log.Fatalf("Failed after max retries: %v", err)
+		log.Fatalf(color.ColorifyWithTimestamp(fmt.Sprintf("Failed after max retries: %v", err), color.Red))
 	}
 }
 
@@ -46,10 +47,10 @@ func runClient() error {
 	defer client.Close()
 
 	if err := client.Connect(); err != nil {
-		return fmt.Errorf("failed to connect: %v", err)
+		return err
 	}
 
-	client.PrintHeader()
+	internal.PrintHeader()
 	if err := client.SetUsername(); err != nil {
 		return fmt.Errorf("failed to set username: %v", err)
 	}

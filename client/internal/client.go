@@ -21,7 +21,7 @@ func NewClient(config Config) (*Client, error) {
 func (c *Client) Connect() error {
 	conn, err := net.Dial("tcp", fmt.Sprintf(":%s", c.config.Port))
 	if err != nil {
-		return fmt.Errorf("failed to connect: %w", err)
+		return err
 	}
 	c.conn = conn
 	return nil

@@ -7,10 +7,19 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func (c *Client) PrintHeader() {
+func PrintHeader() {
 	fmt.Printf("\n\n")
-	fmt.Println("---------CHATROOM--------")
-	fmt.Println("-------------------------")
+	fmt.Println("---------WELCOME TO CHATROOM--------")
+	fmt.Println("------------------------------------")
+	fmt.Println("Available commands:")
+	fmt.Println("/whisper <recipient> <message> - Send a private message")
+	fmt.Println("/reply <message>               - Reply to the last whisper")
+	fmt.Println("/clear                         - Clear the screen")
+	fmt.Println("/active_users                  - Show active users")
+	fmt.Println("/quit                          - Exit the chat")
+	fmt.Println("")
+	fmt.Println("To send a public message, just type and press Enter")
+	fmt.Println("------------------------------------")
 }
 
 func askForInput() {

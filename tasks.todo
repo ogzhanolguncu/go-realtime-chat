@@ -9,7 +9,7 @@ Chat Application Todo List:
         ✔ Client re-establish connection with exponential retry @done(24-07-14 15:38)
     User Interface:
         ✔ Send messages from server with prefix (MSG, WSP)
-        ☐ Display allowed commands when someone joins. This should be handled on client side.
+        ✔ Display allowed commands when someone joins. This should be handled on client side. @started(24-07-15 00:04) @done(24-07-15 00:32) @lasted(28m41s)
         ☐ Client errors should have "Client:" prefix with a different color
         ☐ Implement Active User display:
         ```
