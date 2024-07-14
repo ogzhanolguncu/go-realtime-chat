@@ -3,17 +3,16 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 
 	"github.com/ogzhanolguncu/go-chat/client/color"
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func (c *Client) readMessages(incomingChan chan protocol.Payload) {
+func (c *Client) readMessages(incomingChan chan protocol.Payload, errChan chan error) {
 	for {
 		message, err := bufio.NewReader(c.conn).ReadString('\n')
 		if err != nil {
-			log.Println("Error reading message:", err)
+			errChan <- err
 			return
 		}
 		payload, err := protocol.DecodeMessage(message)
