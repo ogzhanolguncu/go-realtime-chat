@@ -10,11 +10,12 @@ const Separator = "|"
 type MessageType string
 
 const (
-	MessageTypeMSG MessageType = "MSG"
-	MessageTypeWSP MessageType = "WSP"
-	MessageTypeSYS MessageType = "SYS"
-	MessageTypeERR MessageType = "ERR"
-	MessageTypeUSR MessageType = "USR"
+	MessageTypeMSG      MessageType = "MSG"
+	MessageTypeWSP      MessageType = "WSP"
+	MessageTypeSYS      MessageType = "SYS"
+	MessageTypeERR      MessageType = "ERR"
+	MessageTypeUSR      MessageType = "USR"
+	MessageTypeACT_USRS MessageType = "ACT_USRS" //Active users
 )
 
 type Payload struct {
@@ -24,4 +25,5 @@ type Payload struct {
 	Recipient   string
 	Status      string
 	Username    string
+	ActiveUsers []string
 }

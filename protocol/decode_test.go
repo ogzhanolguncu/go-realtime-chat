@@ -55,3 +55,11 @@ func TestDecodeUsernameMessage(t *testing.T) {
 		assert.EqualError(t, err, "insufficient parts in USR message")
 	})
 }
+
+func TestDecodeActiveUsrMessage(t *testing.T) {
+	t.Run("should decode active users message successfully", func(t *testing.T) {
+		payload, _ := DecodeMessage("ACT_USRS|2|hey,there\r\n")
+		assert.Equal(t, Payload{MessageType: MessageTypeACT_USRS, ActiveUsers: []string{"hey", "there"}}, payload)
+	})
+
+}

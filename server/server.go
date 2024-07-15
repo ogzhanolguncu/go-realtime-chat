@@ -118,6 +118,10 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			s.broadcastMessage(msgPayload, c)
 		case protocol.MessageTypeWSP:
 			s.sendWhisper(msgPayload, c)
+		case protocol.MessageTypeACT_USRS:
+			msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: []string{"hey", "there"}, Status: "res"}))
+			c.Write(msg)
+			return
 		default:
 			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
 		}

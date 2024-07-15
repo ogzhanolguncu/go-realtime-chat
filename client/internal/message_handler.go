@@ -19,6 +19,7 @@ type Command struct {
 var commands = []Command{
 	{name: "/whisper", handler: handleWhisper},
 	{name: "/reply", handler: handleReply},
+	{name: "/users", handler: handleActiveUsers},
 }
 
 func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) {
@@ -80,6 +81,12 @@ func handleReply(input, sender, recipient string) (string, error) {
 		Recipient:   recipient,
 		Content:     message,
 		Sender:      sender,
+	}), nil
+}
+
+func handleActiveUsers(input, _, _ string) (string, error) {
+	return protocol.EncodeMessage(protocol.Payload{
+		MessageType: protocol.MessageTypeACT_USRS, Status: "req",
 	}), nil
 }
 

@@ -91,6 +91,28 @@ func DecodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("name length does not match expected length in USR message")
 		}
 		return Payload{MessageType: MessageTypeUSR, Username: name, Status: status}, nil
+	// ACT_USRS|active_user_length|active_user_array|status  status = "res" | "req"
+	case MessageTypeACT_USRS:
+		if len(parts) < 4 {
+			return Payload{}, fmt.Errorf("insufficient parts in ACT_USRS message")
+		}
+
+		lengthStr := parts[1]
+		var activeUsers []string
+		if parts[2] != "" {
+			activeUsers = strings.Split(parts[2], ",")
+		}
+		status := parts[3]
+
+		// Validate message length
+		expectedLength, err := strconv.Atoi(lengthStr)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid length format in ACT_USRS message: %v", err)
+		}
+		if len(activeUsers) != expectedLength {
+			return Payload{}, fmt.Errorf("list length does not match expected length in ACT_USRS message")
+		}
+		return Payload{MessageType: MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: status}, nil
 
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)

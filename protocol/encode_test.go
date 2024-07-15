@@ -100,3 +100,19 @@ func TestEncodeUsrMessage(t *testing.T) {
 	})
 
 }
+
+func TestEncodeActiveUsrMessage(t *testing.T) {
+	t.Run("should encode active users message successfully", func(t *testing.T) {
+		tests := []struct {
+			content  []string
+			expected string
+		}{
+			{[]string{"hey", "there"}, "ACT_USRS|2|hey,there\r\n"},
+		}
+
+		for _, test := range tests {
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeACT_USRS, ActiveUsers: []string{"hey", "there"}}))
+		}
+	})
+
+}
