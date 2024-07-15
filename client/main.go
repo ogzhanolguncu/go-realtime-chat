@@ -55,6 +55,10 @@ func runClient() error {
 		return fmt.Errorf("failed to set username: %v", err)
 	}
 
+	if err := client.FetchActiveUsersAfterUsername(); err != nil {
+		return fmt.Errorf("failed to fetch active users: %v", err)
+	}
+
 	incomingChan := make(chan protocol.Payload)
 	outgoingChan := make(chan string)
 	errChan := make(chan error, 1) // Buffered channel to prevent goroutine leak

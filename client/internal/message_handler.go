@@ -62,7 +62,6 @@ func processInput(input, sender, recipient string) (string, error) {
 		if strings.HasPrefix(input, cmd.name) {
 			return cmd.handler(input, sender, recipient)
 		}
-
 	}
 	return handlePublicMessage(input, sender), nil
 }
@@ -84,7 +83,7 @@ func handleReply(input, sender, recipient string) (string, error) {
 	}), nil
 }
 
-func handleActiveUsers(input, _, _ string) (string, error) {
+func handleActiveUsers(_, _, _ string) (string, error) {
 	return protocol.EncodeMessage(protocol.Payload{
 		MessageType: protocol.MessageTypeACT_USRS, Status: "req",
 	}), nil

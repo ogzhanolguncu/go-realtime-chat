@@ -132,7 +132,6 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			activeUsers := s.getActiveUsers()
 			msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
 			c.Write(msg)
-			return
 		default:
 			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
 		}
