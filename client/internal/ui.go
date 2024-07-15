@@ -16,7 +16,7 @@ func PrintHeader() {
 	fmt.Println("/whisper <recipient> <message> - Send a private message")
 	fmt.Println("/reply <message>               - Reply to the last whisper")
 	fmt.Println("/clear                         - Clear the screen")
-	fmt.Println("/users                  		- Show active users")
+	fmt.Println("/users                         - Show active users")
 	fmt.Println("/quit                          - Exit the chat")
 	fmt.Println("")
 	fmt.Println("To send a public message, just type and press Enter")

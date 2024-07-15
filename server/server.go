@@ -38,6 +38,16 @@ func (s *TCPServer) getConnectedUsersCount() int {
 	return count
 }
 
+func (s *TCPServer) getActiveUsers() []string {
+	var users []string
+	s.connectionMap.Range(func(key, value interface{}) bool {
+		info := value.(*ConnectionInfo)
+		users = append(users, info.OwnerName)
+		return true
+	})
+	return users
+}
+
 func (s *TCPServer) getConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, bool) {
 	value, ok := s.connectionMap.LoadAndDelete(c)
 	if !ok {
@@ -119,7 +129,8 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		case protocol.MessageTypeWSP:
 			s.sendWhisper(msgPayload, c)
 		case protocol.MessageTypeACT_USRS:
-			msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: []string{"hey", "there"}, Status: "res"}))
+			activeUsers := s.getActiveUsers()
+			msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
 			c.Write(msg)
 			return
 		default:
