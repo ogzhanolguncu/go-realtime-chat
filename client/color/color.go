@@ -22,6 +22,9 @@ const (
 	BoldBlue     = "\033[34;1m"
 	BlinkBlue    = "\033[34;1;5m"
 	BrightYellow = "\033[33;1m"
+
+	ClearScreen = "\033[2J"
+	MoveCursor  = "\033[%d;%dH"
 )
 
 // Colorify applies the given color to the text
