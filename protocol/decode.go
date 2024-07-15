@@ -66,13 +66,19 @@ func DecodeMessage(message string) (Payload, error) {
 		return Payload{MessageType: MessageTypeWSP, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
 	// SYS|message_length|message_content|status \r\n status = "fail" | "success"
 	case MessageTypeSYS:
-		if len(parts) < 4 {
+		if len(parts) < 5 {
 			return Payload{}, fmt.Errorf("insufficient parts in SYS message")
 		}
 
-		lengthStr := parts[1]
-		content := parts[2]
-		status := parts[3]
+		timestamp := parts[1]
+		lengthStr := parts[2]
+		content := parts[3]
+		status := parts[4]
+
+		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid timestamp format in SYS message: %v", err)
+		}
 
 		// Validate message length
 		expectedLength, err := strconv.Atoi(lengthStr)
@@ -82,17 +88,23 @@ func DecodeMessage(message string) (Payload, error) {
 		if len(content) != expectedLength {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in SYS message")
 		}
-		return Payload{Content: content, MessageType: MessageTypeSYS, Status: status}, nil
+		return Payload{Content: content, Timestamp: unixTimestamp, MessageType: MessageTypeSYS, Status: status}, nil
 
 	// USR|name_length|name_content|status\r\n status = "fail | "success"
 	case MessageTypeUSR:
-		if len(parts) < 4 {
+		if len(parts) < 5 {
 			return Payload{}, fmt.Errorf("insufficient parts in USR message")
 		}
 
-		lengthStr := parts[1]
-		name := parts[2]
-		status := parts[3]
+		timestamp := parts[1]
+		lengthStr := parts[2]
+		name := parts[3]
+		status := parts[4]
+
+		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid timestamp format in USR message: %v", err)
+		}
 
 		// Validate message length
 		expectedLength, err := strconv.Atoi(lengthStr)
@@ -102,19 +114,25 @@ func DecodeMessage(message string) (Payload, error) {
 		if len(name) != expectedLength {
 			return Payload{}, fmt.Errorf("name length does not match expected length in USR message")
 		}
-		return Payload{MessageType: MessageTypeUSR, Username: name, Status: status}, nil
+		return Payload{MessageType: MessageTypeUSR, Timestamp: unixTimestamp, Username: name, Status: status}, nil
 	// ACT_USRS|active_user_length|active_user_array|status  status = "res" | "req"
 	case MessageTypeACT_USRS:
-		if len(parts) < 4 {
+		if len(parts) < 5 {
 			return Payload{}, fmt.Errorf("insufficient parts in ACT_USRS message")
 		}
 
-		lengthStr := parts[1]
+		timestamp := parts[1]
+		lengthStr := parts[2]
 		var activeUsers []string
-		if parts[2] != "" {
-			activeUsers = strings.Split(parts[2], ",")
+		if parts[3] != "" {
+			activeUsers = strings.Split(parts[3], ",")
 		}
-		status := parts[3]
+		status := parts[4]
+
+		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid timestamp format in ACT_USRS message: %v", err)
+		}
 
 		// Validate message length
 		expectedLength, err := strconv.Atoi(lengthStr)
@@ -124,7 +142,7 @@ func DecodeMessage(message string) (Payload, error) {
 		if len(activeUsers) != expectedLength {
 			return Payload{}, fmt.Errorf("list length does not match expected length in ACT_USRS message")
 		}
-		return Payload{MessageType: MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: status}, nil
+		return Payload{MessageType: MessageTypeACT_USRS, Timestamp: unixTimestamp, ActiveUsers: activeUsers, Status: status}, nil
 
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)

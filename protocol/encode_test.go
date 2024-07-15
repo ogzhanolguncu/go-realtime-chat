@@ -61,11 +61,11 @@ func TestEncodeSystemMessage(t *testing.T) {
 			status   string
 			expected string
 		}{
-			{"John has left the chat!", "left", "SYS|23|John has left the chat!|left\r\n"},
+			{"John has left the chat!", "left", fmt.Sprintf("SYS|%d|23|John has left the chat!|left\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeSYS, Content: test.content, Status: test.status}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeSYS, Timestamp: time.Now().Unix(), Content: test.content, Status: test.status}))
 		}
 	})
 
@@ -77,11 +77,11 @@ func TestEncodeErrMessage(t *testing.T) {
 			content  string
 			expected string
 		}{
-			{"Errr!", "ERR|5|Errr!\r\n"},
+			{"Errr!", fmt.Sprintf("ERR|%d|5|Errr!\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeERR, Content: "Errr!"}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeERR, Timestamp: time.Now().Unix(), Content: "Errr!"}))
 		}
 	})
 
@@ -93,11 +93,11 @@ func TestEncodeUsrMessage(t *testing.T) {
 			content  string
 			expected string
 		}{
-			{"Oz", "USR|2|Oz|success\r\n"},
+			{"Oz", fmt.Sprintf("USR|%d|2|Oz|success\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeUSR, Username: "Oz", Status: "success"}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeUSR, Timestamp: time.Now().Unix(), Username: "Oz", Status: "success"}))
 		}
 	})
 
@@ -109,11 +109,11 @@ func TestEncodeActiveUsrMessage(t *testing.T) {
 			content  []string
 			expected string
 		}{
-			{[]string{"hey", "there"}, "ACT_USRS|2|hey,there\r\n"},
+			{[]string{"Oz", "John"}, fmt.Sprintf("ACT_USRS|%d|2|hey,there|res\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeACT_USRS, ActiveUsers: []string{"hey", "there"}}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeACT_USRS, Timestamp: time.Now().Unix(), ActiveUsers: []string{"hey", "there"}, Status: "res"}))
 		}
 	})
 

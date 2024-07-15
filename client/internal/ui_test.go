@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
@@ -14,7 +15,7 @@ import (
 func TestColorifyAndFormatContent(t *testing.T) {
 
 	t.Run("should format system message with timestamp", func(t *testing.T) {
-		payload := protocol.Payload{Content: "System message", MessageType: protocol.MessageTypeSYS}
+		payload := protocol.Payload{Content: "System message", Timestamp: time.Now().Unix(), MessageType: protocol.MessageTypeSYS}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
@@ -23,7 +24,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	})
 
 	t.Run("should format whisper message with timestamp", func(t *testing.T) {
-		payload := protocol.Payload{Content: "Hello!", MessageType: protocol.MessageTypeWSP, Sender: "Alice"}
+		payload := protocol.Payload{Content: "Hello!", Timestamp: time.Now().Unix(), MessageType: protocol.MessageTypeWSP, Sender: "Alice"}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
@@ -32,12 +33,12 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	})
 
 	t.Run("should format group message with timestamp", func(t *testing.T) {
-		payload := protocol.Payload{Content: "Hey everyone!", MessageType: protocol.MessageTypeMSG, Sender: "Bob"}
+		payload := protocol.Payload{Content: "Hey everyone!", Timestamp: time.Now().Unix(), MessageType: protocol.MessageTypeMSG, Sender: "Bob"}
 		stdout := captureStdout(func() {
 			colorifyAndFormatContent(payload)
 		})
 
-		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Bob: Hey everyone!\n", terminal.Blue))
+		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Bob: Hey everyone!\n", terminal.Green))
 	})
 }
 

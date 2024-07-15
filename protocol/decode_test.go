@@ -38,20 +38,22 @@ func TestDecodeWhisperMessage(t *testing.T) {
 }
 
 func TestDecodeSystemMessage(t *testing.T) {
+	timestamp := time.Now().Unix()
 	t.Run("should decode system message into payload successfully", func(t *testing.T) {
-		payload, _ := DecodeMessage("SYS|4|Oops|fail\r\n")
-		assert.Equal(t, Payload{MessageType: MessageTypeSYS, Content: "Oops", Status: "fail"}, payload)
+		payload, _ := DecodeMessage(fmt.Sprintf("SYS|%d|4|Oops|fail\r\n", timestamp))
+		assert.Equal(t, Payload{MessageType: MessageTypeSYS, Timestamp: timestamp, Content: "Oops", Status: "fail"}, payload)
 	})
 	t.Run("should check for at least 4 parts of message SYS", func(t *testing.T) {
-		_, err := DecodeMessage("SYS|4|fail\r\n")
+		_, err := DecodeMessage(fmt.Sprintf("SYS|%d|4|fail\r\n", timestamp))
 		assert.EqualError(t, err, "insufficient parts in SYS message")
 	})
 }
 
 func TestDecodeUsernameMessage(t *testing.T) {
+	timestamp := time.Now().Unix()
 	t.Run("should decode system message into payload successfully", func(t *testing.T) {
-		payload, _ := DecodeMessage("USR|2|Oz|success\r\n")
-		assert.Equal(t, Payload{MessageType: MessageTypeUSR, Username: "Oz", Status: "success"}, payload)
+		payload, _ := DecodeMessage(fmt.Sprintf("USR|%d|2|Oz|success\r\n", timestamp))
+		assert.Equal(t, Payload{MessageType: MessageTypeUSR, Timestamp: timestamp, Username: "Oz", Status: "success"}, payload)
 	})
 
 	t.Run("should check for at least 4 parts of message USR", func(t *testing.T) {
@@ -61,9 +63,11 @@ func TestDecodeUsernameMessage(t *testing.T) {
 }
 
 func TestDecodeActiveUsrMessage(t *testing.T) {
+	timestamp := time.Now().Unix()
 	t.Run("should decode active users message successfully", func(t *testing.T) {
-		payload, _ := DecodeMessage("ACT_USRS|2|hey,there\r\n")
-		assert.Equal(t, Payload{MessageType: MessageTypeACT_USRS, ActiveUsers: []string{"hey", "there"}}, payload)
+		payload, _ := DecodeMessage(fmt.Sprintf("ACT_USRS|%d|2|hey,there|res\r\n", timestamp))
+		assert.Equal(t, Payload{MessageType: MessageTypeACT_USRS, Timestamp: timestamp, ActiveUsers: []string{"hey", "there"}, Status: "res"}, payload)
+
 	})
 
 }
