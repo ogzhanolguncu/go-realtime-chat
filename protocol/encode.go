@@ -3,6 +3,7 @@ package protocol
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 func EncodeMessage(payload Payload) string {
@@ -11,10 +12,10 @@ func EncodeMessage(payload Payload) string {
 	switch payload.MessageType {
 	// MSG|sender|message_length|message_content\r\n
 	case MessageTypeMSG:
-		return fmt.Sprintf("%s|%s|%d|%s\r\n", payload.MessageType, payload.Sender, length, payload.Content)
+		return fmt.Sprintf("%s|%d|%s|%d|%s\r\n", payload.MessageType, time.Now().Unix(), payload.Sender, length, payload.Content)
 	// WSP|sender|recipient|message_length|message_content\r\n
 	case MessageTypeWSP:
-		return fmt.Sprintf("%s|%s|%s|%d|%s\r\n", payload.MessageType, payload.Sender, payload.Recipient, length, payload.Content)
+		return fmt.Sprintf("%s|%d|%s|%s|%d|%s\r\n", payload.MessageType, time.Now().Unix(), payload.Sender, payload.Recipient, length, payload.Content)
 	// SYS|message_length|message_content|status \r\n status = "fail" | "success"
 	case MessageTypeSYS:
 		if payload.Status == "" {

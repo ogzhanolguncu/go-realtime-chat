@@ -1,7 +1,9 @@
 package protocol
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -13,10 +15,10 @@ func TestEncodeGeneralMessage(t *testing.T) {
 			sender   string
 			expected string
 		}{
-			{"Hello", "John", "MSG|John|5|Hello\r\n"},
-			{"World", "Oz", "MSG|Oz|5|World\r\n"},
-			{"HeyHey", "Frey", "MSG|Frey|6|HeyHey\r\n"},
-			{"", "John", "MSG|John|0|\r\n"},
+			{"Hello", "John", fmt.Sprintf("MSG|%d|John|5|Hello\r\n", time.Now().Unix())},
+			{"World", "Oz", fmt.Sprintf("MSG|%d|Oz|5|World\r\n", time.Now().Unix())},
+			{"HeyHey", "Frey", fmt.Sprintf("MSG|%d|Frey|6|HeyHey\r\n", time.Now().Unix())},
+			{"", "John", fmt.Sprintf("MSG|%d|John|0|\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
@@ -37,9 +39,9 @@ func TestEncodeWhisperMessage(t *testing.T) {
 			recipient string
 			expected  string
 		}{
-			{"Hello", "Oz", "John", "WSP|Oz|John|5|Hello\r\n"},
-			{"World", "John", "Oz", "WSP|John|Oz|5|World\r\n"},
-			{"HeyHey", "Frey", "Oz", "WSP|Frey|Oz|6|HeyHey\r\n"},
+			{"Hello", "Oz", "John", fmt.Sprintf("WSP|%d|Oz|John|5|Hello\r\n", time.Now().Unix())},
+			{"World", "John", "Oz", fmt.Sprintf("WSP|%d|John|Oz|5|World\r\n", time.Now().Unix())},
+			{"HeyHey", "Frey", "Oz", fmt.Sprintf("WSP|%d|Frey|Oz|6|HeyHey\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {

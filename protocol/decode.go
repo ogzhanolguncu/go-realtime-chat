@@ -14,13 +14,19 @@ func DecodeMessage(message string) (Payload, error) {
 
 	switch MessageType(messageType) {
 	case MessageTypeMSG:
-		if len(parts) < 4 {
+		if len(parts) < 5 {
 			return Payload{}, fmt.Errorf("insufficient parts in MSG message")
 		}
 
-		sender := parts[1]
-		lengthStr := parts[2]
-		content := parts[3]
+		timestamp := parts[1]
+		sender := parts[2]
+		lengthStr := parts[3]
+		content := parts[4]
+
+		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid timestamp format in MSG message: %v", err)
+		}
 
 		expectedLength, err := strconv.Atoi(lengthStr)
 		if err != nil {
@@ -30,17 +36,23 @@ func DecodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in MSG message")
 		}
 
-		return Payload{Content: content, Sender: sender, MessageType: MessageTypeMSG}, nil
+		return Payload{Content: content, Timestamp: unixTimestamp, Sender: sender, MessageType: MessageTypeMSG}, nil
 
 	case MessageTypeWSP:
-		if len(parts) < 5 {
+		if len(parts) < 6 {
 			return Payload{}, fmt.Errorf("insufficient parts in WSP message")
 		}
 
-		sender := parts[1]
-		recipient := parts[2]
-		lengthStr := parts[3]
-		content := parts[4]
+		timestamp := parts[1]
+		sender := parts[2]
+		recipient := parts[3]
+		lengthStr := parts[4]
+		content := parts[5]
+
+		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid timestamp format in MSG message: %v", err)
+		}
 
 		// Validate message length
 		expectedLength, err := strconv.Atoi(lengthStr)
@@ -51,7 +63,7 @@ func DecodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("message content length does not match expected length in WSP message")
 		}
 
-		return Payload{MessageType: MessageTypeWSP, Content: content, Sender: sender, Recipient: recipient}, nil
+		return Payload{MessageType: MessageTypeWSP, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
 	// SYS|message_length|message_content|status \r\n status = "fail" | "success"
 	case MessageTypeSYS:
 		if len(parts) < 4 {
