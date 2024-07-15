@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ogzhanolguncu/go-chat/client/color"
+	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
@@ -125,7 +125,7 @@ func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan
 		}
 		payload, err := protocol.DecodeMessage(message)
 		if err != nil {
-			fmt.Print(color.ColorifyWithTimestamp(err.Error(), color.Red))
+			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red))
 			continue
 		}
 		select {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/joho/godotenv"
-	"github.com/ogzhanolguncu/go-chat/client/color"
 	"github.com/ogzhanolguncu/go-chat/client/internal"
+	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
@@ -30,12 +30,12 @@ func main() {
 			if err.Error() == "EOF" {
 				err = fmt.Errorf("server is not responding")
 			}
-			fmt.Println(color.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but %v", err), color.Red))
+			fmt.Println(terminal.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but %v", err), terminal.Red))
 		}),
 	)
 
 	if err != nil {
-		log.Fatalf(color.ColorifyWithTimestamp(fmt.Sprintf("Failed after max retries: %v", err), color.Red))
+		log.Fatalf(terminal.ColorifyWithTimestamp(fmt.Sprintf("Failed after max retries: %v", err), terminal.Red))
 	}
 }
 

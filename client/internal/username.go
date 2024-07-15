@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ogzhanolguncu/go-chat/client/color"
+	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
@@ -20,7 +20,7 @@ func (c *Client) SetUsername() error {
 	}
 
 	for retries := 0; retries < 3; retries++ {
-		fmt.Print(color.ColorifyWithTimestamp("Enter your username: ", color.White))
+		fmt.Print(terminal.ColorifyWithTimestamp("Enter your username: ", terminal.White))
 		nameInput, err := reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("error reading username input: %w", err)
@@ -28,7 +28,7 @@ func (c *Client) SetUsername() error {
 
 		nameInput = strings.TrimSpace(nameInput)
 		if nameInput == "" {
-			fmt.Println(color.ColorifyWithTimestamp("Username cannot be empty. Please try again.", color.Red))
+			fmt.Println(terminal.ColorifyWithTimestamp("Username cannot be empty. Please try again.", terminal.Red))
 			continue
 		}
 

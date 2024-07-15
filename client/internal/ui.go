@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ogzhanolguncu/go-chat/client/color"
+	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 	"golang.org/x/term"
 )
@@ -28,7 +28,7 @@ func printBox(width int, title string, content []string, align string) {
 	box = append(box, "+"+strings.Repeat("-", width-2)+"+")
 
 	termWidth, _, _ := term.GetSize(0) // Implement this function to get terminal width
-	fmt.Print(color.Cyan)
+	fmt.Print(terminal.Cyan)
 	for _, line := range box {
 		switch align {
 		case "right":
@@ -40,12 +40,12 @@ func printBox(width int, title string, content []string, align string) {
 			fmt.Println(line)
 		}
 	}
-	fmt.Print(color.Reset)
+	fmt.Print(terminal.Reset)
 }
 
 func PrintHeader(shouldClear bool) {
 	if shouldClear {
-		fmt.Print(color.ClearScreen)
+		fmt.Print(terminal.ClearScreen)
 		fmt.Print("\033[H") // Moves cursor to top left after clear
 	}
 	content := []string{
@@ -69,7 +69,7 @@ func printActiveUsers(users []string) {
 
 func askForInput() {
 	fmt.Println(separatorLine)
-	coloredPrompt := color.ColorifyWithTimestamp("You:", color.Yellow)
+	coloredPrompt := terminal.ColorifyWithTimestamp("You:", terminal.Yellow)
 	fmt.Printf("%s ", coloredPrompt)
 	fmt.Print("\033[s") // Save cursor position
 	fmt.Println()       // Move to next line
@@ -80,11 +80,11 @@ func askForInput() {
 
 func colorifyAndFormatContent(payload protocol.Payload) {
 	colorMap := map[protocol.MessageType]string{
-		protocol.MessageTypeSYS:      color.Cyan,
-		protocol.MessageTypeWSP:      color.Purple,
-		protocol.MessageTypeUSR:      color.Yellow,
-		protocol.MessageTypeMSG:      color.Green,
-		protocol.MessageTypeACT_USRS: color.Blue,
+		protocol.MessageTypeSYS:      terminal.Cyan,
+		protocol.MessageTypeWSP:      terminal.Purple,
+		protocol.MessageTypeUSR:      terminal.Yellow,
+		protocol.MessageTypeMSG:      terminal.Green,
+		protocol.MessageTypeACT_USRS: terminal.Blue,
 	}
 
 	var message string
@@ -94,7 +94,7 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 	case protocol.MessageTypeSYS:
 		message = fmt.Sprintf("System: %s\n", payload.Content)
 		if payload.Status == "fail" {
-			colorCode = color.Red
+			colorCode = terminal.Red
 		}
 	case protocol.MessageTypeWSP:
 		message = fmt.Sprintf("Whisper from %s: %s\n", payload.Sender, payload.Content)
@@ -103,7 +103,7 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 			message = fmt.Sprintf("Username successfully set to %s\n", payload.Username)
 		} else {
 			message = fmt.Sprintf("%s\n", payload.Username)
-			colorCode = color.Red
+			colorCode = terminal.Red
 		}
 	case protocol.MessageTypeACT_USRS:
 		if payload.Status == "res" {
@@ -120,6 +120,6 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 	}
 
 	if message != "" {
-		fmt.Print(color.ColorifyWithTimestamp(message, colorCode))
+		fmt.Print(terminal.ColorifyWithTimestamp(message, colorCode))
 	}
 }

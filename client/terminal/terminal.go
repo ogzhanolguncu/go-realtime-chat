@@ -1,5 +1,4 @@
-// color/color.go
-package color
+package terminal
 
 import (
 	"fmt"
