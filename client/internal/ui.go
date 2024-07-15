@@ -11,7 +11,6 @@ import (
 
 const (
 	headerWidth   = 70
-	userBoxWidth  = 24
 	separatorLine = "------------------------------------"
 )
 
@@ -44,8 +43,11 @@ func printBox(width int, title string, content []string, align string) {
 	fmt.Print(color.Reset)
 }
 
-func PrintHeader() {
-	fmt.Print(color.ClearScreen)
+func PrintHeader(shouldClear bool) {
+	if shouldClear {
+		fmt.Print(color.ClearScreen)
+		fmt.Print("\033[H") // Moves cursor to top left after clear
+	}
 	content := []string{
 		"Available commands:",
 		"/whisper <recipient> <message> - Send a private message",
@@ -62,7 +64,7 @@ func PrintHeader() {
 
 func printActiveUsers(users []string) {
 	content := append([]string{}, users...)
-	printBox(userBoxWidth, fmt.Sprintf("ACTIVE USERS (%d)", len(users)), content, "left")
+	printBox(headerWidth, fmt.Sprintf("ACTIVE USERS (%d)", len(users)), content, "left")
 }
 
 func askForInput() {
@@ -81,6 +83,7 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 		protocol.MessageTypeSYS:      color.Cyan,
 		protocol.MessageTypeWSP:      color.Purple,
 		protocol.MessageTypeUSR:      color.Yellow,
+		protocol.MessageTypeMSG:      color.Green,
 		protocol.MessageTypeACT_USRS: color.Blue,
 	}
 
@@ -97,14 +100,20 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 		message = fmt.Sprintf("Whisper from %s: %s\n", payload.Sender, payload.Content)
 	case protocol.MessageTypeUSR:
 		if payload.Status == "success" {
-			// message = fmt.Sprintf("Username successfully set to %s\n", payload.Username)
+			message = fmt.Sprintf("Username successfully set to %s\n", payload.Username)
 		} else {
 			message = fmt.Sprintf("%s\n", payload.Username)
 			colorCode = color.Red
 		}
 	case protocol.MessageTypeACT_USRS:
 		if payload.Status == "res" {
-			message = fmt.Sprintf("Active users: %s\n", strings.Join(payload.ActiveUsers, ", "))
+			// Move the cursor up one line
+			println("")
+			fmt.Print("\033[F")
+			// Clear the entire line
+			fmt.Print("\033[K")
+			// Move the cursor back to the beginning of the line
+			printActiveUsers(payload.ActiveUsers)
 		}
 	default:
 		message = fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)

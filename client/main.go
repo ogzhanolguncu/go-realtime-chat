@@ -50,7 +50,7 @@ func runClient() error {
 		return err
 	}
 
-	internal.PrintHeader()
+	internal.PrintHeader(true)
 	if err := client.SetUsername(); err != nil {
 		return fmt.Errorf("failed to set username: %v", err)
 	}

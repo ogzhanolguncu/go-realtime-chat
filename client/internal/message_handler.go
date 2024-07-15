@@ -26,7 +26,6 @@ func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) 
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		askForInput()
 		text, err := reader.ReadString('\n')
 		if err != nil {
 			log.Println("Error reading input:", err)
@@ -38,8 +37,11 @@ func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) 
 			os.Exit(0)
 		}
 		if text == "/clear" {
-			fmt.Print("\033[H\033[2J")
-			askForInput()
+			fmt.Print("\033[H\033[2J") //Clears terminal
+		}
+		if text == "/help" {
+			fmt.Println("")
+			PrintHeader(false)
 		}
 
 		message, err := processInput(text, c.name, c.lastWhispererFromGroupChat)
@@ -138,6 +140,7 @@ func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan
 
 func (c *Client) MessageLoop(incomingChan <-chan protocol.Payload, outgoingChan <-chan string, errChan <-chan error, done chan struct{}) error {
 	for {
+		askForInput()
 		select {
 		case incMessage, ok := <-incomingChan:
 			if !ok {
@@ -147,7 +150,6 @@ func (c *Client) MessageLoop(incomingChan <-chan protocol.Payload, outgoingChan 
 				c.lastWhispererFromGroupChat = incMessage.Sender
 			}
 			colorifyAndFormatContent(incMessage)
-			askForInput()
 		case outMessage, ok := <-outgoingChan:
 			if !ok {
 				return nil // Channel closed, exit loop

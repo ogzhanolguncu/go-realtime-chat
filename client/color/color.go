@@ -18,6 +18,8 @@ const (
 	BlinkRed     = "\033[31;1;5m"
 	Cyan         = "\033[36m"
 	Purple       = "\033[35m"
+	Green        = "\033[32m"
+	Magenta      = "\033[35m"
 	Blue         = "\033[34m"
 	BoldBlue     = "\033[34;1m"
 	BlinkBlue    = "\033[34;1;5m"
