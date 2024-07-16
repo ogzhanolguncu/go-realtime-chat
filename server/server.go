@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/server/chat_history"
 )
 
 // ConnectionInfo holds connection-related information.
@@ -19,6 +20,7 @@ type ConnectionInfo struct {
 
 type TCPServer struct {
 	connectionMap sync.Map
+	history       chat_history.ChatHistory
 }
 
 func newServer() *TCPServer {

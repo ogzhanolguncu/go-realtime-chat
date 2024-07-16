@@ -1,0 +1,83 @@
+package chat_history
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAddMessage(t *testing.T) {
+	chatHistory := NewChatHistory()
+	chatHistory.AddMessage(
+		"MSG|1721160403|Oz|3|aaa\r\n",
+		"MSG|1721160403|Oz|4|aaaa\r\n",
+		"MSG|1721160403|Oz|5|aaaaa\r\n")
+	assert.Equal(t, 3, len(chatHistory.messages))
+}
+
+func TestFilterMessages(t *testing.T) {
+	tests := []struct {
+		name             string
+		messages         []string
+		user             string
+		messageTypes     []string
+		expectedMessages []string
+	}{
+		{
+			name: "filter messages by user and message types",
+			messages: []string{
+				"MSG|1721160403|Oz|3|aaa\r\n",
+				"MSG|1721160403|Oz|4|aaaa\r\n",
+				"MSG|1721160403|Oz|5|aaaaa\r\n",
+				"WSP|1721160403|Oz|John|9|Hello Oz.\r\n",
+				"SYS|1721160403|3|Aaa|success",
+				"WSP|1721160403|John|Oz|11|Hello John.\r\n",
+				"WSP|1721160403|John|Frey|11|Hello Frey.\r\n",
+			},
+			user:         "Oz",
+			messageTypes: []string{"MSG", "WSP"},
+			expectedMessages: []string{
+				"MSG|1721160403|Oz|3|aaa\r\n",
+				"MSG|1721160403|Oz|4|aaaa\r\n",
+				"MSG|1721160403|Oz|5|aaaaa\r\n",
+				"WSP|1721160403|Oz|John|9|Hello Oz.\r\n",
+				"WSP|1721160403|John|Oz|11|Hello John.\r\n",
+			},
+		},
+		// Add more test cases as needed
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			chatHistory := NewChatHistory()
+			chatHistory.AddMessage(tt.messages...)
+			filteredHistory := chatHistory.GetHistory(tt.user, tt.messageTypes...)
+			assert.Equal(t, tt.expectedMessages, filteredHistory)
+		})
+	}
+}
+
+func TestSaveToDisk(t *testing.T) {
+	chatHistory := NewChatHistory()
+	chatHistory.AddMessage(
+		"MSG|1721160403|Oz|3|aaa\r\n",
+		"MSG|1721160403|Oz|4|aaaa\r\n",
+		"MSG|1721160403|Oz|5|aaaaa\r\n")
+
+	chatHistory.SaveToDisk()
+	require.DirExists(t, fmt.Sprintf("%s/chat_history", rootDir()))
+}
+
+// func TestDeleteFromDisk(t *testing.T) {
+// 	chatHistory := NewChatHistory()
+// 	chatHistory.AddMessage(
+// 		"MSG|1721160403|Oz|3|aaa\r\n",
+// 		"MSG|1721160403|Oz|4|aaaa\r\n",
+// 		"MSG|1721160403|Oz|5|aaaaa\r\n")
+
+// 	chatHistory.SaveToDisk()
+// 	chatHistory.DeleteFromDisk()
+// 	require.NoDirExists(t, fmt.Sprintf("%s/chat_history", rootDir()))
+// }
