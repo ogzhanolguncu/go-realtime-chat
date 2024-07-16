@@ -1,10 +1,13 @@
 package chat_history
 
 import (
-	"encoding/json"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type ChatHistory struct {
@@ -40,18 +43,9 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 }
 
 func (ch *ChatHistory) SaveToDisk() error {
-	dir := filepath.Join(rootDir(), "chat_history")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	file := filepath.Join(dir, "history.json")
-	data, err := json.Marshal(ch.messages)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(file, data, 0644)
+	file := filepath.Join(rootDir(), "chat_history.txt")
+	ch.messages = prepend(ch.messages, strconv.FormatInt(time.Now().Unix(), 10)+"\n")
+	return os.WriteFile(file, []byte(strings.Join(ch.messages, "")), 0644)
 }
 
 func (ch *ChatHistory) DeleteFromDisk() error {
@@ -60,8 +54,13 @@ func (ch *ChatHistory) DeleteFromDisk() error {
 }
 
 func rootDir() string {
-	// This is a placeholder. In a real application, you'd return the actual root directory.
-	return "."
+	_, b, _, _ := runtime.Caller(0)
+	d := path.Join(path.Dir(b))
+	return filepath.Dir(d)
+}
+
+func prepend[T any](slice []T, elems ...T) []T {
+	return append(elems, slice...)
 }
 
 func contains(slice []string, item string) bool {
