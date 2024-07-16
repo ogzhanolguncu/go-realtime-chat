@@ -1,6 +1,7 @@
 package chat_history
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -24,6 +25,7 @@ func (ch *ChatHistory) AddMessage(messages ...string) {
 	ch.messages = append(ch.messages, messages...)
 }
 
+// Get messages from memory if they are from requester user and contain allowed messageTypes
 func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string {
 	var filteredMessages []string
 	for _, msg := range ch.messages {
@@ -42,15 +44,46 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 	return filteredMessages
 }
 
+// Save to disk. And add a timestamp to first line so we can check and delete if its older than a day.
 func (ch *ChatHistory) SaveToDisk() error {
 	file := filepath.Join(rootDir(), "chat_history.txt")
-	ch.messages = prepend(ch.messages, strconv.FormatInt(time.Now().Unix(), 10)+"\n")
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	ch.messages = prepend(ch.messages, timestamp+"\n")
 	return os.WriteFile(file, []byte(strings.Join(ch.messages, "")), 0644)
 }
 
+// Remove file from disk if it exists.
 func (ch *ChatHistory) DeleteFromDisk() error {
-	dir := filepath.Join(rootDir(), "chat_history")
-	return os.RemoveAll(dir)
+	filePath := filepath.Join(rootDir(), "chat_history.txt")
+	return os.Remove(filePath)
+}
+
+// Read chat_history.txt from disk to in-memory.
+func (ch *ChatHistory) ReadFromDiskToInMemory() error {
+	filePath := filepath.Join(rootDir(), "chat_history.txt")
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("could not read file: %w", err)
+	}
+
+	// Split the data by newline character
+	ch.messages = strings.Split(string(data), "\n")
+
+	// Remove empty strings that may result from splitting
+	ch.messages = removeEmpty(ch.messages)
+
+	return nil
+}
+
+// Helper function to remove empty strings from a slice
+func removeEmpty(s []string) []string {
+	var r []string
+	for _, str := range s {
+		if str != "" {
+			r = append(r, str)
+		}
+	}
+	return r
 }
 
 func rootDir() string {

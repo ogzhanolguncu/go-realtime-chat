@@ -1,7 +1,10 @@
 package chat_history
 
 import (
-	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,19 +68,62 @@ func TestSaveToDisk(t *testing.T) {
 		"MSG|1721160403|Oz|3|aaa\r\n",
 		"MSG|1721160403|Oz|4|aaaa\r\n",
 		"MSG|1721160403|Oz|5|aaaaa\r\n")
+	err := chatHistory.SaveToDisk()
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(rootDir(), "chat_history.txt"))
 
-	chatHistory.SaveToDisk()
-	require.DirExists(t, fmt.Sprintf("%s/chat_history", rootDir()))
+	// Read the file to verify its contents
+	content, err := os.ReadFile(filepath.Join(rootDir(), "chat_history.txt"))
+	require.NoError(t, err)
+	lines := strings.Split(strings.ReplaceAll(string(content), "\r", ""), "\n")
+	require.GreaterOrEqual(t, len(lines), 4)    // Timestamp + 3 messages
+	_, err = strconv.ParseInt(lines[0], 10, 64) // Check if the first line is a valid timestamp
+	require.NoError(t, err)
+	assert.Equal(t, "MSG|1721160403|Oz|3|aaa", lines[1])
+	assert.Equal(t, "MSG|1721160403|Oz|4|aaaa", lines[2])
+	assert.Equal(t, "MSG|1721160403|Oz|5|aaaaa", lines[3])
 }
 
-// func TestDeleteFromDisk(t *testing.T) {
-// 	chatHistory := NewChatHistory()
-// 	chatHistory.AddMessage(
-// 		"MSG|1721160403|Oz|3|aaa\r\n",
-// 		"MSG|1721160403|Oz|4|aaaa\r\n",
-// 		"MSG|1721160403|Oz|5|aaaaa\r\n")
+func TestDeleteFromDisk(t *testing.T) {
+	chatHistory := NewChatHistory()
+	chatHistory.AddMessage(
+		"MSG|1721160403|Oz|3|aaa\r\n",
+		"MSG|1721160403|Oz|4|aaaa\r\n",
+		"MSG|1721160403|Oz|5|aaaaa\r\n")
+	err := chatHistory.SaveToDisk()
+	require.NoError(t, err)
 
-// 	chatHistory.SaveToDisk()
-// 	chatHistory.DeleteFromDisk()
-// 	require.NoDirExists(t, fmt.Sprintf("%s/chat_history", rootDir()))
-// }
+	err = chatHistory.DeleteFromDisk()
+	require.NoError(t, err)
+	require.NoFileExists(t, filepath.Join(rootDir(), "chat_history.txt"))
+}
+
+func TestReadFromDiskToInMemory(t *testing.T) {
+	// Setup
+	chatHistory := NewChatHistory()
+	testMessages := []string{
+		"1234567890", // Timestamp
+		"MSG|1721160403|Oz|3|aaa\r",
+		"MSG|1721160403|Oz|4|aaaa\r",
+		"MSG|1721160403|Oz|5|aaaaa\r",
+	}
+
+	testFile := filepath.Join(rootDir(), "chat_history.txt")
+	err := os.WriteFile(testFile, []byte(strings.Join(testMessages, "\n")), 0644)
+	require.NoError(t, err)
+
+	defer os.Remove(testFile)
+
+	err = chatHistory.ReadFromDiskToInMemory()
+	require.NoError(t, err)
+
+	require.Equal(t, len(testMessages), len(chatHistory.messages))
+	for i, msg := range testMessages {
+		assert.Equal(t, msg, chatHistory.messages[i])
+	}
+
+	os.Remove(testFile)
+	err = chatHistory.ReadFromDiskToInMemory()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not read file")
+}
