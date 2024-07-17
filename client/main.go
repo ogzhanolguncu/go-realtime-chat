@@ -55,12 +55,12 @@ func runClient() error {
 		return fmt.Errorf("failed to set username: %v", err)
 	}
 
-	if err := client.FetchChatHistory(); err != nil {
-		return fmt.Errorf("failed to fetch chat history: %v", err)
-	}
-
 	if err := client.FetchActiveUsersAfterUsername(); err != nil {
 		return fmt.Errorf("failed to fetch active users: %v", err)
+	}
+
+	if err := client.FetchChatHistory(); err != nil {
+		return fmt.Errorf("failed to fetch chat history: %v", err)
 	}
 
 	incomingChan := make(chan protocol.Payload)

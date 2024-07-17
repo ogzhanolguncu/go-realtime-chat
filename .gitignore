@@ -26,3 +26,4 @@ go.work.sum
 
 /client/client
 /server/server
+chat_history.txt

@@ -68,14 +68,8 @@ func printActiveUsers(users []string) {
 }
 
 func askForInput() {
-	fmt.Println(separatorLine)
 	coloredPrompt := terminal.ColorifyWithTimestamp("You:", terminal.Yellow)
 	fmt.Printf("%s ", coloredPrompt)
-	fmt.Print("\033[s") // Save cursor position
-	fmt.Println()       // Move to next line
-	fmt.Println(separatorLine)
-	fmt.Print("\033[u")    // Restore cursor position
-	fmt.Print("\033[?25h") // Show the cursor
 }
 
 func colorifyAndFormatContent(payload protocol.Payload) {
