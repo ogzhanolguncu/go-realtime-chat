@@ -145,12 +145,12 @@ func DecodeMessage(message string) (Payload, error) {
 		return Payload{MessageType: MessageTypeACT_USRS, Timestamp: unixTimestamp, ActiveUsers: activeUsers, Status: status}, nil
 	// HSTRY|timestamp|messages_array|status\r\n status = "res" | "req"
 	case MessageTypeHSTRY:
-		if len(parts) < 5 {
+		if len(parts) < 3 {
 			return Payload{}, fmt.Errorf("insufficient parts in HSTRY message")
 		}
 
 		payloadDetails, messages := parseChatHistory(sanitizedMessage)
-		parts := strings.Split(payloadDetails, Separator)
+		parts = strings.Split(payloadDetails, Separator)
 		timestamp := parts[1]
 		status := parts[2]
 		var parsedChatHistory []Payload
@@ -181,15 +181,18 @@ func parseChatHistory(input string) (string, []string) {
 	part1 := fmt.Sprintf("%s|%s|%s", parts[0], parts[1], parts[len(parts)-1])
 
 	// Reconstruct the MSG parts with comma separated segments
-	var msgParts []string
-	for i := 2; i < len(parts)-1; i++ {
-		if strings.Contains(parts[i], "MSG") {
-			msgParts = append(msgParts, parts[i])
-		} else {
-			msgParts[len(msgParts)-1] = msgParts[len(msgParts)-1] + "|" + parts[i]
+	var part2 []string
+	if parts[2] != "" {
+		var msgParts []string
+		for i := 2; i < len(parts)-1; i++ {
+			if strings.Contains(parts[i], "MSG") {
+				msgParts = append(msgParts, parts[i])
+			} else {
+				msgParts[len(msgParts)-1] = msgParts[len(msgParts)-1] + "|" + parts[i]
+			}
 		}
+		part2 = strings.Split(strings.TrimSuffix(strings.Join(msgParts, "|"), ","), ",")
 	}
-	part2 := strings.Split(strings.TrimSuffix(strings.Join(msgParts, "|"), ","), ",")
 
 	return part1, part2
 }

@@ -146,6 +146,13 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			activeUsers := s.getActiveUsers()
 			msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
 			c.Write(msg)
+		case protocol.MessageTypeHSTRY:
+			msg := []byte(protocol.EncodeMessage(protocol.Payload{
+				MessageType: protocol.MessageTypeHSTRY,
+				//TODO: Add requester to protocol instead of harcoded "Oz"
+				EncodedChatHistory: s.history.GetHistory("Oz", "MSG", "WSP"),
+				Status:             "res"}))
+			c.Write(msg)
 		default:
 			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
 		}

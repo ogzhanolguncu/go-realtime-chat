@@ -7,9 +7,9 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func (c *Client) FetchActiveUsersAfterUsername() error {
+func (c *Client) FetchChatHistory() error {
 	serverReader := bufio.NewReader(c.conn)
-	message, err := prepareActiveUserPayload("", "", "")
+	message, err := prepareChatHistoryPayload()
 	if err != nil {
 		return err
 	}
@@ -30,6 +30,8 @@ func (c *Client) FetchActiveUsersAfterUsername() error {
 		return err
 	}
 
-	printActiveUsers(decodedMsg.ActiveUsers)
+	for _, v := range decodedMsg.DecodedChatHistory {
+		colorifyAndFormatContent(v)
+	}
 	return nil
 }

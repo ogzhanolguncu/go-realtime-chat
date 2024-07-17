@@ -72,6 +72,6 @@ func TestDecodeActiveUsrMessage(t *testing.T) {
 func TestDecodeChatHistory(t *testing.T) {
 	timestamp := time.Now().Unix()
 	payload, _ := DecodeMessage(fmt.Sprintf("HSTRY|%d|MSG|1721160403|Oz|3|aaa|res\r\n", timestamp))
-	require.Equal(t, Payload{MessageType: MessageTypeHSTRY, Timestamp: timestamp, DecodedChatHistory: []Payload{Payload{MessageType: MessageTypeMSG, Timestamp: 1721160403, Sender: "Oz", Content: "aaa"}}, Status: "res"}, payload)
+	require.Equal(t, Payload{MessageType: MessageTypeHSTRY, Timestamp: timestamp, DecodedChatHistory: []Payload{{MessageType: MessageTypeMSG, Timestamp: 1721160403, Sender: "Oz", Content: "aaa"}}, Status: "res"}, payload)
 
 }

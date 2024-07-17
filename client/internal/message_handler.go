@@ -17,9 +17,9 @@ type Command struct {
 }
 
 var commands = []Command{
-	{name: "/whisper", handler: handleWhisper},
-	{name: "/reply", handler: handleReply},
-	{name: "/users", handler: handleActiveUsers},
+	{name: "/whisper", handler: prepareWhisperPayload},
+	{name: "/reply", handler: prepareReplyPayload},
+	{name: "/users", handler: prepareActiveUserPayload},
 }
 
 func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) {
@@ -65,10 +65,10 @@ func processInput(input, sender, recipient string) (string, error) {
 			return cmd.handler(input, sender, recipient)
 		}
 	}
-	return handlePublicMessage(input, sender), nil
+	return preparePublicMessagePayload(input, sender), nil
 }
 
-func handleReply(input, sender, recipient string) (string, error) {
+func prepareReplyPayload(input, sender, recipient string) (string, error) {
 	parts := strings.SplitN(input, " ", 2)
 	if len(parts) < 2 {
 		return "", fmt.Errorf("invalid reply format. Use: /reply <message>")
@@ -85,13 +85,19 @@ func handleReply(input, sender, recipient string) (string, error) {
 	}), nil
 }
 
-func handleActiveUsers(_, _, _ string) (string, error) {
+func prepareActiveUserPayload(_, _, _ string) (string, error) {
 	return protocol.EncodeMessage(protocol.Payload{
 		MessageType: protocol.MessageTypeACT_USRS, Status: "req",
 	}), nil
 }
 
-func handleWhisper(input, sender, _ string) (string, error) {
+func prepareChatHistoryPayload() (string, error) {
+	return protocol.EncodeMessage(protocol.Payload{
+		MessageType: protocol.MessageTypeHSTRY, Status: "req",
+	}), nil
+}
+
+func prepareWhisperPayload(input, sender, _ string) (string, error) {
 	parts := strings.SplitN(input, " ", 3)
 	if len(parts) < 3 {
 		return "", fmt.Errorf("invalid whisper format. Use: /whisper <recipient> <message>")
@@ -107,7 +113,7 @@ func handleWhisper(input, sender, _ string) (string, error) {
 	}), nil
 }
 
-func handlePublicMessage(input, sender string) (message string) {
+func preparePublicMessagePayload(input, sender string) (message string) {
 	return protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: input})
 }
 
