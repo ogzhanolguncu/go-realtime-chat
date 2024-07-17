@@ -6,9 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
-	"time"
 )
 
 type ChatHistory struct {
@@ -47,9 +45,7 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 // Save to disk. And add a timestamp to first line so we can check and delete if its older than a day.
 func (ch *ChatHistory) SaveToDisk() error {
 	file := filepath.Join(rootDir(), "chat_history.txt")
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	ch.messages = prepend(ch.messages, timestamp+"\n")
-	return os.WriteFile(file, []byte(strings.Join(ch.messages, "")), 0644)
+	return os.WriteFile(file, []byte(strings.Join(ch.messages, "\n")), 0644)
 }
 
 // Remove file from disk if it exists.

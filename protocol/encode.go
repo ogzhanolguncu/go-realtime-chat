@@ -29,10 +29,13 @@ func EncodeMessage(payload Payload) string {
 	case MessageTypeUSR:
 		nameLength := len(payload.Username)
 		return fmt.Sprintf("%s|%d|%d|%s|%s\r\n", payload.MessageType, time.Now().Unix(), nameLength, payload.Username, payload.Status)
-	// ACT_USRS|active_user_length|active_user_array|status\r\n status = "req" | "res"
+	// ACT_USRS|active_user_length|active_user_array|status\r\n status = "res" | "req"
 	case MessageTypeACT_USRS:
 		activeUserLen := len(payload.ActiveUsers)
 		return fmt.Sprintf("%s|%d|%d|%s|%s\r\n", payload.MessageType, time.Now().Unix(), activeUserLen, strings.Join(payload.ActiveUsers, ","), payload.Status)
+	//HSTRY|timestamp|messages_array|status\r\n status = "res" | "req"
+	case MessageTypeHSTRY:
+		return fmt.Sprintf("%s|%d|%s|%s\r\n", payload.MessageType, time.Now().Unix(), strings.Join(payload.EncodedChatHistory, ","), payload.Status)
 	// ERR|message_length|error_message\r\n
 	default:
 		return fmt.Sprintf("ERR|%d|Invalid message type\r\n", len("Invalid message type"))

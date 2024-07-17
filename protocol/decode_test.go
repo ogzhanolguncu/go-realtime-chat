@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDecodeGeneralMessage(t *testing.T) {
@@ -64,10 +65,13 @@ func TestDecodeUsernameMessage(t *testing.T) {
 
 func TestDecodeActiveUsrMessage(t *testing.T) {
 	timestamp := time.Now().Unix()
-	t.Run("should decode active users message successfully", func(t *testing.T) {
-		payload, _ := DecodeMessage(fmt.Sprintf("ACT_USRS|%d|2|hey,there|res\r\n", timestamp))
-		assert.Equal(t, Payload{MessageType: MessageTypeACT_USRS, Timestamp: timestamp, ActiveUsers: []string{"hey", "there"}, Status: "res"}, payload)
+	payload, _ := DecodeMessage(fmt.Sprintf("ACT_USRS|%d|2|hey,there|res\r\n", timestamp))
+	assert.Equal(t, Payload{MessageType: MessageTypeACT_USRS, Timestamp: timestamp, ActiveUsers: []string{"hey", "there"}, Status: "res"}, payload)
 
-	})
+}
+func TestDecodeChatHistory(t *testing.T) {
+	timestamp := time.Now().Unix()
+	payload, _ := DecodeMessage(fmt.Sprintf("HSTRY|%d|MSG|1721160403|Oz|3|aaa|res\r\n", timestamp))
+	require.Equal(t, Payload{MessageType: MessageTypeHSTRY, Timestamp: timestamp, DecodedChatHistory: []Payload{Payload{MessageType: MessageTypeMSG, Timestamp: 1721160403, Sender: "Oz", Content: "aaa"}}, Status: "res"}, payload)
 
 }

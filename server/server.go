@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 	"github.com/ogzhanolguncu/go-chat/server/chat_history"
@@ -99,13 +100,23 @@ func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool)
 }
 
 func (s *TCPServer) handleConnection(c net.Conn) {
+	var stopInterval chan bool
 	defer func() {
+		//Cleanup for chat history save disk
+		if stopInterval != nil {
+			stopInterval <- true
+		}
 		info, _ := s.getConnectionInfoAndDelete(c)
 		if info != nil {
 			s.sendSystemNotice(info.OwnerName, nil, "left")
 		}
 		c.Close()
 	}()
+
+	//Save chat history to disk every five second.
+	stopInterval = setInterval(func() {
+		s.history.SaveToDisk()
+	}, 5*time.Second)
 
 	connReader := bufio.NewReader(c)
 
@@ -118,6 +129,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 
 		rawMessage := strings.TrimSpace(data)
 		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
+		s.history.AddMessage(rawMessage)
 
 		msgPayload, err := protocol.DecodeMessage(rawMessage)
 		if err != nil {
@@ -217,4 +229,22 @@ func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
 		}
 	}
 	return name
+}
+
+func setInterval(callback func(), interval time.Duration) chan bool {
+	// Create a channel to signal the interval to stop
+	stop := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-time.After(interval):
+				callback()
+			case <-stop:
+				return
+			}
+		}
+	}()
+
+	return stop
 }

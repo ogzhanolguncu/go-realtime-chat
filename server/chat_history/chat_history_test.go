@@ -3,7 +3,6 @@ package chat_history
 import (
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -65,9 +64,9 @@ func TestFilterMessages(t *testing.T) {
 func TestSaveToDisk(t *testing.T) {
 	chatHistory := NewChatHistory()
 	chatHistory.AddMessage(
-		"MSG|1721160403|Oz|3|aaa\r\n",
-		"MSG|1721160403|Oz|4|aaaa\r\n",
-		"MSG|1721160403|Oz|5|aaaaa\r\n")
+		"MSG|1721160403|Oz|3|aaa",
+		"MSG|1721160403|Oz|4|aaaa",
+		"MSG|1721160403|Oz|5|aaaaa")
 	err := chatHistory.SaveToDisk()
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(rootDir(), "chat_history.txt"))
@@ -76,12 +75,11 @@ func TestSaveToDisk(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(rootDir(), "chat_history.txt"))
 	require.NoError(t, err)
 	lines := strings.Split(strings.ReplaceAll(string(content), "\r", ""), "\n")
-	require.GreaterOrEqual(t, len(lines), 4)    // Timestamp + 3 messages
-	_, err = strconv.ParseInt(lines[0], 10, 64) // Check if the first line is a valid timestamp
-	require.NoError(t, err)
-	assert.Equal(t, "MSG|1721160403|Oz|3|aaa", lines[1])
-	assert.Equal(t, "MSG|1721160403|Oz|4|aaaa", lines[2])
-	assert.Equal(t, "MSG|1721160403|Oz|5|aaaaa", lines[3])
+	require.GreaterOrEqual(t, len(lines), 3) // Timestamp + 3 messages
+
+	assert.Equal(t, "MSG|1721160403|Oz|3|aaa", lines[0])
+	assert.Equal(t, "MSG|1721160403|Oz|4|aaaa", lines[1])
+	assert.Equal(t, "MSG|1721160403|Oz|5|aaaaa", lines[2])
 }
 
 func TestDeleteFromDisk(t *testing.T) {
