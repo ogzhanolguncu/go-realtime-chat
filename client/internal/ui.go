@@ -67,8 +67,8 @@ func printActiveUsers(users []string) {
 	printBox(headerWidth, fmt.Sprintf("ACTIVE USERS (%d)", len(users)), content, "left")
 }
 
-func askForInput() {
-	coloredPrompt := terminal.ColorifyWithTimestamp("You:", terminal.Yellow)
+func askForInput(name string) {
+	coloredPrompt := terminal.ColorifyWithTimestamp(fmt.Sprintf("%s:", name), terminal.Yellow, 0)
 	fmt.Printf("%s ", coloredPrompt)
 }
 
@@ -90,11 +90,24 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 		if payload.Status == "fail" {
 			colorCode = terminal.Red
 		}
+		// Don't let it print with day and month. Use default time format.
+		payload.Timestamp = 0
 	case protocol.MessageTypeWSP:
 		message = fmt.Sprintf("Whisper from %s: %s\n", payload.Sender, payload.Content)
+		// Don't let it print with day and month. Use default time format.
+		payload.Timestamp = 0
 	case protocol.MessageTypeUSR:
 		if payload.Status == "success" {
-			message = fmt.Sprintf("Username successfully set to %s\n", payload.Username)
+			fmt.Print("\033[F") // Move cursor up one line
+			fmt.Print("\033[K") // Clear the entire line
+			// Save cursor position
+			fmt.Print("\033[s")
+			// Move to the line right after ACTIVE USERS
+			fmt.Print("\033[18;1H") // Adjust this number if needed
+			// Restore cursor position
+			fmt.Print("\033[u")
+			// Don't let it print with day and month. Use default time format.
+			payload.Timestamp = 0
 		} else {
 			message = fmt.Sprintf("%s\n", payload.Username)
 			colorCode = terminal.Red
@@ -111,9 +124,11 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 		}
 	default:
 		message = fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)
+		// Don't let it print with day and month. Use default time format.
+		payload.Timestamp = 0
 	}
 
 	if message != "" {
-		fmt.Print(terminal.ColorifyWithTimestamp(message, colorCode))
+		fmt.Print(terminal.ColorifyWithTimestamp(message, colorCode, payload.Timestamp))
 	}
 }

@@ -131,7 +131,7 @@ func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan
 		}
 		payload, err := protocol.DecodeMessage(message)
 		if err != nil {
-			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red))
+			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red, 0))
 			continue
 		}
 		select {
@@ -146,7 +146,7 @@ func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan
 
 func (c *Client) MessageLoop(incomingChan <-chan protocol.Payload, outgoingChan <-chan string, errChan <-chan error, done chan struct{}) error {
 	for {
-		askForInput()
+		askForInput(c.name)
 		select {
 		case incMessage, ok := <-incomingChan:
 			if !ok {

@@ -34,7 +34,13 @@ func Colorify(text, color string) string {
 }
 
 // ColorifyWithTimestamp adds a timestamp and applies the given color to the text
-func ColorifyWithTimestamp(text, color string) string {
-	timestamp := time.Now().Format("[15:04]")
+func ColorifyWithTimestamp(text, color string, altTimestamp int64) string {
+
+	var timestamp string
+	if altTimestamp != 0 {
+		timestamp = time.Unix(altTimestamp, 0).Format("[02-01-2006 15:04]")
+	} else {
+		timestamp = time.Now().Format("[15:04]")
+	}
 	return fmt.Sprintf("\r%s %s%s%s", timestamp, color, text, Reset)
 }

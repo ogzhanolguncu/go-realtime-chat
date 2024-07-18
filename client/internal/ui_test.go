@@ -20,7 +20,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 			colorifyAndFormatContent(payload)
 		})
 
-		assert.Equal(t, stdout, terminal.ColorifyWithTimestamp("System: System message\n", terminal.Cyan))
+		assert.Equal(t, stdout, terminal.ColorifyWithTimestamp("System: System message\n", terminal.Cyan, 0))
 	})
 
 	t.Run("should format whisper message with timestamp", func(t *testing.T) {
@@ -29,7 +29,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 			colorifyAndFormatContent(payload)
 		})
 
-		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Whisper from Alice: Hello!\n", terminal.Purple))
+		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Whisper from Alice: Hello!\n", terminal.Purple, 0))
 	})
 
 	t.Run("should format group message with timestamp", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 			colorifyAndFormatContent(payload)
 		})
 
-		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Bob: Hey everyone!\n", terminal.Green))
+		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Bob: Hey everyone!\n", terminal.Green, 0))
 	})
 }
 

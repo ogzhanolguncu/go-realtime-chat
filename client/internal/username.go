@@ -20,7 +20,7 @@ func (c *Client) SetUsername() error {
 	}
 
 	for retries := 0; retries < 3; retries++ {
-		fmt.Print(terminal.ColorifyWithTimestamp("Enter your username: ", terminal.White))
+		fmt.Print(terminal.ColorifyWithTimestamp("Enter your username: ", terminal.White, 0))
 		nameInput, err := reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("error reading username input: %w", err)
@@ -28,7 +28,7 @@ func (c *Client) SetUsername() error {
 
 		nameInput = strings.TrimSpace(nameInput)
 		if nameInput == "" {
-			fmt.Println(terminal.ColorifyWithTimestamp("Username cannot be empty. Please try again.", terminal.Red))
+			fmt.Println(terminal.ColorifyWithTimestamp("Username cannot be empty. Please try again.", terminal.Red, 0))
 			continue
 		}
 
