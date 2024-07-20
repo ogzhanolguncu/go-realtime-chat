@@ -148,9 +148,9 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			c.Write(msg)
 		case protocol.MessageTypeHSTRY:
 			msg := []byte(protocol.EncodeMessage(protocol.Payload{
-				MessageType: protocol.MessageTypeHSTRY,
-				//TODO: Add requester to protocol instead of harcoded "Oz"
-				EncodedChatHistory: s.history.GetHistory("Oz", "MSG", "WSP"),
+				MessageType:        protocol.MessageTypeHSTRY,
+				Sender:             msgPayload.Sender,
+				EncodedChatHistory: s.history.GetHistory(msgPayload.Sender, "MSG", "WSP"),
 				Status:             "res"}))
 			c.Write(msg)
 		default:

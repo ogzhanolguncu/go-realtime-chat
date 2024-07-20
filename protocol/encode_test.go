@@ -128,11 +128,11 @@ func TestEncodeChatHistory(t *testing.T) {
 			{[]string{
 				"MSG|1721160403|Oz|3|aaa",
 				"MSG|1721160403|Oz|4|aaaa",
-			}, fmt.Sprintf("HSTRY|%d|MSG|1721160403|Oz|3|aaa,MSG|1721160403|Oz|4|aaaa|res\r\n", time.Now().Unix())},
+			}, fmt.Sprintf("HSTRY|%d|Oz|MSG|1721160403|Oz|3|aaa,MSG|1721160403|Oz|4|aaaa|res\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeHSTRY, Timestamp: time.Now().Unix(), EncodedChatHistory: []string{"MSG|1721160403|Oz|3|aaa",
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeHSTRY, Sender: "Oz", Timestamp: time.Now().Unix(), EncodedChatHistory: []string{"MSG|1721160403|Oz|3|aaa",
 				"MSG|1721160403|Oz|4|aaaa"}, Status: "res"}))
 		}
 	})

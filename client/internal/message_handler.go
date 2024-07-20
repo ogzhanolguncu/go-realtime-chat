@@ -91,9 +91,9 @@ func prepareActiveUserPayload(_, _, _ string) (string, error) {
 	}), nil
 }
 
-func prepareChatHistoryPayload() (string, error) {
+func prepareChatHistoryPayload(requester string) (string, error) {
 	return protocol.EncodeMessage(protocol.Payload{
-		MessageType: protocol.MessageTypeHSTRY, Status: "req",
+		MessageType: protocol.MessageTypeHSTRY, Status: "req", Sender: requester,
 	}), nil
 }
 

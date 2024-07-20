@@ -17,6 +17,8 @@ func main() {
 	defer listener.Close()
 
 	log.Printf("Chat server started on port %d\n", port)
+	//Add some messages to in-memory from disk before any chat starts.
+	s.history.ReadFromDiskToInMemory()
 
 	for {
 		c, err := listener.Accept()

@@ -9,7 +9,7 @@ import (
 
 func (c *Client) FetchChatHistory() error {
 	serverReader := bufio.NewReader(c.conn)
-	message, err := prepareChatHistoryPayload()
+	message, err := prepareChatHistoryPayload(c.name)
 	if err != nil {
 		return err
 	}

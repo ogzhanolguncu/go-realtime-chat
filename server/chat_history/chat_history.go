@@ -6,7 +6,11 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+
+	"github.com/elliotchance/pie/v2"
+	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 type ChatHistory struct {
@@ -25,21 +29,28 @@ func (ch *ChatHistory) AddMessage(messages ...string) {
 
 // Get messages from memory if they are from requester user and contain allowed messageTypes
 func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string {
-	var filteredMessages []string
-	for _, msg := range ch.messages {
-		parts := strings.Split(msg, "|")
-		if len(parts) < 3 {
-			continue
-		}
-
-		msgType := parts[0]
-		msgUser := parts[2]
-
-		if contains(messageTypes, msgType) && (user == "" || msgUser == user || (msgType == "WSP" && len(parts) > 3 && parts[3] == user)) {
-			filteredMessages = append(filteredMessages, msg)
-		}
+	if len(ch.messages) == 0 {
+		ch.ReadFromDiskToInMemory()
 	}
-	return filteredMessages
+
+	msgs := pie.Filter(ch.messages, func(msg string) bool {
+		decodedMsg, err := protocol.DecodeMessage(msg)
+		if err != nil {
+			return false // Skip undecodable messages
+		}
+
+		msgType := string(decodedMsg.MessageType)
+		if !slices.Contains(messageTypes, msgType) {
+			return false // Skip messages with unallowed types
+		}
+		//If message is not WSP return it
+		if decodedMsg.MessageType != "WSP" {
+			return true
+		}
+		//If message is WSP make sure recipient or sender is user
+		return decodedMsg.Recipient == user || decodedMsg.Sender == user
+	})
+	return msgs
 }
 
 // Save to disk. And add a timestamp to first line so we can check and delete if its older than a day.
@@ -67,7 +78,6 @@ func (ch *ChatHistory) ReadFromDiskToInMemory() error {
 
 	// Remove empty strings that may result from splitting
 	ch.messages = removeEmpty(ch.messages)
-
 	return nil
 }
 
@@ -86,17 +96,4 @@ func rootDir() string {
 	_, b, _, _ := runtime.Caller(0)
 	d := path.Join(path.Dir(b))
 	return filepath.Dir(d)
-}
-
-func prepend[T any](slice []T, elems ...T) []T {
-	return append(elems, slice...)
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

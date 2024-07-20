@@ -64,7 +64,6 @@ func DecodeMessage(message string) (Payload, error) {
 		}
 
 		return Payload{MessageType: MessageTypeWSP, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
-	// SYS|message_length|message_content|status \r\n status = "fail" | "success"
 	case MessageTypeSYS:
 		if len(parts) < 5 {
 			return Payload{}, fmt.Errorf("insufficient parts in SYS message")
@@ -90,7 +89,6 @@ func DecodeMessage(message string) (Payload, error) {
 		}
 		return Payload{Content: content, Timestamp: unixTimestamp, MessageType: MessageTypeSYS, Status: status}, nil
 
-	// USR|name_length|name_content|status\r\n status = "fail | "success"
 	case MessageTypeUSR:
 		if len(parts) < 5 {
 			return Payload{}, fmt.Errorf("insufficient parts in USR message")
@@ -115,7 +113,6 @@ func DecodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("name length does not match expected length in USR message")
 		}
 		return Payload{MessageType: MessageTypeUSR, Timestamp: unixTimestamp, Username: name, Status: status}, nil
-	// ACT_USRS|active_user_length|active_user_array|status  status = "res" | "req"
 	case MessageTypeACT_USRS:
 		if len(parts) < 5 {
 			return Payload{}, fmt.Errorf("insufficient parts in ACT_USRS message")
@@ -143,16 +140,18 @@ func DecodeMessage(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("list length does not match expected length in ACT_USRS message")
 		}
 		return Payload{MessageType: MessageTypeACT_USRS, Timestamp: unixTimestamp, ActiveUsers: activeUsers, Status: status}, nil
-	// HSTRY|timestamp|messages_array|status\r\n status = "res" | "req"
 	case MessageTypeHSTRY:
-		if len(parts) < 3 {
+		if len(parts) < 4 {
 			return Payload{}, fmt.Errorf("insufficient parts in HSTRY message")
 		}
 
 		payloadDetails, messages := parseChatHistory(sanitizedMessage)
 		parts = strings.Split(payloadDetails, Separator)
+
 		timestamp := parts[1]
-		status := parts[2]
+		requester := parts[2]
+		status := parts[3]
+
 		var parsedChatHistory []Payload
 		for _, v := range messages {
 			msg, err := DecodeMessage(v)
@@ -166,7 +165,7 @@ func DecodeMessage(message string) (Payload, error) {
 		if err != nil {
 			return Payload{}, fmt.Errorf("invalid timestamp format in HSTRY message: %v", err)
 		}
-		return Payload{MessageType: MessageTypeHSTRY, Timestamp: unixTimestamp, DecodedChatHistory: parsedChatHistory, Status: status}, nil
+		return Payload{MessageType: MessageTypeHSTRY, Sender: requester, Timestamp: unixTimestamp, DecodedChatHistory: parsedChatHistory, Status: status}, nil
 
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)
@@ -178,13 +177,12 @@ func parseChatHistory(input string) (string, []string) {
 	parts := strings.Split(input, "|")
 
 	// Construct the first part
-	part1 := fmt.Sprintf("%s|%s|%s", parts[0], parts[1], parts[len(parts)-1])
-
+	part1 := fmt.Sprintf("%s|%s|%s|%s", parts[0], parts[1], parts[2], parts[len(parts)-1])
 	// Reconstruct the MSG parts with comma separated segments
 	var part2 []string
-	if parts[2] != "" {
+	if parts[3] != "" {
 		var msgParts []string
-		for i := 2; i < len(parts)-1; i++ {
+		for i := 3; i < len(parts)-1; i++ {
 			if strings.Contains(parts[i], "MSG") {
 				msgParts = append(msgParts, parts[i])
 			} else {

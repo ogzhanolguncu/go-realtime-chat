@@ -6,7 +6,7 @@ package protocol
 // Error Message (ERR): 			ERR|timestamp|message_length|error_message\r\n
 // Active Users(USR):				ACT_USRS|timestamp|active_user_length|active_user_array|status\r\n status = "res" | "req"
 // Username Message(ACT_USRS): 		USR|timestamp|name_length|name_content|status\r\n status = "fail | "success"
-// Chat History(HSTRY): 			HSTRY|timestamp|messages_array|status\r\n status = "res" | "req"
+// Chat History(HSTRY): 			HSTRY|timestamp|requester|messages_array|status\r\n status = "res" | "req"
 const Separator = "|"
 
 type MessageType string
