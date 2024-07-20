@@ -14,6 +14,8 @@ import (
 )
 
 // ConnectionInfo holds connection-related information.
+const maxMessageLimit = 200
+
 type ConnectionInfo struct {
 	Connection net.Conn
 	OwnerName  string
@@ -115,7 +117,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 
 	//Save chat history to disk every five second.
 	stopInterval = setInterval(func() {
-		s.history.SaveToDisk()
+		s.history.SaveToDisk(maxMessageLimit)
 	}, 5*time.Second)
 
 	connReader := bufio.NewReader(c)

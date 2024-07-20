@@ -64,10 +64,14 @@ func TestFilterMessages(t *testing.T) {
 func TestSaveToDisk(t *testing.T) {
 	chatHistory := NewChatHistory()
 	chatHistory.AddMessage(
+		"MSG|1721160403|Oz|4|3333",
+		"MSG|1721160403|Oz|4|4444",
+		"MSG|1721160403|Oz|4|5555",
+		"MSG|1721160403|Oz|4|6666",
 		"MSG|1721160403|Oz|3|aaa",
 		"MSG|1721160403|Oz|4|aaaa",
 		"MSG|1721160403|Oz|5|aaaaa")
-	err := chatHistory.SaveToDisk()
+	err := chatHistory.SaveToDisk(4)
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(rootDir(), "chat_history.txt"))
 
@@ -88,7 +92,7 @@ func TestDeleteFromDisk(t *testing.T) {
 		"MSG|1721160403|Oz|3|aaa\r\n",
 		"MSG|1721160403|Oz|4|aaaa\r\n",
 		"MSG|1721160403|Oz|5|aaaaa\r\n")
-	err := chatHistory.SaveToDisk()
+	err := chatHistory.SaveToDisk(200)
 	require.NoError(t, err)
 
 	err = chatHistory.DeleteFromDisk()

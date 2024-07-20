@@ -22,25 +22,21 @@ Chat Application Todo List:
 
     Chat History:
         ✔ Add timestamp to all message types @done(24-07-15 23:43)
-        ☐ Add new data structure to save history to memory
-            - Implement a simple slice for general messages
-            - Add a map for quick access to private messages
-        ☐ Filter messages before dispatching them to clients
-            - Delete private messages if user is not recipient or sender
-            - Ensure private messages are not exposed to unintended recipients
-        ☐ Store chat history for late-joining clients (limit to ~200 messages)
-        ☐ Implement /history command
-            - Return recent messages (up to 200)
-            - Include only relevant private messages for the requesting user
-        ☐ Client should format timestamps carefully because some messages are from past
-            - Implement a function to format timestamps relative to current time
-        ☐ Server should persist history to file and restore on restart
-            - Implement SaveToFile and LoadFromFile functions
-            - Only persist general and private messages, not system or error messages
-            - Saved file should be named as chat_history_TIMESTAMP.txt. So we can easily check if its old enough to be deleted.
-            - Should keep saving and checking on separate goroutine
-        ☐ Delete persisted messages if they are older than a day
-            - Add a cleanup function to remove old messages
+        ✔ Add new data structure to save history to memory @done(24-07-20 17:28)
+            ✔ Implement a simple slice for general messages @done(24-07-20 17:28)
+        ✔ Filter messages before dispatching them to clients @done(24-07-20 17:28)
+            ✔ Delete private messages if user is not recipient or sender @done(24-07-20 17:28)
+            ✔ Ensure private messages are not exposed to unintended recipients @done(24-07-20 17:28)
+        ✔ Store chat history for late-joining clients (limit to ~200 messages) @done(24-07-20 22:59)
+        ✔ Implement /history command @done(24-07-20 17:28)
+            ✔ Return recent messages (up to 200) @done(24-07-20 22:59)
+        ✔ Client should format timestamps carefully because some messages are from past @done(24-07-20 17:31)
+            ✔ Implement a function to format timestamps relative to current time @done(24-07-20 17:31)
+        ✔ Server should persist history to file and restore on restart @done(24-07-20 17:29)
+            ✔ Implement SaveToFile and LoadFromFile functions @done(24-07-20 17:31)
+            ✔ Should keep saving and checking on separate goroutine @done(24-07-20 17:29)
+        ✔ Disregard time difference between client and server since this app is only suppose to work locally. @done(24-07-20 17:32)
+        ☐ Connect this chat history to auth to prevent users to access other peoples chat histories, because if someone enters chat with someone elses name they will be able to read private message.
     Protocol and Security:
         ✔ Add Protocol
         ✔ Implement protocol: Client read
@@ -50,14 +46,22 @@ Chat Application Todo List:
         ☐ Message encryption: Implement end-to-end encryption using golang.org/x/crypto
     Advanced Features:
         Auth:
-            - Persist everything on disk or redis.
+            ☐ Persist everything on disk using JSON
+                This will allow users to safely fetch histories without exposing their private messages.
+            ```
+            [{
+                "username": "Oz",
+                "password": "xxxxx" -> Maybe encrypt it
+            }]
+            ```
+        Chatrooms:
+            ☐ Allow users to create and join different chatrooms
+            ☐ Ensure it server deleted private chat after 1 minute inactivity
+            ☐ Allow clients to switch between private chats and group chat
+            ☐ Implement commands: /create, /join, /leave
             Presence System:
                 ☐ Show user statuses (online, away, busy, etc.)
                 ☐ Allow users to set custom status messages
-        Chatrooms:
-            ☐ Allow users to create and join different chatrooms
-            ☐ Allow clients to switch between private chats and group chat
-            ☐ Implement commands: /create, /join, /leave
             Typing Indicators (for private chats):
                 ☐ Implement client-side typing detection
                     - Send "typing" signal when user starts typing in a private chat

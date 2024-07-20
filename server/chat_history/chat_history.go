@@ -1,7 +1,10 @@
 package chat_history
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -12,6 +15,8 @@ import (
 	"github.com/elliotchance/pie/v2"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
+
+const fileName = "chat_history.txt"
 
 type ChatHistory struct {
 	messages []string
@@ -53,21 +58,42 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 	return msgs
 }
 
-// Save to disk. And add a timestamp to first line so we can check and delete if its older than a day.
-func (ch *ChatHistory) SaveToDisk() error {
-	file := filepath.Join(rootDir(), "chat_history.txt")
-	return os.WriteFile(file, []byte(strings.Join(ch.messages, "\n")), 0644)
+func (ch *ChatHistory) SaveToDisk(msgLimit int) error {
+	filePath := filepath.Join(rootDir(), fileName)
+
+	if checkIfFileExists(filePath) {
+		file, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to open file: %w", err)
+		}
+		defer file.Close()
+		lineCount, err := lineCounter(file)
+
+		if err != nil {
+			return fmt.Errorf("line count failed: %w", err)
+		}
+
+		if lineCount > msgLimit {
+			ch.messages = pie.DropTop(ch.messages, msgLimit)
+			if err := os.Remove(filePath); err != nil {
+				return fmt.Errorf("failed to remove old file: %w", err)
+			}
+		}
+	}
+
+	// // Write new content
+	return os.WriteFile(filePath, []byte(strings.Join(ch.messages, "\n")), 0644)
 }
 
 // Remove file from disk if it exists.
 func (ch *ChatHistory) DeleteFromDisk() error {
-	filePath := filepath.Join(rootDir(), "chat_history.txt")
+	filePath := filepath.Join(rootDir(), fileName)
 	return os.Remove(filePath)
 }
 
 // Read chat_history.txt from disk to in-memory.
 func (ch *ChatHistory) ReadFromDiskToInMemory() error {
-	filePath := filepath.Join(rootDir(), "chat_history.txt")
+	filePath := filepath.Join(rootDir(), fileName)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("could not read file: %w", err)
@@ -96,4 +122,31 @@ func rootDir() string {
 	_, b, _, _ := runtime.Caller(0)
 	d := path.Join(path.Dir(b))
 	return filepath.Dir(d)
+}
+
+// https://stackoverflow.com/questions/24562942/golang-how-do-i-determine-the-number-of-lines-in-a-file-efficiently
+func lineCounter(r io.Reader) (int, error) {
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+
+	for {
+		c, err := r.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+
+		switch {
+		case err == io.EOF:
+			return count, nil
+
+		case err != nil:
+			return count, err
+		}
+	}
+}
+
+func checkIfFileExists(name string) bool {
+	if _, err := os.Stat(name); errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
 }
