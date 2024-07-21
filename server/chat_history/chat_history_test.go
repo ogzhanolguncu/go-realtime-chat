@@ -64,13 +64,13 @@ func TestFilterMessages(t *testing.T) {
 func TestSaveToDisk(t *testing.T) {
 	chatHistory := NewChatHistory()
 	chatHistory.AddMessage(
-		"MSG|1721160403|Oz|4|3333",
-		"MSG|1721160403|Oz|4|4444",
-		"MSG|1721160403|Oz|4|5555",
-		"MSG|1721160403|Oz|4|6666",
-		"MSG|1721160403|Oz|3|aaa",
-		"MSG|1721160403|Oz|4|aaaa",
-		"MSG|1721160403|Oz|5|aaaaa")
+		"MSG|1721160403|Oz|3333",
+		"MSG|1721160403|Oz|4444",
+		"MSG|1721160403|Oz|5555",
+		"MSG|1721160403|Oz|6666",
+		"MSG|1721160403|Oz|aaa",
+		"MSG|1721160403|Oz|aaaa",
+		"MSG|1721160403|Oz|aaaaa")
 	err := chatHistory.SaveToDisk(4)
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(rootDir(), "chat_history.txt"))
@@ -81,9 +81,9 @@ func TestSaveToDisk(t *testing.T) {
 	lines := strings.Split(strings.ReplaceAll(string(content), "\r", ""), "\n")
 	require.GreaterOrEqual(t, len(lines), 3) // Timestamp + 3 messages
 
-	assert.Equal(t, "MSG|1721160403|Oz|3|aaa", lines[0])
-	assert.Equal(t, "MSG|1721160403|Oz|4|aaaa", lines[1])
-	assert.Equal(t, "MSG|1721160403|Oz|5|aaaaa", lines[2])
+	assert.Equal(t, "MSG|1721160403|Oz|aaa", lines[0])
+	assert.Equal(t, "MSG|1721160403|Oz|aaaa", lines[1])
+	assert.Equal(t, "MSG|1721160403|Oz|aaaaa", lines[2])
 }
 
 func TestDeleteFromDisk(t *testing.T) {

@@ -15,10 +15,10 @@ func TestEncodeGeneralMessage(t *testing.T) {
 			sender   string
 			expected string
 		}{
-			{"Hello", "John", fmt.Sprintf("MSG|%d|John|5|Hello\r\n", time.Now().Unix())},
-			{"World", "Oz", fmt.Sprintf("MSG|%d|Oz|5|World\r\n", time.Now().Unix())},
-			{"HeyHey", "Frey", fmt.Sprintf("MSG|%d|Frey|6|HeyHey\r\n", time.Now().Unix())},
-			{"", "John", fmt.Sprintf("MSG|%d|John|0|\r\n", time.Now().Unix())},
+			{"Hello", "John", fmt.Sprintf("MSG|%d|John|Hello\r\n", time.Now().Unix())},
+			{"World", "Oz", fmt.Sprintf("MSG|%d|Oz|World\r\n", time.Now().Unix())},
+			{"HeyHey", "Frey", fmt.Sprintf("MSG|%d|Frey|HeyHey\r\n", time.Now().Unix())},
+			{"", "John", fmt.Sprintf("MSG|%d|John|\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
@@ -39,9 +39,9 @@ func TestEncodeWhisperMessage(t *testing.T) {
 			recipient string
 			expected  string
 		}{
-			{"Hello", "Oz", "John", fmt.Sprintf("WSP|%d|Oz|John|5|Hello\r\n", time.Now().Unix())},
-			{"World", "John", "Oz", fmt.Sprintf("WSP|%d|John|Oz|5|World\r\n", time.Now().Unix())},
-			{"HeyHey", "Frey", "Oz", fmt.Sprintf("WSP|%d|Frey|Oz|6|HeyHey\r\n", time.Now().Unix())},
+			{"Hello", "Oz", "John", fmt.Sprintf("WSP|%d|Oz|John|Hello\r\n", time.Now().Unix())},
+			{"World", "John", "Oz", fmt.Sprintf("WSP|%d|John|Oz|World\r\n", time.Now().Unix())},
+			{"HeyHey", "Frey", "Oz", fmt.Sprintf("WSP|%d|Frey|Oz|HeyHey\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
@@ -61,7 +61,7 @@ func TestEncodeSystemMessage(t *testing.T) {
 			status   string
 			expected string
 		}{
-			{"John has left the chat!", "left", fmt.Sprintf("SYS|%d|23|John has left the chat!|left\r\n", time.Now().Unix())},
+			{"John has left the chat!", "left", fmt.Sprintf("SYS|%d|John has left the chat!|left\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
@@ -77,7 +77,7 @@ func TestEncodeErrMessage(t *testing.T) {
 			content  string
 			expected string
 		}{
-			{"Errr!", fmt.Sprintf("ERR|%d|5|Errr!\r\n", time.Now().Unix())},
+			{"Errr!", fmt.Sprintf("ERR|%d|Errr!\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
@@ -93,7 +93,7 @@ func TestEncodeUsrMessage(t *testing.T) {
 			content  string
 			expected string
 		}{
-			{"Oz", fmt.Sprintf("USR|%d|2|Oz|success\r\n", time.Now().Unix())},
+			{"Oz", fmt.Sprintf("USR|%d|Oz|success\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
@@ -109,7 +109,7 @@ func TestEncodeActiveUsrMessage(t *testing.T) {
 			content  []string
 			expected string
 		}{
-			{[]string{"Oz", "John"}, fmt.Sprintf("ACT_USRS|%d|2|hey,there|res\r\n", time.Now().Unix())},
+			{[]string{"Oz", "John"}, fmt.Sprintf("ACT_USRS|%d|hey,there|res\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
@@ -126,14 +126,14 @@ func TestEncodeChatHistory(t *testing.T) {
 			expected string
 		}{
 			{[]string{
-				"MSG|1721160403|Oz|3|aaa",
-				"MSG|1721160403|Oz|4|aaaa",
-			}, fmt.Sprintf("HSTRY|%d|Oz|MSG|1721160403|Oz|3|aaa,MSG|1721160403|Oz|4|aaaa|res\r\n", time.Now().Unix())},
+				"MSG|1721160403|Oz|aaa",
+				"MSG|1721160403|Oz|aaaa",
+			}, fmt.Sprintf("HSTRY|%d|Oz|MSG|1721160403|Oz|aaa,MSG|1721160403|Oz|aaaa|res\r\n", time.Now().Unix())},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeHSTRY, Sender: "Oz", Timestamp: time.Now().Unix(), EncodedChatHistory: []string{"MSG|1721160403|Oz|3|aaa",
-				"MSG|1721160403|Oz|4|aaaa"}, Status: "res"}))
+			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeHSTRY, Sender: "Oz", Timestamp: time.Now().Unix(), EncodedChatHistory: []string{"MSG|1721160403|Oz|aaa",
+				"MSG|1721160403|Oz|aaaa"}, Status: "res"}))
 		}
 	})
 

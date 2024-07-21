@@ -1,11 +1,11 @@
 package protocol
 
-// Group/General Message (MSG): 	MSG|timestamp|sender|message_length|message_content\r\n
-// Whisper/DM Message (WSP): 		WSP|timestamp|sender|recipient|message_length|message_content\r\n
-// System Notice (SYS): 			SYS|timestamp|message_length|message_content|status \r\n status = "fail" | "success"
-// Error Message (ERR): 			ERR|timestamp|message_length|error_message\r\n
-// Active Users(ACT_USRS):			ACT_USRS|timestamp|active_user_length|active_user_array|status\r\n status = "res" | "req"
-// Username Message(USR): 			USR|timestamp|name_length|name_content|status\r\n status = "fail | "success"
+// Group/General Message (MSG): 	MSG|timestamp|sender|message_content\r\n
+// Whisper/DM Message (WSP): 		WSP|timestamp|sender|recipient|message_content\r\n
+// System Notice (SYS): 			SYS|timestamp|message_content|status \r\n status = "fail" | "success"
+// Error Message (ERR): 			ERR|timestamp|error_message\r\n
+// Active Users(ACT_USRS):			ACT_USRS|timestampactive_user_array|status\r\n status = "res" | "req"
+// Username Message(USR): 			USR|timestampname_content|status\r\n status = "fail | "success"
 // Chat History(HSTRY): 			HSTRY|timestamp|requester|messages_array|status\r\n status = "res" | "req"
 // Encryption(ENC): 				ENC|timestamp|requester_public_key|encrypted_group_chat_key
 const Separator = "|"
