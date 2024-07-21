@@ -43,24 +43,24 @@ Chat Application Todo List:
         ✔ Implement protocol: Server sent
         ✔ Implement protocol: Client sent @done(24-07-07 12:38)
         ✔ Implement protocol: Server read @done(24-07-07 12:38)
-        ☐ Message encryption: Implement end-to-end encryption using
-            Initial Setup:
+        Message encryption: Implement end-to-end encryption using:
+            ✔ Initial Setup: @done(24-07-22 01:17)
 
             The server generates a unique group key for the chat.
-            User Joins:
+            ✔ User Joins: @done(24-07-22 01:17)
 
             Each user (e.g., Alice, Bob, Charlie) connects to the server and provides their public key.
             The server encrypts the group key with each user’s public key and sends it to them.
             Users decrypt the group key using their private keys.
-            Sending Messages:
+            ☐ Sending Messages:
 
             Users encrypt their messages with the shared group key.
             The server forwards the encrypted messages to all group members.
 
-            Rotating Group Key:
+            ☐ Rotating Group Key:
             Perodically rotate keys in order not to leak group key. Start with every 30 sec.
 
-            History:
+            ☐ History:
             Encrypt chat messages using a separate secure key stored in env file.
             Decrypt them using history key and re-encrypt them when requested using group key.
     Advanced Features:
