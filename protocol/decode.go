@@ -1,13 +1,22 @@
 package protocol
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-func DecodeMessage(message string) (Payload, error) {
-	sanitizedMessage := strings.TrimSpace(message) // Messages from server comes with \r\n, so we have to trim it
+func DecodeProtocol(message string) (Payload, error) {
+	decodedMessage, err := base64.StdEncoding.DecodeString(message)
+	if err != nil {
+		return Payload{}, fmt.Errorf("something went wrong when decoding message: %v", err)
+	}
+	return _decodeProtocol(string(decodedMessage))
+}
+
+func _decodeProtocol(message string) (Payload, error) {
+	sanitizedMessage := strings.TrimSpace(string(message)) // Messages from server comes with \r\n, so we have to trim it
 
 	parts := strings.Split(sanitizedMessage, Separator)
 	messageType := parts[0]
@@ -108,7 +117,7 @@ func DecodeMessage(message string) (Payload, error) {
 
 		var parsedChatHistory []Payload
 		for _, v := range messages {
-			msg, err := DecodeMessage(v)
+			msg, err := DecodeProtocol(v)
 			if err != nil {
 				continue
 			}
@@ -139,24 +148,17 @@ func DecodeMessage(message string) (Payload, error) {
 }
 
 func parseChatHistory(input string) (string, []string) {
-	// Split the string by '|'
 	parts := strings.Split(input, "|")
 
-	// Construct the first part
-	part1 := fmt.Sprintf("%s|%s|%s|%s", parts[0], parts[1], parts[2], parts[len(parts)-1])
-	// Reconstruct the MSG parts with comma separated segments
-	var part2 []string
-	if parts[3] != "" {
-		var msgParts []string
-		for i := 3; i < len(parts)-1; i++ {
-			if strings.Contains(parts[i], "MSG") {
-				msgParts = append(msgParts, parts[i])
-			} else {
-				msgParts[len(msgParts)-1] = msgParts[len(msgParts)-1] + "|" + parts[i]
-			}
-		}
-		part2 = strings.Split(strings.TrimSuffix(strings.Join(msgParts, "|"), ","), ",")
+	if len(parts) < 5 {
+		return input, nil // Return original input if it doesn't have enough parts
 	}
 
-	return part1, part2
+	// Construct the first part (HSTRY metadata)
+	part1 := fmt.Sprintf("%s|%s|%s|%s", parts[0], parts[1], parts[2], parts[len(parts)-1])
+
+	// Get the comma-separated messages
+	messages := strings.Split(parts[3], ",")
+
+	return part1, messages
 }

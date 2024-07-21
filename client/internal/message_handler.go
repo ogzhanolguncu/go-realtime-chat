@@ -77,7 +77,7 @@ func prepareReplyPayload(input, sender, recipient string) (string, error) {
 	if recipient == "" {
 		return "", fmt.Errorf("no one to reply to")
 	}
-	return protocol.EncodeMessage(protocol.Payload{
+	return protocol.EncodeProtocol(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
@@ -86,13 +86,13 @@ func prepareReplyPayload(input, sender, recipient string) (string, error) {
 }
 
 func prepareActiveUserPayload(_, _, _ string) (string, error) {
-	return protocol.EncodeMessage(protocol.Payload{
+	return protocol.EncodeProtocol(protocol.Payload{
 		MessageType: protocol.MessageTypeACT_USRS, Status: "req",
 	}), nil
 }
 
 func prepareChatHistoryPayload(requester string) (string, error) {
-	return protocol.EncodeMessage(protocol.Payload{
+	return protocol.EncodeProtocol(protocol.Payload{
 		MessageType: protocol.MessageTypeHSTRY, Status: "req", Sender: requester,
 	}), nil
 }
@@ -105,7 +105,7 @@ func prepareWhisperPayload(input, sender, _ string) (string, error) {
 	recipient := parts[1]
 	message := parts[2]
 
-	return protocol.EncodeMessage(protocol.Payload{
+	return protocol.EncodeProtocol(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
@@ -114,7 +114,7 @@ func prepareWhisperPayload(input, sender, _ string) (string, error) {
 }
 
 func preparePublicMessagePayload(input, sender string) (message string) {
-	return protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: input})
+	return protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: input})
 }
 
 //RECEIVER
@@ -129,7 +129,7 @@ func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan
 			}
 			return
 		}
-		payload, err := protocol.DecodeMessage(message)
+		payload, err := protocol.DecodeProtocol(message)
 		if err != nil {
 			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red, 0))
 			continue

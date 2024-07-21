@@ -25,7 +25,7 @@ func (c *Client) FetchActiveUsersAfterUsername() error {
 	if err != nil {
 		return err
 	}
-	decodedMsg, err := protocol.DecodeMessage(serverResp)
+	decodedMsg, err := protocol.DecodeProtocol(serverResp)
 	if err != nil {
 		return err
 	}

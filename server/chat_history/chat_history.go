@@ -39,7 +39,7 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 	}
 
 	msgs := pie.Filter(ch.messages, func(msg string) bool {
-		decodedMsg, err := protocol.DecodeMessage(msg)
+		decodedMsg, err := protocol.DecodeProtocol(msg)
 		if err != nil {
 			return false // Skip undecodable messages
 		}

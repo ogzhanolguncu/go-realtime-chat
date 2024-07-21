@@ -148,7 +148,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 		s.history.AddMessage(rawMessage)
 
-		msgPayload, err := protocol.DecodeMessage(rawMessage)
+		msgPayload, err := protocol.DecodeProtocol(rawMessage)
 		if err != nil {
 			// Write back to client that their message is malformed
 			c.Write([]byte(err.Error()))
@@ -161,10 +161,10 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			s.sendWhisper(msgPayload, c)
 		case protocol.MessageTypeACT_USRS:
 			activeUsers := s.getActiveUsers()
-			msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
+			msg := []byte(protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
 			c.Write(msg)
 		case protocol.MessageTypeHSTRY:
-			msg := []byte(protocol.EncodeMessage(protocol.Payload{
+			msg := []byte(protocol.EncodeProtocol(protocol.Payload{
 				MessageType:        protocol.MessageTypeHSTRY,
 				Sender:             msgPayload.Sender,
 				EncodedChatHistory: s.history.GetHistory(msgPayload.Sender, "MSG", "WSP"),
@@ -195,7 +195,7 @@ func (s *TCPServer) sendEncryptionKey(msgPayload protocol.Payload, c net.Conn) {
 	}
 
 	base64EncryptedKey := base64.StdEncoding.EncodeToString(groupChatKey)
-	msg := []byte(protocol.EncodeMessage(protocol.Payload{
+	msg := []byte(protocol.EncodeProtocol(protocol.Payload{
 		MessageType:  protocol.MessageTypeENC,
 		EncryptedKey: base64EncryptedKey,
 	}))
@@ -218,7 +218,7 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 	// If the recipient is not found or their connection is lost, send a system failure message to the sender
 	if !found || recipientConn == nil {
 		// Encode and send a system message indicating the recipient was not found or the connection was lost
-		_, err := sender.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeSYS, Content: "Recipient not found or connection lost", Status: "fail"})))
+		_, err := sender.Write([]byte(protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeSYS, Content: "Recipient not found or connection lost", Status: "fail"})))
 		if err != nil {
 			log.Println("Error sending recipient not found message:", err)
 		}
@@ -226,7 +226,7 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 	}
 
 	// If the recipient's connection is found, send the whisper message to the recipient
-	_, err := recipientConn.Write([]byte(protocol.EncodeMessage(msgPayload)))
+	_, err := recipientConn.Write([]byte(protocol.EncodeProtocol(msgPayload)))
 	if err != nil {
 		log.Println("Error sending whisper:", err)
 	}
@@ -234,14 +234,14 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 
 // broadcastMessage sends a message to all connections except the sender
 func (s *TCPServer) broadcastMessage(msgPayload protocol.Payload, sender net.Conn) {
-	msg := []byte(protocol.EncodeMessage(msgPayload))
+	msg := []byte(protocol.EncodeProtocol(msgPayload))
 	s.broadcastToAll(msg, "Error broadcasting message", sender)
 }
 
 // sendSystemNotice sends a system notice to all connections except the sender.
 // The notice informs about an action performed by the sender (e.g., joining or leaving the chat).
 func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
-	msg := []byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), Status: "success"}))
+	msg := []byte(protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), Status: "success"}))
 	s.broadcastToAll(msg, "Error sending system notice", sender)
 }
 
@@ -260,7 +260,7 @@ func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn net.Conn
 }
 
 func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
-	requiredMsg := protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Status: "required"})
+	requiredMsg := protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeUSR, Status: "required"})
 	conn.Write([]byte(requiredMsg))
 	connReader := bufio.NewReader(conn)
 
@@ -272,15 +272,15 @@ func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
 		if err != nil {
 			break
 		}
-		payload, err := protocol.DecodeMessage(data)
+		payload, err := protocol.DecodeProtocol(data)
 		_, nameIsAlreadyInUse := s.findConnectionByOwnerName(payload.Username)
 		if err != nil || len(payload.Username) < 2 {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' cannot be empty or less than two characters.", payload.Username), Status: "fail"})))
+			conn.Write([]byte(protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' cannot be empty or less than two characters.", payload.Username), Status: "fail"})))
 		} else if nameIsAlreadyInUse {
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' is already in use.", payload.Username), Status: "fail"})))
+			conn.Write([]byte(protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' is already in use.", payload.Username), Status: "fail"})))
 		} else {
 			name = payload.Username
-			conn.Write([]byte(protocol.EncodeMessage(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
+			conn.Write([]byte(protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
 			break
 		}
 	}

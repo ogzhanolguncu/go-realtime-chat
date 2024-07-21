@@ -1,7 +1,9 @@
 package protocol
 
 import (
+	"encoding/base64"
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
@@ -20,14 +22,19 @@ func TestEncodeGeneralMessage(t *testing.T) {
 			{"HeyHey", "Frey", fmt.Sprintf("MSG|%d|Frey|HeyHey\r\n", time.Now().Unix())},
 			{"", "John", fmt.Sprintf("MSG|%d|John|\r\n", time.Now().Unix())},
 		}
-
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeMSG, Content: test.content, Sender: test.sender, Status: ""}))
+			result := EncodeProtocol(Payload{MessageType: MessageTypeMSG, Content: test.content, Sender: test.sender})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
 		}
 	})
 
-	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "MSG|John|5|HeyHey\r\n", EncodeMessage(Payload{MessageType: MessageTypeMSG, Content: "HeyHey", Sender: "John", Status: ""}))
+	t.Run("should fail to encode when message type is invalid", func(t *testing.T) {
+		result := EncodeProtocol(Payload{MessageType: "INVALID", Content: "HeyHey", Sender: "John"})
+		decoded, _ := base64.StdEncoding.DecodeString(result)
+
+		expected := "ERR|Invalid message type\r\n"
+		assert.Equal(t, expected, string(decoded))
 	})
 }
 
@@ -42,15 +49,35 @@ func TestEncodeWhisperMessage(t *testing.T) {
 			{"Hello", "Oz", "John", fmt.Sprintf("WSP|%d|Oz|John|Hello\r\n", time.Now().Unix())},
 			{"World", "John", "Oz", fmt.Sprintf("WSP|%d|John|Oz|World\r\n", time.Now().Unix())},
 			{"HeyHey", "Frey", "Oz", fmt.Sprintf("WSP|%d|Frey|Oz|HeyHey\r\n", time.Now().Unix())},
+			{"", "Alice", "Bob", fmt.Sprintf("WSP|%d|Alice|Bob|\r\n", time.Now().Unix())},
 		}
-
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeWSP, Content: test.content, Sender: test.sender, Recipient: test.recipient, Status: ""}))
+			result := EncodeProtocol(Payload{
+				MessageType: MessageTypeWSP,
+				Content:     test.content,
+				Sender:      test.sender,
+				Recipient:   test.recipient,
+			})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
 		}
 	})
 
-	t.Run("should fail to encode when length and given text mismatch", func(t *testing.T) {
-		assert.NotEqual(t, "WSP|5|HeyHey\r\n", EncodeMessage(Payload{MessageType: MessageTypeWSP, Content: "HeyHey", Sender: "John", Recipient: "Oz", Status: ""}))
+	t.Run("should encode whisper message with empty content", func(t *testing.T) {
+		result := EncodeProtocol(Payload{
+			MessageType: MessageTypeWSP,
+			Content:     "",
+			Sender:      "John",
+			Recipient:   "Oz",
+		})
+		decoded, err := base64.StdEncoding.DecodeString(result)
+		assert.NoError(t, err)
+
+		pattern := "WSP|\\d+|John|Oz|\r\n"
+		matched, err := regexp.Match(pattern, decoded)
+
+		assert.NoError(t, err)
+		assert.True(t, matched, "Encoded message with empty content does not match expected pattern")
 	})
 }
 
@@ -63,12 +90,12 @@ func TestEncodeSystemMessage(t *testing.T) {
 		}{
 			{"John has left the chat!", "left", fmt.Sprintf("SYS|%d|John has left the chat!|left\r\n", time.Now().Unix())},
 		}
-
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeSYS, Timestamp: time.Now().Unix(), Content: test.content, Status: test.status}))
+			result := EncodeProtocol(Payload{MessageType: MessageTypeSYS, Content: test.content, Status: test.status})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
 		}
 	})
-
 }
 
 func TestEncodeErrMessage(t *testing.T) {
@@ -79,62 +106,72 @@ func TestEncodeErrMessage(t *testing.T) {
 		}{
 			{"Errr!", fmt.Sprintf("ERR|%d|Errr!\r\n", time.Now().Unix())},
 		}
-
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeERR, Timestamp: time.Now().Unix(), Content: "Errr!"}))
+			result := EncodeProtocol(Payload{MessageType: MessageTypeERR, Content: test.content})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
 		}
 	})
-
 }
 
 func TestEncodeUsrMessage(t *testing.T) {
 	t.Run("should encode username message successfully", func(t *testing.T) {
 		tests := []struct {
-			content  string
+			username string
+			status   string
 			expected string
 		}{
-			{"Oz", fmt.Sprintf("USR|%d|Oz|success\r\n", time.Now().Unix())},
+			{"Oz", "success", fmt.Sprintf("USR|%d|Oz|success\r\n", time.Now().Unix())},
 		}
-
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeUSR, Timestamp: time.Now().Unix(), Username: "Oz", Status: "success"}))
+			result := EncodeProtocol(Payload{MessageType: MessageTypeUSR, Username: test.username, Status: test.status})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
 		}
 	})
-
 }
 
 func TestEncodeActiveUsrMessage(t *testing.T) {
 	t.Run("should encode active users message successfully", func(t *testing.T) {
 		tests := []struct {
-			content  []string
-			expected string
+			activeUsers []string
+			status      string
+			expected    string
 		}{
-			{[]string{"Oz", "John"}, fmt.Sprintf("ACT_USRS|%d|hey,there|res\r\n", time.Now().Unix())},
+			{[]string{"Oz", "John"}, "res", fmt.Sprintf("ACT_USRS|%d|Oz,John|res\r\n", time.Now().Unix())},
 		}
-
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeACT_USRS, Timestamp: time.Now().Unix(), ActiveUsers: []string{"hey", "there"}, Status: "res"}))
+			result := EncodeProtocol(Payload{MessageType: MessageTypeACT_USRS, ActiveUsers: test.activeUsers, Status: test.status})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
 		}
 	})
-
 }
 
 func TestEncodeChatHistory(t *testing.T) {
 	t.Run("should encode chat history successfully", func(t *testing.T) {
 		tests := []struct {
-			content  []string
+			sender   string
+			history  []string
+			status   string
 			expected string
 		}{
-			{[]string{
-				"MSG|1721160403|Oz|aaa",
-				"MSG|1721160403|Oz|aaaa",
-			}, fmt.Sprintf("HSTRY|%d|Oz|MSG|1721160403|Oz|aaa,MSG|1721160403|Oz|aaaa|res\r\n", time.Now().Unix())},
+			{
+				"Oz",
+				[]string{"MSG|1721160403|Oz|aaa", "MSG|1721160403|Oz|aaaa"},
+				"res",
+				fmt.Sprintf("HSTRY|%d|Oz|MSG|1721160403|Oz|aaa,MSG|1721160403|Oz|aaaa|res\r\n", time.Now().Unix()),
+			},
 		}
-
 		for _, test := range tests {
-			assert.Equal(t, test.expected, EncodeMessage(Payload{MessageType: MessageTypeHSTRY, Sender: "Oz", Timestamp: time.Now().Unix(), EncodedChatHistory: []string{"MSG|1721160403|Oz|aaa",
-				"MSG|1721160403|Oz|aaaa"}, Status: "res"}))
+			result := EncodeProtocol(Payload{
+				MessageType:        MessageTypeHSTRY,
+				Sender:             test.sender,
+				EncodedChatHistory: test.history,
+				Status:             test.status,
+			})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
 		}
 	})
-
 }

@@ -38,7 +38,7 @@ func (c *Client) FetchGroupChatKey() error {
 	if err != nil {
 		return err
 	}
-	decodedMsg, err := protocol.DecodeMessage(serverResp)
+	decodedMsg, err := protocol.DecodeProtocol(serverResp)
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func prepareEncryptionPayload(publicKey *rsa.PublicKey) (string, error) {
 	}
 	publicKeyStr := base64.StdEncoding.EncodeToString(publicKeyBytes)
 
-	return protocol.EncodeMessage(protocol.Payload{
+	return protocol.EncodeProtocol(protocol.Payload{
 		MessageType: protocol.MessageTypeENC, EncryptedKey: publicKeyStr,
 	}), nil
 }
