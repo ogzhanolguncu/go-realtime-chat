@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"net"
 )
@@ -10,11 +12,23 @@ type Client struct {
 	config                     Config
 	name                       string
 	lastWhispererFromGroupChat string
+
+	privateKey   *rsa.PrivateKey
+	publicKey    *rsa.PublicKey
+	groupChatKey string
 }
 
 func NewClient(config Config) (*Client, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate RSA key: %w", err)
+	}
+
+	publicKey := &privateKey.PublicKey
 	return &Client{
-		config: config,
+		config:     config,
+		privateKey: privateKey,
+		publicKey:  publicKey,
 	}, nil
 }
 

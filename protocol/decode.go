@@ -167,6 +167,18 @@ func DecodeMessage(message string) (Payload, error) {
 		}
 		return Payload{MessageType: MessageTypeHSTRY, Sender: requester, Timestamp: unixTimestamp, DecodedChatHistory: parsedChatHistory, Status: status}, nil
 
+	case MessageTypeENC:
+		if len(parts) < 3 {
+			return Payload{}, fmt.Errorf("insufficient parts in ENC message")
+		}
+		timestamp := parts[1]
+		encryptedKey := parts[2]
+
+		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid timestamp format in USR message: %v", err)
+		}
+		return Payload{MessageType: MessageTypeENC, EncryptedKey: encryptedKey, Timestamp: unixTimestamp}, nil
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)
 	}

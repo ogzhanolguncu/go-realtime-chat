@@ -63,6 +63,10 @@ func runClient() error {
 		return fmt.Errorf("failed to fetch chat history: %v", err)
 	}
 
+	if err := client.FetchGroupChatKey(); err != nil {
+		return fmt.Errorf("failed to fetch chat history: %v", err)
+	}
+
 	incomingChan := make(chan protocol.Payload)
 	outgoingChan := make(chan string)
 	errChan := make(chan error, 1) // Buffered channel to prevent goroutine leak

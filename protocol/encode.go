@@ -29,6 +29,8 @@ func EncodeMessage(payload Payload) string {
 		return fmt.Sprintf("%s|%d|%d|%s|%s\r\n", payload.MessageType, time.Now().Unix(), activeUserLen, strings.Join(payload.ActiveUsers, ","), payload.Status)
 	case MessageTypeHSTRY:
 		return fmt.Sprintf("%s|%d|%s|%s|%s\r\n", payload.MessageType, time.Now().Unix(), payload.Sender, strings.Join(payload.EncodedChatHistory, ","), payload.Status)
+	case MessageTypeENC:
+		return fmt.Sprintf("%s|%d|%s\r\n", payload.MessageType, time.Now().Unix(), payload.EncryptedKey)
 	default:
 		return fmt.Sprintf("ERR|%d|Invalid message type\r\n", len("Invalid message type"))
 	}

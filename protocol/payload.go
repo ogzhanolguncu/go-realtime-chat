@@ -4,9 +4,10 @@ package protocol
 // Whisper/DM Message (WSP): 		WSP|timestamp|sender|recipient|message_length|message_content\r\n
 // System Notice (SYS): 			SYS|timestamp|message_length|message_content|status \r\n status = "fail" | "success"
 // Error Message (ERR): 			ERR|timestamp|message_length|error_message\r\n
-// Active Users(USR):				ACT_USRS|timestamp|active_user_length|active_user_array|status\r\n status = "res" | "req"
-// Username Message(ACT_USRS): 		USR|timestamp|name_length|name_content|status\r\n status = "fail | "success"
+// Active Users(ACT_USRS):			ACT_USRS|timestamp|active_user_length|active_user_array|status\r\n status = "res" | "req"
+// Username Message(USR): 			USR|timestamp|name_length|name_content|status\r\n status = "fail | "success"
 // Chat History(HSTRY): 			HSTRY|timestamp|requester|messages_array|status\r\n status = "res" | "req"
+// Encryption(ENC): 				ENC|timestamp|requester_public_key|encrypted_group_chat_key
 const Separator = "|"
 
 type MessageType string
@@ -19,6 +20,7 @@ const (
 	MessageTypeUSR      MessageType = "USR"
 	MessageTypeACT_USRS MessageType = "ACT_USRS" //Active users
 	MessageTypeHSTRY    MessageType = "HSTRY"    //Chat history
+	MessageTypeENC      MessageType = "ENC"
 )
 
 type Payload struct {
@@ -33,4 +35,6 @@ type Payload struct {
 
 	EncodedChatHistory []string // Comma separated messages
 	DecodedChatHistory []Payload
+
+	EncryptedKey string
 }

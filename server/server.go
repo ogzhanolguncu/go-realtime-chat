@@ -2,6 +2,11 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -15,6 +20,7 @@ import (
 
 // ConnectionInfo holds connection-related information.
 const maxMessageLimit = 200
+const groupKey = "SuperSecretGroupKey"
 
 type ConnectionInfo struct {
 	Connection net.Conn
@@ -24,10 +30,19 @@ type ConnectionInfo struct {
 type TCPServer struct {
 	connectionMap sync.Map
 	history       chat_history.ChatHistory
+	groupKey      string
 }
 
 func newServer() *TCPServer {
-	return &TCPServer{}
+	//Generate a 32-byte key
+	key, err := generateSecureKey(32)
+	if err != nil {
+		log.Printf("Failed to create secure key moving forward with hardcoded key %v", err)
+		key = groupKey
+	}
+	return &TCPServer{
+		groupKey: key,
+	}
 }
 
 func (s *TCPServer) addConnection(c net.Conn, info *ConnectionInfo) {
@@ -155,11 +170,43 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 				EncodedChatHistory: s.history.GetHistory(msgPayload.Sender, "MSG", "WSP"),
 				Status:             "res"}))
 			c.Write(msg)
+		case protocol.MessageTypeENC:
+			s.sendEncryptionKey(msgPayload, c)
 		default:
 			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
 		}
 	}
 	log.Printf("Connection closed for %s\n", c.RemoteAddr().String())
+}
+
+func (s *TCPServer) sendEncryptionKey(msgPayload protocol.Payload, c net.Conn) {
+	usersPublicKey, err := stringToPublicKey(msgPayload.EncryptedKey)
+	if err != nil {
+		log.Printf("Could not decode users public key, closing the connection: %v", err)
+		c.Close()
+		return
+	}
+
+	groupChatKey, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, usersPublicKey, []byte(s.groupKey), nil)
+	if err != nil {
+		log.Printf("Could not encrypt group chat key using users public key, closing the connection: %v", err)
+		c.Close()
+		return
+	}
+
+	base64EncryptedKey := base64.StdEncoding.EncodeToString(groupChatKey)
+	msg := []byte(protocol.EncodeMessage(protocol.Payload{
+		MessageType:  protocol.MessageTypeENC,
+		EncryptedKey: base64EncryptedKey,
+	}))
+
+	_, err = c.Write(msg)
+	if err != nil {
+		log.Printf("Failed to send encrypted group chat key: %v", err)
+		c.Close()
+		return
+	}
+	log.Printf("Successfully sent encrypted group chat key to client")
 }
 
 // sendWhisper looks up the recipient's connection in the connectionList. If found, it sends a whisper message to the recipient.
@@ -256,4 +303,33 @@ func setInterval(callback func(), interval time.Duration) chan bool {
 	}()
 
 	return stop
+}
+
+func generateSecureKey(keyLength int) (string, error) {
+	key := make([]byte, keyLength)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", err
+	}
+	strKey := base64.StdEncoding.EncodeToString(key)
+	log.Printf("Generating group chat key %s", strKey)
+
+	return strKey, nil
+}
+
+func stringToPublicKey(keyStr string) (*rsa.PublicKey, error) {
+	keyBytes, err := base64.StdEncoding.DecodeString(keyStr)
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := x509.ParsePKIXPublicKey(keyBytes)
+	if err != nil {
+		return nil, err
+	}
+	rsaPubKey, ok := pubKey.(*rsa.PublicKey)
+
+	if !ok {
+		return nil, fmt.Errorf("not an RSA public key")
+	}
+	return rsaPubKey, nil
 }
