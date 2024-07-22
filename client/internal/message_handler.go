@@ -22,43 +22,26 @@ var commands = []Command{
 	{name: "/users", handler: prepareActiveUserPayload},
 }
 
-func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) {
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			log.Println("Error reading input:", err)
-			continue
-		}
-
-		text = strings.TrimSpace(text)
-		if text == "/quit" {
-			os.Exit(0)
-		}
-		if text == "/clear" {
-			fmt.Print("\033[H\033[2J") //Clears terminal
-		}
-		if text == "/help" {
-			fmt.Println("")
-			PrintHeader(false)
-		}
-
-		message, err := processInput(text, c.name, c.lastWhispererFromGroupChat)
-		if err != nil {
-			log.Println("Error preparing message:", err)
-			continue
-		}
-
-		select {
-		case outgoingChan <- message:
-			// Message sent successfully
-		case <-done:
-			return
-		}
+func (c *Client) SendMessages(text string) {
+	text = strings.TrimSpace(text)
+	if text == "/quit" {
+		os.Exit(0)
 	}
-}
+	if text == "/clear" {
+		fmt.Print("\033[H\033[2J") //Clears terminal
+	}
+	if text == "/help" {
+		fmt.Println("")
+		PrintHeader(false)
+	}
 
+	message, err := processInput(text, c.name, c.lastWhispererFromGroupChat)
+	if err != nil {
+		log.Println("Error preparing message:", err)
+	}
+	c.conn.Write([]byte(message))
+
+}
 func processInput(input, sender, recipient string) (string, error) {
 	for _, cmd := range commands {
 		if strings.HasPrefix(input, cmd.name) {
