@@ -20,7 +20,6 @@ func main() {
 	defer client.Close()
 
 	client.Connect()
-	internal.PrintHeader(true)
 
 	if err := client.SetUsername(); err != nil {
 		fmt.Printf("failed to set username: %v", err)
@@ -84,7 +83,7 @@ func main() {
 				for i := 0; i < userListScrollOffset; i++ {
 					userList.ScrollDown()
 				}
-			case "q", "<C-c>":
+			case "<C-c>":
 				close(done)
 				return
 			case "<Enter>":
@@ -98,6 +97,21 @@ func main() {
 					updateChatBox()
 					inputBox.Text = ""
 				}
+			case "<Resize>":
+				payload := e.Payload.(ui.Resize)
+				header.SetRect(0, 0, payload.Width, 3)
+				commandBox.SetRect(0, 3, payload.Width*3/4, 13)
+				chatBox.SetRect(0, 13, payload.Width*3/4, payload.Height-3)
+				inputBox.SetRect(0, payload.Height-3, payload.Width, payload.Height)
+				userList.SetRect(payload.Width*3/4, 3, payload.Width, payload.Height-3)
+				ui.Clear()
+				draw()
+			case "<Backspace>":
+				if len(inputBox.Text) > 0 {
+					inputBox.Text = inputBox.Text[:len(inputBox.Text)-1]
+				}
+			case "<Space>":
+				inputBox.Text += " "
 			default:
 				if len(e.ID) == 1 {
 					inputBox.Text += e.ID
@@ -115,13 +129,19 @@ func main() {
 }
 
 func prepareUIItems(users []string) (*widgets.Paragraph, *widgets.Paragraph, *widgets.Paragraph, *widgets.Paragraph, *widgets.List) {
+	termWidth, termHeight := ui.TerminalDimensions()
+
+	// Header
 	header := widgets.NewParagraph()
 	header.Text = "WELCOME TO CHATROOM"
-	header.SetRect(0, 0, 100, 3)
+	header.SetRect(0, 0, termWidth, 3)
 	header.Border = true
+	header.TextStyle.Fg = ui.ColorYellow
+	header.BorderStyle.Fg = ui.ColorCyan
 
+	// Command Box
 	commandBox := widgets.NewParagraph()
-	commandBox.Title = "Available commands:"
+	commandBox.Title = "Available Commands"
 	commandBox.Text = "/whisper <recipient> <message> - Send a private message\n" +
 		"/reply <message>              - Reply to the last whisper\n" +
 		"/clear                        - Clear the screen\n" +
@@ -129,31 +149,40 @@ func prepareUIItems(users []string) (*widgets.Paragraph, *widgets.Paragraph, *wi
 		"/help                         - Show commands\n" +
 		"/quit                         - Exit the chat\n\n" +
 		"To send a public message, just type and press Enter"
-	commandBox.SetRect(0, 3, 75, 13)
+	commandBox.SetRect(0, 3, termWidth*3/4, 13)
 	commandBox.Border = true
+	commandBox.TitleStyle.Fg = ui.ColorGreen
+	commandBox.BorderStyle.Fg = ui.ColorWhite
 
+	// Chat Box
 	chatBox := widgets.NewParagraph()
 	chatBox.Title = "Chat Messages"
-	chatBox.SetRect(0, 13, 75, 27)
-	chatBox.TextStyle.Fg = ui.ColorBlue
+	chatBox.SetRect(0, 13, termWidth*3/4, termHeight-3)
 	chatBox.BorderStyle.Fg = ui.ColorCyan
+	chatBox.TitleStyle.Fg = ui.ColorYellow
+	chatBox.WrapText = true
+	chatBox.TextStyle.Fg = ui.ColorWhite // Set a default text color
 
+	// Input Box
 	inputBox := widgets.NewParagraph()
 	inputBox.Title = "Type your message"
-	inputBox.SetRect(0, 27, 100, 30)
-	inputBox.TextStyle.Fg = ui.ColorYellow
-	inputBox.BorderStyle.Fg = ui.ColorWhite
+	inputBox.SetRect(0, termHeight-3, termWidth, termHeight)
+	inputBox.TextStyle.Fg = ui.ColorGreen
+	inputBox.BorderStyle.Fg = ui.ColorCyan
+	inputBox.TitleStyle.Fg = ui.ColorYellow
 
+	// User List
 	userList := widgets.NewList()
 	userList.Title = "Active Users"
 	userList.Rows = users
-	userList.TextStyle = ui.NewStyle(ui.ColorYellow)
+	userList.TextStyle = ui.NewStyle(ui.ColorGreen)
 	userList.WrapText = false
-	userList.SetRect(75, 3, 100, 27)
+	userList.SetRect(termWidth*3/4, 3, termWidth, termHeight-3)
+	userList.BorderStyle.Fg = ui.ColorCyan
+	userList.TitleStyle.Fg = ui.ColorYellow
 
 	return header, commandBox, chatBox, inputBox, userList
 }
-
 func handleCommand(cmd string, messages *[]string, client *internal.Client, userList *widgets.List) {
 	parts := strings.Fields(cmd)
 	switch parts[0] {
