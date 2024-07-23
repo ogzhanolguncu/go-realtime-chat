@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/avast/retry-go"
@@ -78,7 +77,7 @@ func runClient() error {
 
 	messages := []string{}
 	updateChatBox := func() {
-		chatBox.Text = strings.Join(messages, "\n")
+		chatBox.Rows = messages
 	}
 
 	inputMode := true
@@ -121,12 +120,7 @@ func runClient() error {
 				return nil
 			case "<Enter>":
 				if inputMode && len(inputBox.Text) > 0 {
-					if strings.HasPrefix(inputBox.Text, "/") {
-						handleCommand(inputBox.Text, &messages, client, userList)
-					} else {
-						messages = append(messages, fmt.Sprintf("[%s] You: %s", time.Now().Format("15:04"), inputBox.Text))
-						client.SendMessages(inputBox.Text)
-					}
+					client.HandleCommand(inputBox.Text, &messages)
 					updateChatBox()
 					inputBox.Text = ""
 				}
@@ -150,11 +144,19 @@ func runClient() error {
 					inputBox.Text += e.ID
 				}
 			}
-		case msg := <-outgoingChan:
-			messages = append(messages, msg)
-			updateChatBox()
 		case msg := <-incomingChan:
-			messages = append(messages, msg.Content)
+			if msg.MessageType == protocol.MessageTypeWSP {
+				client.UpdateLastWhispererFromGroupChat(msg.Sender)
+			}
+			coloredMessage := internal.ColorifyAndFormatContent(msg)
+			if coloredMessage != "" {
+				messages = append(messages, coloredMessage)
+				updateChatBox()
+			}
+
+		case msg := <-outgoingChan:
+			coloredMessage := fmt.Sprintf("[%s %s](fg:green)", time.Now().Format("15:04"), msg)
+			messages = append(messages, coloredMessage)
 			updateChatBox()
 		case err, ok := <-errChan:
 			if !ok {
@@ -166,7 +168,7 @@ func runClient() error {
 	}
 }
 
-func prepareUIItems(users []string) (*widgets.Paragraph, *widgets.Paragraph, *widgets.Paragraph, *widgets.Paragraph, *widgets.List) {
+func prepareUIItems(users []string) (*widgets.Paragraph, *widgets.Paragraph, *widgets.List, *widgets.Paragraph, *widgets.List) {
 	termWidth, termHeight := ui.TerminalDimensions()
 
 	// Header
@@ -193,13 +195,12 @@ func prepareUIItems(users []string) (*widgets.Paragraph, *widgets.Paragraph, *wi
 	commandBox.BorderStyle.Fg = ui.ColorWhite
 
 	// Chat Box
-	chatBox := widgets.NewParagraph()
+	chatBox := widgets.NewList()
 	chatBox.Title = "Chat Messages"
 	chatBox.SetRect(0, 13, termWidth*3/4, termHeight-3)
 	chatBox.BorderStyle.Fg = ui.ColorCyan
 	chatBox.TitleStyle.Fg = ui.ColorYellow
 	chatBox.WrapText = true
-	chatBox.TextStyle.Fg = ui.ColorWhite // Set a default text color
 
 	// Input Box
 	inputBox := widgets.NewParagraph()
@@ -220,36 +221,4 @@ func prepareUIItems(users []string) (*widgets.Paragraph, *widgets.Paragraph, *wi
 	userList.TitleStyle.Fg = ui.ColorYellow
 
 	return header, commandBox, chatBox, inputBox, userList
-}
-func handleCommand(cmd string, messages *[]string, client *internal.Client, userList *widgets.List) {
-	parts := strings.Fields(cmd)
-	switch parts[0] {
-	case "/whisper":
-		if len(parts) < 3 {
-			*messages = append(*messages, "Usage: /whisper <recipient> <message>")
-		} else {
-			recipient := parts[1]
-			message := strings.Join(parts[2:], " ")
-			// Implement whisper functionality here
-			*messages = append(*messages, fmt.Sprintf("Whispered to %s: %s", recipient, message))
-		}
-	case "/reply":
-		if len(parts) < 2 {
-			*messages = append(*messages, "Usage: /reply <message>")
-		} else {
-			message := strings.Join(parts[1:], " ")
-			// Implement reply functionality here
-			*messages = append(*messages, fmt.Sprintf("Replied: %s", message))
-		}
-	case "/clear":
-		*messages = []string{}
-	case "/users":
-		*messages = append(*messages, "Active users: "+strings.Join(userList.Rows, ", "))
-	case "/help":
-		*messages = append(*messages, "Available commands: /whisper, /reply, /clear, /users, /help, /quit")
-	case "/quit":
-		// This will be handled in the main loop
-	default:
-		*messages = append(*messages, "Unknown command. Type /help for available commands.")
-	}
 }

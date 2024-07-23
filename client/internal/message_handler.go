@@ -3,69 +3,59 @@ package internal
 import (
 	"bufio"
 	"fmt"
-	"log"
-	"os"
 	"strings"
+	"time"
 
 	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-type Command struct {
-	name    string
-	handler func(message, sender, recipient string) (string, error)
-}
-
-var commands = []Command{
-	{name: "/whisper", handler: prepareWhisperPayload},
-	{name: "/reply", handler: prepareReplyPayload},
-	{name: "/users", handler: prepareActiveUserPayload},
-}
-
-func (c *Client) SendMessages(text string) {
-	text = strings.TrimSpace(text)
-	if text == "/quit" {
-		os.Exit(0)
+func (c *Client) HandleCommand(cmd string, messages *[]string) {
+	if !strings.HasPrefix(cmd, "/") {
+		*messages = append(*messages, fmt.Sprintf("[%s You: %s](fg:cyan)", time.Now().Format("15:04"), cmd))
+		c.conn.Write([]byte(preparePublicMessagePayload(cmd, c.name)))
+		return
 	}
-	if text == "/clear" {
-		fmt.Print("\033[H\033[2J") //Clears terminal
-	}
-	if text == "/help" {
-		fmt.Println("")
-		PrintHeader(false)
-	}
-
-	message, err := processInput(text, c.name, c.lastWhispererFromGroupChat)
-	if err != nil {
-		log.Println("Error preparing message:", err)
-	}
-	c.conn.Write([]byte(message))
-
-}
-func processInput(input, sender, recipient string) (string, error) {
-	for _, cmd := range commands {
-		if strings.HasPrefix(input, cmd.name) {
-			return cmd.handler(input, sender, recipient)
+	parts := strings.Fields(cmd)
+	switch parts[0] {
+	case "/whisper":
+		if len(parts) < 3 {
+			*messages = append(*messages, "Usage: /whisper <recipient> <message>")
+		} else {
+			recipient := parts[1]
+			message := strings.Join(parts[2:], " ")
+			// Implement whisper functionality here
+			*messages = append(*messages, fmt.Sprintf("Whispered to %s: %s", recipient, message))
+			message = prepareWhisperPayload(message, c.name, recipient)
+			c.conn.Write([]byte(message))
 		}
+	case "/reply":
+		if len(parts) < 2 {
+			*messages = append(*messages, "Usage: /reply <message>")
+		} else {
+			message := strings.Join(parts[1:], " ")
+			// Implement reply functionality here
+			*messages = append(*messages, fmt.Sprintf("Replied: %s", message))
+			message = prepareReplyPayload(message, c.name, c.lastWhispererFromGroupChat)
+			c.conn.Write([]byte(message))
+
+		}
+	case "/clear":
+		*messages = []string{}
+	case "/quit":
+		// This will be handled in the main loop
+	default:
+		*messages = append(*messages, "Unknown command. Type /help for available commands.")
 	}
-	return preparePublicMessagePayload(input, sender), nil
 }
 
-func prepareReplyPayload(input, sender, recipient string) (string, error) {
-	parts := strings.SplitN(input, " ", 2)
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid reply format. Use: /reply <message>")
-	}
-	message := parts[1]
-	if recipient == "" {
-		return "", fmt.Errorf("no one to reply to")
-	}
+func prepareReplyPayload(input, sender, recipient string) string {
 	return protocol.EncodeProtocol(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
-		Content:     message,
+		Content:     input,
 		Sender:      sender,
-	}), nil
+	})
 }
 
 func prepareActiveUserPayload(_, _, _ string) (string, error) {
@@ -80,20 +70,13 @@ func prepareChatHistoryPayload(requester string) (string, error) {
 	}), nil
 }
 
-func prepareWhisperPayload(input, sender, _ string) (string, error) {
-	parts := strings.SplitN(input, " ", 3)
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid whisper format. Use: /whisper <recipient> <message>")
-	}
-	recipient := parts[1]
-	message := parts[2]
-
+func prepareWhisperPayload(input, sender, recipient string) string {
 	return protocol.EncodeProtocol(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
-		Content:     message,
+		Content:     input,
 		Sender:      sender,
-	}), nil
+	})
 }
 
 func preparePublicMessagePayload(input, sender string) (message string) {

@@ -46,3 +46,7 @@ func (c *Client) Close() {
 		c.conn.Close()
 	}
 }
+
+func (c *Client) UpdateLastWhispererFromGroupChat(lastWhisperer string) {
+	c.lastWhispererFromGroupChat = lastWhisperer
+}
