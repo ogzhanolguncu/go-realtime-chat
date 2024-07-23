@@ -31,7 +31,7 @@ func (c *Client) FetchChatHistory() error {
 	}
 
 	for _, v := range decodedMsg.DecodedChatHistory {
-		colorifyAndFormatContent(v)
+		ColorifyAndFormatContent(v)
 	}
 	return nil
 }

@@ -62,17 +62,7 @@ func PrintHeader(shouldClear bool) {
 	printBox(headerWidth, "WELCOME TO CHATROOM", content, "left")
 }
 
-func printActiveUsers(users []string) {
-	content := append([]string{}, users...)
-	printBox(headerWidth, fmt.Sprintf("ACTIVE USERS (%d)", len(users)), content, "left")
-}
-
-func askForInput(name string) {
-	coloredPrompt := terminal.ColorifyWithTimestamp(fmt.Sprintf("%s:", name), terminal.Yellow, 0)
-	fmt.Printf("%s ", coloredPrompt)
-}
-
-func colorifyAndFormatContent(payload protocol.Payload) {
+func ColorifyAndFormatContent(payload protocol.Payload) {
 	colorMap := map[protocol.MessageType]string{
 		protocol.MessageTypeSYS:      terminal.Cyan,
 		protocol.MessageTypeWSP:      terminal.Purple,
@@ -111,16 +101,6 @@ func colorifyAndFormatContent(payload protocol.Payload) {
 		} else {
 			message = fmt.Sprintf("%s\n", payload.Username)
 			colorCode = terminal.Red
-		}
-	case protocol.MessageTypeACT_USRS:
-		if payload.Status == "res" {
-			// Move the cursor up one line
-			println("")
-			fmt.Print("\033[F")
-			// Clear the entire line
-			fmt.Print("\033[K")
-			// Move the cursor back to the beginning of the line
-			printActiveUsers(payload.ActiveUsers)
 		}
 	default:
 		message = fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)

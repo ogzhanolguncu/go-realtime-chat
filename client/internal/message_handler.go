@@ -102,58 +102,17 @@ func preparePublicMessagePayload(input, sender string) (message string) {
 
 //RECEIVER
 
-func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan<- error, done <-chan struct{}) {
+func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan<- error) {
 	for {
 		message, err := bufio.NewReader(c.conn).ReadString('\n')
 		if err != nil {
-			select {
-			case errChan <- err:
-			case <-done:
-			}
-			return
+			errChan <- err
 		}
 		payload, err := protocol.DecodeProtocol(message)
 		if err != nil {
 			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red, 0))
 			continue
 		}
-		select {
-		case incomingChan <- payload:
-		case <-done:
-			return
-		}
-	}
-}
-
-//MESSAGE LOOP
-
-func (c *Client) MessageLoop(incomingChan <-chan protocol.Payload, outgoingChan <-chan string, errChan <-chan error, done chan struct{}) error {
-	for {
-		askForInput(c.name)
-		select {
-		case incMessage, ok := <-incomingChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			if incMessage.MessageType == protocol.MessageTypeWSP {
-				c.lastWhispererFromGroupChat = incMessage.Sender
-			}
-			colorifyAndFormatContent(incMessage)
-		case outMessage, ok := <-outgoingChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			_, err := c.conn.Write([]byte(outMessage))
-			if err != nil {
-				return fmt.Errorf("error sending message: %v", err)
-			}
-		case err, ok := <-errChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			return err
-		case <-done:
-			return nil // Done signal received, exit loop
-		}
+		incomingChan <- payload
 	}
 }

@@ -17,7 +17,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	t.Run("should format system message with timestamp", func(t *testing.T) {
 		payload := protocol.Payload{Content: "System message", Timestamp: time.Now().Unix(), MessageType: protocol.MessageTypeSYS}
 		stdout := captureStdout(func() {
-			colorifyAndFormatContent(payload)
+			ColorifyAndFormatContent(payload)
 		})
 
 		assert.Equal(t, stdout, terminal.ColorifyWithTimestamp("System: System message\n", terminal.Cyan, 0))
@@ -26,7 +26,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	t.Run("should format whisper message with timestamp", func(t *testing.T) {
 		payload := protocol.Payload{Content: "Hello!", Timestamp: time.Now().Unix(), MessageType: protocol.MessageTypeWSP, Sender: "Alice"}
 		stdout := captureStdout(func() {
-			colorifyAndFormatContent(payload)
+			ColorifyAndFormatContent(payload)
 		})
 
 		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Whisper from Alice: Hello!\n", terminal.Purple, 0))
@@ -35,7 +35,7 @@ func TestColorifyAndFormatContent(t *testing.T) {
 	t.Run("should format group message with timestamp", func(t *testing.T) {
 		payload := protocol.Payload{Content: "Hey everyone!", Timestamp: time.Now().Unix(), MessageType: protocol.MessageTypeMSG, Sender: "Bob"}
 		stdout := captureStdout(func() {
-			colorifyAndFormatContent(payload)
+			ColorifyAndFormatContent(payload)
 		})
 
 		assert.Contains(t, stdout, terminal.ColorifyWithTimestamp("Bob: Hey everyone!\n", terminal.Green, 0))

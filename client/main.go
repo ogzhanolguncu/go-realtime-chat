@@ -6,32 +6,67 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avast/retry-go"
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
+	"github.com/joho/godotenv"
 	"github.com/ogzhanolguncu/go-chat/client/internal"
+	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	err = retry.Do(
+		func() error {
+			return runClient()
+		},
+		retry.Attempts(5),
+		retry.Delay(time.Second),
+		retry.DelayType(retry.BackOffDelay),
+		retry.OnRetry(func(n uint, err error) {
+			if err.Error() == "EOF" {
+				err = fmt.Errorf("server is not responding")
+			}
+			fmt.Println(terminal.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but %v", err), terminal.Red, 0))
+		}),
+	)
+
+	if err != nil {
+		log.Fatalf(terminal.ColorifyWithTimestamp(fmt.Sprintf("Failed after max retries: %v", err), terminal.Red, 0))
+	}
+}
+
+func runClient() error {
 	client, err := internal.NewClient(internal.NewConfig())
 	if err != nil {
 		fmt.Printf("failed to create client: %v", err)
 	}
 	defer client.Close()
 
-	client.Connect()
+	if err := client.Connect(); err != nil {
+		return err
+	}
 
 	if err := client.SetUsername(); err != nil {
-		fmt.Printf("failed to set username: %v", err)
+		return fmt.Errorf("failed to set username: %v", err)
 	}
 
 	users, err := client.FetchActiveUsersAfterUsername()
 	if err != nil {
-		fmt.Printf("failed to fetch active users: %v", err)
+		return fmt.Errorf("failed to fetch active users: %v", err)
+	}
+
+	if err := client.FetchGroupChatKey(); err != nil {
+		return fmt.Errorf("failed to fetch chat history: %v", err)
 	}
 
 	if err := ui.Init(); err != nil {
-		log.Fatalf("failed to initialize termui: %v", err)
+		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
 	defer ui.Close()
 
@@ -53,10 +88,9 @@ func main() {
 	incomingChan := make(chan protocol.Payload)
 	outgoingChan := make(chan string)
 	errChan := make(chan error, 1)
-	done := make(chan struct{})
 
 	go func() {
-		client.ReadMessages(incomingChan, errChan, done)
+		client.ReadMessages(incomingChan, errChan)
 	}()
 
 	userListScrollOffset := 0
@@ -84,14 +118,13 @@ func main() {
 					userList.ScrollDown()
 				}
 			case "<C-c>":
-				close(done)
-				return
+				return nil
 			case "<Enter>":
 				if inputMode && len(inputBox.Text) > 0 {
 					if strings.HasPrefix(inputBox.Text, "/") {
 						handleCommand(inputBox.Text, &messages, client, userList)
 					} else {
-						messages = append(messages, fmt.Sprintf("[%s] You: %s", time.Now().Format("15:04:05"), inputBox.Text))
+						messages = append(messages, fmt.Sprintf("[%s] You: %s", time.Now().Format("15:04"), inputBox.Text))
 						client.SendMessages(inputBox.Text)
 					}
 					updateChatBox()
@@ -123,6 +156,11 @@ func main() {
 		case msg := <-incomingChan:
 			messages = append(messages, msg.Content)
 			updateChatBox()
+		case err, ok := <-errChan:
+			if !ok {
+				return nil // Channel closed, exit loop
+			}
+			return err
 		}
 		draw()
 	}

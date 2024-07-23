@@ -82,10 +82,10 @@ func (c *Client) sendUsernameAndHandleResponse(username string, reader *bufio.Re
 
 	switch decodedMessage.Status {
 	case "fail":
-		colorifyAndFormatContent(decodedMessage)
+		ColorifyAndFormatContent(decodedMessage)
 		return errRetry
 	case "success":
-		colorifyAndFormatContent(decodedMessage)
+		ColorifyAndFormatContent(decodedMessage)
 		c.name = decodedMessage.Username
 		return nil
 	default:

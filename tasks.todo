@@ -19,6 +19,8 @@ Chat Application Todo List:
         ----------------------------------
         Your message:
         ```
+    TUI:
+        ☐ Implement a decent UI with a TUI library. Make sure client logic is still the same.
 
     Chat History:
         ✔ Add timestamp to all message types @done(24-07-15 23:43)
@@ -113,7 +115,7 @@ Chat Application Todo List:
             ☐ Implement rate limiting to prevent spam and abuse
     Bug Fixes:
         ☐ Don't let clients send empty message
-        ☐ If someone new joins current input clears itself
+        ✔ If someone new joins current input clears itself @done(24-07-23 13:47)
         ✔ Fix: Server locks when two users join simultaneously
         ✔ Check whisper logic: Ensure robustness and correctness
         ✔ When client reconnects after successful connection it required one more extra input before sending username. @done(24-07-14 16:04)
