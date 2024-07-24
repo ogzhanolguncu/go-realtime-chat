@@ -1,5 +1,13 @@
 package internal
 
+import (
+	"bufio"
+	"fmt"
+
+	"github.com/ogzhanolguncu/go-chat/client/terminal"
+	"github.com/ogzhanolguncu/go-chat/protocol"
+)
+
 // import (
 // 	"bufio"
 // 	"fmt"
@@ -117,30 +125,30 @@ package internal
 // 	return protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: input})
 // }
 
-// //RECEIVER
+//RECEIVER
 
-// func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan<- error, done <-chan struct{}) {
-// 	for {
-// 		message, err := bufio.NewReader(c.conn).ReadString('\n')
-// 		if err != nil {
-// 			select {
-// 			case errChan <- err:
-// 			case <-done:
-// 			}
-// 			return
-// 		}
-// 		payload, err := protocol.DecodeProtocol(message)
-// 		if err != nil {
-// 			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red, 0))
-// 			continue
-// 		}
-// 		select {
-// 		case incomingChan <- payload:
-// 		case <-done:
-// 			return
-// 		}
-// 	}
-// }
+func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan<- error, done <-chan struct{}) {
+	for {
+		message, err := bufio.NewReader(c.conn).ReadString('\n')
+		if err != nil {
+			select {
+			case errChan <- err:
+			case <-done:
+			}
+			return
+		}
+		payload, err := protocol.DecodeProtocol(message)
+		if err != nil {
+			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red, 0))
+			continue
+		}
+		select {
+		case incomingChan <- payload:
+		case <-done:
+			return
+		}
+	}
+}
 
 // //MESSAGE LOOP
 
