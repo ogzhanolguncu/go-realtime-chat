@@ -24,18 +24,18 @@ type Config struct {
 func NewChatUI() *ChatUI {
 	return &ChatUI{
 		config: Config{
-			HeaderColor:   ui.ColorMagenta, // Neon Pink
-			CommandColor:  ui.ColorCyan,    // Neon Blue
-			ChatColor:     ui.ColorGreen,   // Neon Green
-			InputColor:    ui.ColorYellow,  // Neon Yellow
-			UserListColor: ui.ColorRed,     // Neon Red
+			HeaderColor:   ui.ColorMagenta,
+			CommandColor:  ui.Color(33),  // Softer blue
+			ChatColor:     ui.Color(40),  // Softer green
+			InputColor:    ui.Color(220), // Softer yellow
+			UserListColor: ui.Color(196), // Slightly softer red
 		},
 		userListScrollOffset: 0,
 		inputMode:            true,
 	}
 }
 
-func (cu *ChatUI) InitUI() (header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.List, inputBox *widgets.Paragraph, userList *widgets.List, err error) {
+func (cu *ChatUI) InitUI() (header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.Paragraph, inputBox *widgets.Paragraph, userList *widgets.List, err error) {
 	if err := ui.Init(); err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to initialize termui: %v", err)
 	}
@@ -43,13 +43,13 @@ func (cu *ChatUI) InitUI() (header *widgets.Paragraph, commandBox *widgets.Parag
 	return p1, p2, l1, p3, l2, nil
 }
 
-func (cu *ChatUI) Draw(header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.List, inputBox *widgets.Paragraph, userList *widgets.List) func() {
+func (cu *ChatUI) Draw(header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.Paragraph, inputBox *widgets.Paragraph, userList *widgets.List) func() {
 	return func() {
 		ui.Render(header, commandBox, chatBox, inputBox, userList)
 	}
 }
 
-func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.List, inputBox *widgets.Paragraph, userList *widgets.List) {
+func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.Paragraph, inputBox *widgets.Paragraph, userList *widgets.List) {
 	termWidth, termHeight := ui.TerminalDimensions()
 
 	// Header
@@ -58,7 +58,7 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	header.SetRect(0, 0, termWidth, 3)
 	header.Border = true
 	header.TextStyle.Fg = cu.config.HeaderColor
-	header.BorderStyle.Fg = ui.ColorMagenta
+	header.BorderStyle.Fg = cu.config.HeaderColor
 
 	// Command Box
 	commandBox = widgets.NewParagraph()
@@ -73,15 +73,16 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	commandBox.SetRect(0, 3, termWidth*3/4, 13)
 	commandBox.Border = true
 	commandBox.TitleStyle.Fg = cu.config.CommandColor
-	commandBox.BorderStyle.Fg = ui.ColorMagenta
+	commandBox.BorderStyle.Fg = cu.config.CommandColor
+	commandBox.TextStyle.Fg = cu.config.CommandColor
 	commandBox.WrapText = true
 
 	// Chat Box
-	chatBox = widgets.NewList()
+	chatBox = widgets.NewParagraph()
 	chatBox.Title = "Chat Messages"
 	chatBox.SetRect(0, 13, termWidth*3/4, termHeight-3)
 	chatBox.BorderStyle.Fg = ui.ColorMagenta
-	chatBox.TitleStyle.Fg = cu.config.ChatColor
+	chatBox.BorderStyle.Fg = cu.config.ChatColor
 	chatBox.WrapText = true
 
 	// Input Box
@@ -89,7 +90,7 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	inputBox.Title = "Type your message"
 	inputBox.SetRect(0, termHeight-3, termWidth, termHeight)
 	inputBox.TextStyle.Fg = cu.config.InputColor
-	inputBox.BorderStyle.Fg = ui.ColorMagenta
+	inputBox.BorderStyle.Fg = cu.config.InputColor
 	inputBox.TitleStyle.Fg = cu.config.InputColor
 
 	// User List
@@ -99,17 +100,17 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	userList.TextStyle = ui.NewStyle(cu.config.UserListColor)
 	userList.WrapText = false
 	userList.SetRect(termWidth*3/4, 3, termWidth, termHeight-3)
-	userList.BorderStyle.Fg = ui.ColorMagenta
+	userList.BorderStyle.Fg = cu.config.UserListColor
 	userList.TitleStyle.Fg = cu.config.UserListColor
 
 	return header, commandBox, chatBox, inputBox, userList
 }
 
-func (cu *ChatUI) UpdateChatBox(input string, chatBox *widgets.List) {
-	chatBox.Rows = append(chatBox.Rows, input)
+func (cu *ChatUI) UpdateChatBox(input string, chatBox *widgets.Paragraph) {
+	chatBox.Text += input + "\n"
 }
 
-func (cu *ChatUI) ResizeUI(header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.List, inputBox *widgets.Paragraph, userList *widgets.List) {
+func (cu *ChatUI) ResizeUI(header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.Paragraph, inputBox *widgets.Paragraph, userList *widgets.List) {
 	termWidth, termHeight := ui.TerminalDimensions()
 
 	header.SetRect(0, 0, termWidth, 3)
@@ -122,16 +123,16 @@ func (cu *ChatUI) ResizeUI(header *widgets.Paragraph, commandBox *widgets.Paragr
 	cu.Draw(header, commandBox, chatBox, inputBox, userList)
 }
 
-func (cu *ChatUI) ScrollChatBox(chatBox *widgets.List, direction int) {
-	chatBox.ScrollAmount(direction)
+func (cu *ChatUI) ScrollChatBox(chatBox *widgets.Paragraph, direction int) {
+	// chatBox.(direction)
 }
 
 func (cu *ChatUI) UpdateUserList(userList *widgets.List, users []string) {
 	userList.Rows = users
 }
 
-func (cu *ChatUI) ClearChatBox(chatBox *widgets.List) {
-	chatBox.Rows = []string{}
+func (cu *ChatUI) ClearChatBox(chatBox *widgets.Paragraph) {
+	chatBox.Text = ""
 }
 
 func (cu *ChatUI) SetInputMode(mode bool) {
