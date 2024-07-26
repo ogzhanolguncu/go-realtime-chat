@@ -46,3 +46,7 @@ func (c *Client) Close() {
 		c.conn.Close()
 	}
 }
+
+func (c *Client) GetUsername() string {
+	return c.name
+}

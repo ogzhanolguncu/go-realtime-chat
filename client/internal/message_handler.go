@@ -78,44 +78,65 @@ func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.
 	}
 }
 
-func (c *Client) HandleCommand(userInput string) string {
+func (c *Client) HandleSend(userInput string) string {
 	if !strings.HasPrefix(userInput, "/") {
 		if _, err := c.conn.Write([]byte(preparePublicMessagePayload(userInput, c.name))); err != nil {
 			return fmt.Sprintf("[[%s] Error sending message: %v](fg:red)", time.Now().Format("15:04"), err)
 		}
-		return fmt.Sprintf("[[%s] You: %s](fg:cyan)", time.Now().Format("15:04"), userInput)
+		return fmt.Sprintf("[%s] [You: %s](fg:cyan)", time.Now().Format("15:04"), userInput)
 
 	}
 	parts := strings.Fields(userInput)
 	switch parts[0] {
 	case "/whisper":
 		if len(parts) < 3 {
-			return fmt.Sprintf("[[%s] %s](fg:red)", time.Now().Format("15:04"), "Usage: /whisper <recipient> <message>")
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Usage: /whisper <recipient> <message>")
 		} else {
 			recipient := parts[1]
 			message := strings.Join(parts[2:], " ")
 
 			if _, err := c.conn.Write([]byte(prepareWhisperPayload(message, c.name, recipient))); err != nil {
-				return fmt.Sprintf("[[%s] Error sending whisper: %v](fg:red)", time.Now().Format("15:04"), err)
+				return fmt.Sprintf("[%s] [Error sending whisper: %v](fg:red)", time.Now().Format("15:04"), err)
 			}
-			return fmt.Sprintf("[[%s] Whispered to %s: %s](fg:magenta)", time.Now().Format("15:04"), recipient, message)
+			return fmt.Sprintf("[%s] [Whispered to %s: %s](fg:magenta)", time.Now().Format("15:04"), recipient, message)
 		}
 	case "/reply":
 		if len(parts) < 2 {
-			return fmt.Sprintf("[[%s] %s](fg:red)", time.Now().Format("15:04"), "Usage: /reply <message>")
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Usage: /reply <message>")
 		} else {
 			message := strings.Join(parts[1:], " ")
 			if c.lastWhispererFromGroupChat == "" {
-				return fmt.Sprintf("[[%s] %s](fg:red)", time.Now().Format("15:04"), "No one to reply to")
+				return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "No one to reply to")
 			}
 
 			if _, err := c.conn.Write([]byte(prepareReplyPayload(message, c.name, c.lastWhispererFromGroupChat))); err != nil {
-				return fmt.Sprintf("[[%s] Error sending whisper: %v](fg:red)", time.Now().Format("15:04"), err)
+				return fmt.Sprintf("[%s] [Error sending whisper: %v](fg:red)", time.Now().Format("15:04"), err)
 			}
 
-			return fmt.Sprintf("[[%s] Replied: %s](fg:magenta)", time.Now().Format("15:04"), message)
+			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("15:04"), message)
 		}
 	default:
 		return "Unknown command"
 	}
+}
+
+func (c *Client) HandleReceive(payload protocol.Payload) string {
+	var message string
+
+	switch payload.MessageType {
+	case protocol.MessageTypeMSG:
+		return fmt.Sprintf("[%s] [%s: %s](fg:green)", time.Now().Format("15:04"), payload.Sender, payload.Content)
+	case protocol.MessageTypeWSP:
+		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:purple)\n", time.Now().Format("15:04"), payload.Sender, payload.Content)
+	case protocol.MessageTypeSYS:
+		if payload.Status == "fail" {
+			message = fmt.Sprintf("[%s] [System: %s](fg:red)", time.Now().Format("15:04"), payload.Content)
+		} else {
+			message = fmt.Sprintf("[%s] [System: %s](fg:cyan)", time.Now().Format("15:04"), payload.Content)
+		}
+	default:
+		message = fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)
+	}
+
+	return message
 }

@@ -31,7 +31,7 @@ func main() {
 		log.Fatalf("failed to set username: %v", err)
 	}
 
-	chatUI := chat_ui.NewChatUI()
+	chatUI := chat_ui.NewChatUI(client.GetUsername())
 	header, commandBox, chatBox, inputBox, userList, err := chatUI.InitUI()
 	if err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
@@ -53,11 +53,15 @@ func main() {
 		select {
 		case e := <-uiEvents:
 			switch e.ID {
+			case "<MouseWheelUp>":
+				chatUI.ScrollChatBox(chatBox, -1)
+			case "<MouseWheelDown>":
+				chatUI.ScrollChatBox(chatBox, 1)
 			case "<C-c>":
 				return
 			case "<Enter>":
 				if chatUI.IsInputMode() && len(inputBox.Text) > 0 {
-					message := client.HandleCommand(inputBox.Text)
+					message := client.HandleSend(inputBox.Text)
 					chatUI.UpdateChatBox(message, chatBox)
 					inputBox.Text = ""
 				}
@@ -74,7 +78,7 @@ func main() {
 			}
 		case payload := <-incomingChan:
 			//TODO format incoming messages
-			chatUI.UpdateChatBox(payload.Content, chatBox)
+			chatUI.UpdateChatBox(client.HandleReceive(payload), chatBox)
 		}
 		draw()
 	}

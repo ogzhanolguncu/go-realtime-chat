@@ -3,6 +3,8 @@ package chat_ui
 import (
 	"fmt"
 
+	"strings"
+
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
 )
@@ -10,28 +12,18 @@ import (
 type ChatUI struct {
 	inputMode            bool
 	userListScrollOffset int
-	config               Config
+	chatScrollOffset     int
+	chatMessages         []string
+	currentUserName      string
 }
 
-type Config struct {
-	HeaderColor   ui.Color
-	CommandColor  ui.Color
-	ChatColor     ui.Color
-	InputColor    ui.Color
-	UserListColor ui.Color
-}
-
-func NewChatUI() *ChatUI {
+func NewChatUI(username string) *ChatUI {
 	return &ChatUI{
-		config: Config{
-			HeaderColor:   ui.ColorMagenta,
-			CommandColor:  ui.Color(33),  // Softer blue
-			ChatColor:     ui.Color(40),  // Softer green
-			InputColor:    ui.Color(220), // Softer yellow
-			UserListColor: ui.Color(196), // Slightly softer red
-		},
 		userListScrollOffset: 0,
+		chatScrollOffset:     0,
 		inputMode:            true,
+		chatMessages:         []string{},
+		currentUserName:      username,
 	}
 }
 
@@ -54,11 +46,11 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 
 	// Header
 	header = widgets.NewParagraph()
-	header.Text = "WELCOME TO CHATROOM"
+	header.Text = fmt.Sprintf("Welcome to chatroom, %s", cu.currentUserName)
 	header.SetRect(0, 0, termWidth, 3)
 	header.Border = true
-	header.TextStyle.Fg = cu.config.HeaderColor
-	header.BorderStyle.Fg = cu.config.HeaderColor
+	header.TextStyle.Fg = ui.ColorGreen
+	header.BorderStyle.Fg = ui.ColorMagenta
 
 	// Command Box
 	commandBox = widgets.NewParagraph()
@@ -72,9 +64,9 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 		"To send a public message, just type and press Enter"
 	commandBox.SetRect(0, 3, termWidth*3/4, 13)
 	commandBox.Border = true
-	commandBox.TitleStyle.Fg = cu.config.CommandColor
-	commandBox.BorderStyle.Fg = cu.config.CommandColor
-	commandBox.TextStyle.Fg = cu.config.CommandColor
+	commandBox.TitleStyle.Fg = ui.ColorGreen
+	commandBox.BorderStyle.Fg = ui.ColorMagenta
+	commandBox.TextStyle.Fg = ui.ColorMagenta
 	commandBox.WrapText = true
 
 	// Chat Box
@@ -82,32 +74,45 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	chatBox.Title = "Chat Messages"
 	chatBox.SetRect(0, 13, termWidth*3/4, termHeight-3)
 	chatBox.BorderStyle.Fg = ui.ColorMagenta
-	chatBox.BorderStyle.Fg = cu.config.ChatColor
+	chatBox.TitleStyle.Fg = ui.ColorGreen
 	chatBox.WrapText = true
 
 	// Input Box
 	inputBox = widgets.NewParagraph()
 	inputBox.Title = "Type your message"
 	inputBox.SetRect(0, termHeight-3, termWidth, termHeight)
-	inputBox.TextStyle.Fg = cu.config.InputColor
-	inputBox.BorderStyle.Fg = cu.config.InputColor
-	inputBox.TitleStyle.Fg = cu.config.InputColor
+	inputBox.TextStyle.Fg = ui.ColorMagenta
+	inputBox.BorderStyle.Fg = ui.ColorMagenta
+	inputBox.TitleStyle.Fg = ui.ColorGreen
 
 	// User List
 	userList = widgets.NewList()
 	userList.Title = "Active Users"
 	userList.Rows = nil
-	userList.TextStyle = ui.NewStyle(cu.config.UserListColor)
+	userList.TextStyle = ui.NewStyle(ui.ColorMagenta)
 	userList.WrapText = false
 	userList.SetRect(termWidth*3/4, 3, termWidth, termHeight-3)
-	userList.BorderStyle.Fg = cu.config.UserListColor
-	userList.TitleStyle.Fg = cu.config.UserListColor
+	userList.BorderStyle.Fg = ui.ColorMagenta
+	userList.TitleStyle.Fg = ui.ColorGreen
 
 	return header, commandBox, chatBox, inputBox, userList
 }
 
 func (cu *ChatUI) UpdateChatBox(input string, chatBox *widgets.Paragraph) {
-	chatBox.Text += input + "\n"
+	cu.chatMessages = append(cu.chatMessages, input)
+	cu.chatScrollOffset = len(cu.chatMessages) - (chatBox.Inner.Dy() - 1)
+	if cu.chatScrollOffset < 0 {
+		cu.chatScrollOffset = 0
+	}
+	cu.refreshChatBox(chatBox)
+}
+
+func (cu *ChatUI) refreshChatBox(chatBox *widgets.Paragraph) {
+	visibleLines := chatBox.Inner.Dy() - 1
+	if cu.chatScrollOffset+visibleLines > len(cu.chatMessages) {
+		visibleLines = len(cu.chatMessages) - cu.chatScrollOffset
+	}
+	chatBox.Text = strings.Join(cu.chatMessages[cu.chatScrollOffset:cu.chatScrollOffset+visibleLines], "\n")
 }
 
 func (cu *ChatUI) ResizeUI(header *widgets.Paragraph, commandBox *widgets.Paragraph, chatBox *widgets.Paragraph, inputBox *widgets.Paragraph, userList *widgets.List) {
@@ -124,7 +129,14 @@ func (cu *ChatUI) ResizeUI(header *widgets.Paragraph, commandBox *widgets.Paragr
 }
 
 func (cu *ChatUI) ScrollChatBox(chatBox *widgets.Paragraph, direction int) {
-	// chatBox.(direction)
+	cu.chatScrollOffset += direction
+	if cu.chatScrollOffset < 0 {
+		cu.chatScrollOffset = 0
+	}
+	if cu.chatScrollOffset > len(cu.chatMessages)-(chatBox.Inner.Dy()-1) {
+		cu.chatScrollOffset = len(cu.chatMessages) - (chatBox.Inner.Dy() - 1)
+	}
+	cu.refreshChatBox(chatBox)
 }
 
 func (cu *ChatUI) UpdateUserList(userList *widgets.List, users []string) {
@@ -132,7 +144,9 @@ func (cu *ChatUI) UpdateUserList(userList *widgets.List, users []string) {
 }
 
 func (cu *ChatUI) ClearChatBox(chatBox *widgets.Paragraph) {
-	chatBox.Text = ""
+	cu.chatMessages = []string{}
+	cu.chatScrollOffset = 0
+	cu.refreshChatBox(chatBox)
 }
 
 func (cu *ChatUI) SetInputMode(mode bool) {
