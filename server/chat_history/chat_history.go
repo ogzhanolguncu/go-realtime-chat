@@ -20,11 +20,13 @@ const fileName = "chat_history.txt"
 
 type ChatHistory struct {
 	messages []string
+	encoding bool
 }
 
-func NewChatHistory() *ChatHistory {
+func NewChatHistory(encoding bool) *ChatHistory {
 	return &ChatHistory{
 		messages: []string{},
+		encoding: encoding,
 	}
 }
 
@@ -39,7 +41,7 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 	}
 
 	msgs := pie.Filter(ch.messages, func(msg string) bool {
-		decodedMsg, err := protocol.DecodeProtocol(msg)
+		decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(msg)
 		if err != nil {
 			return false // Skip undecodable messages
 		}

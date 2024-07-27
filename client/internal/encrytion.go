@@ -24,7 +24,7 @@ import (
 // Users decrypt the group key using their private keys.
 func (c *Client) FetchGroupChatKey() error {
 	serverReader := bufio.NewReader(c.conn)
-	message, err := prepareEncryptionPayload(c.publicKey)
+	message, err := c.prepareEncryptionPayload(c.publicKey)
 	if err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func (c *Client) FetchGroupChatKey() error {
 	if err != nil {
 		return err
 	}
-	decodedMsg, err := protocol.DecodeProtocol(serverResp)
+	decodedMsg, err := c.decodeFn(serverResp)
 	if err != nil {
 		return err
 	}
@@ -57,14 +57,14 @@ func (c *Client) FetchGroupChatKey() error {
 	return nil
 }
 
-func prepareEncryptionPayload(publicKey *rsa.PublicKey) (string, error) {
+func (c *Client) prepareEncryptionPayload(publicKey *rsa.PublicKey) (string, error) {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		return "", err
 	}
 	publicKeyStr := base64.StdEncoding.EncodeToString(publicKeyBytes)
 
-	return protocol.EncodeProtocol(protocol.Payload{
+	return c.encodeFn(protocol.Payload{
 		MessageType: protocol.MessageTypeENC, EncryptedKey: publicKeyStr,
 	}), nil
 }

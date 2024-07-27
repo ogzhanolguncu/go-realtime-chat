@@ -11,7 +11,7 @@ import (
 )
 
 func TestAddMessage(t *testing.T) {
-	chatHistory := NewChatHistory()
+	chatHistory := NewChatHistory(false)
 	chatHistory.AddMessage(
 		"MSG|1721160403|Oz|3|aaa\r\n",
 		"MSG|1721160403|Oz|4|aaaa\r\n",
@@ -53,7 +53,7 @@ func TestFilterMessages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chatHistory := NewChatHistory()
+			chatHistory := NewChatHistory(false)
 			chatHistory.AddMessage(tt.messages...)
 			filteredHistory := chatHistory.GetHistory(tt.user, tt.messageTypes...)
 			assert.Equal(t, tt.expectedMessages, filteredHistory)
@@ -62,7 +62,7 @@ func TestFilterMessages(t *testing.T) {
 }
 
 func TestSaveToDisk(t *testing.T) {
-	chatHistory := NewChatHistory()
+	chatHistory := NewChatHistory(false)
 	chatHistory.AddMessage(
 		"MSG|1721160403|Oz|3333",
 		"MSG|1721160403|Oz|4444",
@@ -81,13 +81,13 @@ func TestSaveToDisk(t *testing.T) {
 	lines := strings.Split(strings.ReplaceAll(string(content), "\r", ""), "\n")
 	require.GreaterOrEqual(t, len(lines), 3) // Timestamp + 3 messages
 
-	assert.Equal(t, "MSG|1721160403|Oz|aaa", lines[0])
-	assert.Equal(t, "MSG|1721160403|Oz|aaaa", lines[1])
-	assert.Equal(t, "MSG|1721160403|Oz|aaaaa", lines[2])
+	assert.Equal(t, "MSG|1721160403|Oz|3333", lines[0])
+	assert.Equal(t, "MSG|1721160403|Oz|4444", lines[1])
+	assert.Equal(t, "MSG|1721160403|Oz|5555", lines[2])
 }
 
 func TestDeleteFromDisk(t *testing.T) {
-	chatHistory := NewChatHistory()
+	chatHistory := NewChatHistory(false)
 	chatHistory.AddMessage(
 		"MSG|1721160403|Oz|3|aaa\r\n",
 		"MSG|1721160403|Oz|4|aaaa\r\n",
@@ -102,7 +102,7 @@ func TestDeleteFromDisk(t *testing.T) {
 
 func TestReadFromDiskToInMemory(t *testing.T) {
 	// Setup
-	chatHistory := NewChatHistory()
+	chatHistory := NewChatHistory(false)
 	testMessages := []string{
 		"1234567890", // Timestamp
 		"MSG|1721160403|Oz|3|aaa\r",

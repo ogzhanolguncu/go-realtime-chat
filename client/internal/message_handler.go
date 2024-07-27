@@ -12,9 +12,9 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func prepareReplyPayload(message, sender, recipient string) string {
+func (c *Client) prepareReplyPayload(message, sender, recipient string) string {
 
-	return protocol.EncodeProtocol(protocol.Payload{
+	return c.encodeFn(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
@@ -22,8 +22,8 @@ func prepareReplyPayload(message, sender, recipient string) string {
 	})
 }
 
-func prepareWhisperPayload(message, sender, recipient string) string {
-	return protocol.EncodeProtocol(protocol.Payload{
+func (c *Client) prepareWhisperPayload(message, sender, recipient string) string {
+	return c.encodeFn(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
@@ -31,8 +31,8 @@ func prepareWhisperPayload(message, sender, recipient string) string {
 	})
 }
 
-func preparePublicMessagePayload(message, sender string) string {
-	return protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: message})
+func (c *Client) preparePublicMessagePayload(message, sender string) string {
+	return c.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: message})
 }
 
 //RECEIVER
@@ -69,7 +69,7 @@ func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.
 				continue
 			}
 
-			payload, err := protocol.DecodeProtocol(message)
+			payload, err := c.decodeFn(message)
 			if err != nil {
 				// Client keep reading it payload is broken, its safe
 				continue
@@ -82,7 +82,7 @@ func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.
 
 func (c *Client) HandleSend(userInput string) (string, error) {
 	if !strings.HasPrefix(userInput, "/") {
-		if _, err := c.conn.Write([]byte(preparePublicMessagePayload(userInput, c.name))); err != nil {
+		if _, err := c.conn.Write([]byte(c.preparePublicMessagePayload(userInput, c.name))); err != nil {
 			return "", fmt.Errorf("error sending message: %v", err)
 		}
 		return fmt.Sprintf("[%s] [You: %s](fg:cyan)", time.Now().Format("15:04"), userInput), nil
@@ -97,7 +97,7 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 			recipient := parts[1]
 			message := strings.Join(parts[2:], " ")
 
-			if _, err := c.conn.Write([]byte(prepareWhisperPayload(message, c.name, recipient))); err != nil {
+			if _, err := c.conn.Write([]byte(c.prepareWhisperPayload(message, c.name, recipient))); err != nil {
 				return "", fmt.Errorf("error sending whisper: %v", err)
 			}
 			return fmt.Sprintf("[%s] [Whispered to %s: %s](fg:magenta)", time.Now().Format("15:04"), recipient, message), nil
@@ -111,7 +111,7 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 				return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "No one to reply to"), nil
 			}
 
-			if _, err := c.conn.Write([]byte(prepareReplyPayload(message, c.name, c.lastWhispererFromGroupChat))); err != nil {
+			if _, err := c.conn.Write([]byte(c.prepareReplyPayload(message, c.name, c.lastWhispererFromGroupChat))); err != nil {
 				return "", fmt.Errorf("error sending whisper: %v", err)
 			}
 
@@ -129,7 +129,7 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 	case protocol.MessageTypeMSG:
 		return fmt.Sprintf("[%s] [%s: %s](fg:green)", time.Now().Format("15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeWSP:
-		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:purple)\n", time.Now().Format("15:04"), payload.Sender, payload.Content)
+		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:magenta)\n", time.Now().Format("15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeSYS:
 		if payload.Status == "fail" {
 			message = fmt.Sprintf("[%s] [System: %s](fg:red)", time.Now().Format("15:04"), payload.Content)
