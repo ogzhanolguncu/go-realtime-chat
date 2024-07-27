@@ -133,9 +133,16 @@ func (cu *ChatUI) ScrollChatBox(chatBox *widgets.Paragraph, direction int) {
 	if cu.chatScrollOffset < 0 {
 		cu.chatScrollOffset = 0
 	}
-	if cu.chatScrollOffset > len(cu.chatMessages)-(chatBox.Inner.Dy()-1) {
-		cu.chatScrollOffset = len(cu.chatMessages) - (chatBox.Inner.Dy() - 1)
+
+	visibleLines := chatBox.Inner.Dy() - 1
+	totalMessages := len(cu.chatMessages)
+
+	if totalMessages <= visibleLines {
+		cu.chatScrollOffset = 0
+	} else if cu.chatScrollOffset > totalMessages-visibleLines {
+		cu.chatScrollOffset = totalMessages - visibleLines
 	}
+
 	cu.refreshChatBox(chatBox)
 }
 

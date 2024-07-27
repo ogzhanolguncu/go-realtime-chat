@@ -69,6 +69,8 @@ func main() {
 				if len(inputBox.Text) > 0 {
 					inputBox.Text = inputBox.Text[:len(inputBox.Text)-1]
 				}
+			case "<Resize>":
+				chatUI.ResizeUI(header, commandBox, chatBox, inputBox, userList)
 			case "<Space>":
 				inputBox.Text += " "
 			default:
