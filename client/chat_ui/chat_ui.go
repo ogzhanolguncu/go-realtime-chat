@@ -58,8 +58,6 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	commandBox.Text = "/whisper <recipient> <message> - Send a private message\n" +
 		"/reply <message>              - Reply to the last whisper\n" +
 		"/clear                        - Clear the screen\n" +
-		"/users                        - Show active users\n" +
-		"/help                         - Show commands\n" +
 		"/quit                         - Exit the chat\n\n" +
 		"To send a public message, just type and press Enter"
 	commandBox.SetRect(0, 3, termWidth*3/4, 13)

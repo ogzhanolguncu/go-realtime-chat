@@ -90,6 +90,15 @@ func runClient() error {
 				return nil
 			case "<Enter>":
 				if chatUI.IsInputMode() && len(inputBox.Text) > 0 {
+					if inputBox.Text == "/quit" {
+						return nil
+					}
+					if inputBox.Text == "/clear" {
+						chatUI.ClearChatBox(chatBox)
+						inputBox.Text = ""
+						draw()   // Redraw the UI
+						continue // Skip the rest of the loop iteration
+					}
 					message, err := client.HandleSend(inputBox.Text)
 					if err != nil {
 						return err
