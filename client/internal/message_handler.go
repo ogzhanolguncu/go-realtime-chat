@@ -78,45 +78,45 @@ func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.
 	}
 }
 
-func (c *Client) HandleSend(userInput string) string {
+func (c *Client) HandleSend(userInput string) (string, error) {
 	if !strings.HasPrefix(userInput, "/") {
 		if _, err := c.conn.Write([]byte(preparePublicMessagePayload(userInput, c.name))); err != nil {
-			return fmt.Sprintf("[[%s] Error sending message: %v](fg:red)", time.Now().Format("15:04"), err)
+			return "", fmt.Errorf("error sending message: %v", err)
 		}
-		return fmt.Sprintf("[%s] [You: %s](fg:cyan)", time.Now().Format("15:04"), userInput)
+		return fmt.Sprintf("[%s] [You: %s](fg:cyan)", time.Now().Format("15:04"), userInput), nil
 
 	}
 	parts := strings.Fields(userInput)
 	switch parts[0] {
 	case "/whisper":
 		if len(parts) < 3 {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Usage: /whisper <recipient> <message>")
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Usage: /whisper <recipient> <message>"), nil
 		} else {
 			recipient := parts[1]
 			message := strings.Join(parts[2:], " ")
 
 			if _, err := c.conn.Write([]byte(prepareWhisperPayload(message, c.name, recipient))); err != nil {
-				return fmt.Sprintf("[%s] [Error sending whisper: %v](fg:red)", time.Now().Format("15:04"), err)
+				return "", fmt.Errorf("error sending whisper: %v", err)
 			}
-			return fmt.Sprintf("[%s] [Whispered to %s: %s](fg:magenta)", time.Now().Format("15:04"), recipient, message)
+			return fmt.Sprintf("[%s] [Whispered to %s: %s](fg:magenta)", time.Now().Format("15:04"), recipient, message), nil
 		}
 	case "/reply":
 		if len(parts) < 2 {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Usage: /reply <message>")
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Usage: /reply <message>"), nil
 		} else {
 			message := strings.Join(parts[1:], " ")
 			if c.lastWhispererFromGroupChat == "" {
-				return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "No one to reply to")
+				return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "No one to reply to"), nil
 			}
 
 			if _, err := c.conn.Write([]byte(prepareReplyPayload(message, c.name, c.lastWhispererFromGroupChat))); err != nil {
-				return fmt.Sprintf("[%s] [Error sending whisper: %v](fg:red)", time.Now().Format("15:04"), err)
+				return "", fmt.Errorf("error sending whisper: %v", err)
 			}
 
-			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("15:04"), message)
+			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("15:04"), message), nil
 		}
 	default:
-		return "Unknown command"
+		return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Unknown command"), nil
 	}
 }
 
