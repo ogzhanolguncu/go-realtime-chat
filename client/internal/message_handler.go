@@ -118,7 +118,7 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("15:04"), message), nil
 		}
 	default:
-		return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("15:04"), "Unknown command"), nil
+		return fmt.Sprintf("[%s] [Unknown '%s' command](fg:red)", time.Now().Format("15:04"), parts[0]), nil
 	}
 }
 
@@ -129,7 +129,7 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 	case protocol.MessageTypeMSG:
 		return fmt.Sprintf("[%s] [%s: %s](fg:green)", time.Now().Format("15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeWSP:
-		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:magenta)\n", time.Now().Format("15:04"), payload.Sender, payload.Content)
+		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:magenta)", time.Now().Format("15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeSYS:
 		if payload.Status == "fail" {
 			message = fmt.Sprintf("[%s] [System: %s](fg:red)", time.Now().Format("15:04"), payload.Content)
@@ -137,7 +137,7 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 			message = fmt.Sprintf("[%s] [System: %s](fg:cyan)", time.Now().Format("15:04"), payload.Content)
 		}
 	default:
-		message = fmt.Sprintf("%s: %s\n", payload.Sender, payload.Content)
+		return fmt.Sprintf("[%s] [Unknown message](fg:red)", time.Now().Format("15:04"))
 	}
 
 	return message

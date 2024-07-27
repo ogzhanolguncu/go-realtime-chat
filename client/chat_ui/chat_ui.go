@@ -49,49 +49,46 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	header.Text = fmt.Sprintf("Welcome to chatroom, %s", cu.currentUserName)
 	header.SetRect(0, 0, termWidth, 3)
 	header.Border = true
-	header.TextStyle.Fg = ui.ColorGreen
-	header.BorderStyle.Fg = ui.ColorMagenta
+	header.TextStyle.Fg = ui.ColorYellow
+	header.BorderStyle.Fg = ui.ColorCyan
 
 	// Command Box
 	commandBox = widgets.NewParagraph()
-	commandBox.Title = "Available Commands"
-	commandBox.Text = "/whisper <recipient> <message> - Send a private message\n" +
-		"/reply <message>              - Reply to the last whisper\n" +
-		"/clear                        - Clear the screen\n" +
-		"/quit                         - Exit the chat\n\n" +
-		"To send a public message, just type and press Enter"
-	commandBox.SetRect(0, 3, termWidth*3/4, 13)
+	commandBox.Title = "Commands"
+	commandBox.Text = "/whisper, /reply, /clear, /quit"
+	commandBox.SetRect(0, 3, termWidth*3/4, 6)
 	commandBox.Border = true
-	commandBox.TitleStyle.Fg = ui.ColorGreen
-	commandBox.BorderStyle.Fg = ui.ColorMagenta
-	commandBox.TextStyle.Fg = ui.ColorMagenta
+	commandBox.TitleStyle.Fg = ui.ColorYellow
+	commandBox.BorderStyle.Fg = ui.ColorCyan
+	commandBox.TextStyle.Fg = ui.ColorWhite
 	commandBox.WrapText = true
 
 	// Chat Box
 	chatBox = widgets.NewParagraph()
 	chatBox.Title = "Chat Messages"
-	chatBox.SetRect(0, 13, termWidth*3/4, termHeight-3)
-	chatBox.BorderStyle.Fg = ui.ColorMagenta
-	chatBox.TitleStyle.Fg = ui.ColorGreen
+	chatBox.SetRect(0, 6, termWidth*3/4, termHeight-3)
+	chatBox.BorderStyle.Fg = ui.ColorCyan
+	chatBox.TitleStyle.Fg = ui.ColorYellow
 	chatBox.WrapText = true
 
 	// Input Box
 	inputBox = widgets.NewParagraph()
 	inputBox.Title = "Type your message"
 	inputBox.SetRect(0, termHeight-3, termWidth, termHeight)
-	inputBox.TextStyle.Fg = ui.ColorMagenta
-	inputBox.BorderStyle.Fg = ui.ColorMagenta
-	inputBox.TitleStyle.Fg = ui.ColorGreen
+	inputBox.TextStyle.Fg = ui.ColorWhite
+	inputBox.BorderStyle.Fg = ui.ColorCyan
+	inputBox.TitleStyle.Fg = ui.ColorYellow
 
 	// User List
 	userList = widgets.NewList()
 	userList.Title = "Active Users"
 	userList.Rows = nil
-	userList.TextStyle = ui.NewStyle(ui.ColorMagenta)
+	userList.TextStyle = ui.NewStyle(ui.ColorWhite)
 	userList.WrapText = false
 	userList.SetRect(termWidth*3/4, 3, termWidth, termHeight-3)
-	userList.BorderStyle.Fg = ui.ColorMagenta
-	userList.TitleStyle.Fg = ui.ColorGreen
+	userList.BorderStyle.Fg = ui.ColorCyan
+	userList.TitleStyle.Fg = ui.ColorYellow
+	userList.SelectedRowStyle = ui.NewStyle(ui.ColorBlack, ui.ColorYellow)
 
 	return header, commandBox, chatBox, inputBox, userList
 }

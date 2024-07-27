@@ -98,22 +98,35 @@ func (s *TCPServer) getConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, boo
 
 func (s *TCPServer) handleNewConnection(c net.Conn) {
 	name := s.handleUsernameSet(c)
-
 	// If the username is an empty string after exhausting retries,
 	// close the connection to prevent clients with no username from connecting.
 	if len(name) == 0 {
 		c.Close()
 		return
 	}
-
 	log.Printf("Recently joined user's name: %s\n", name)
 	s.addConnection(c, &ConnectionInfo{Connection: c, OwnerName: name})
-
 	connectedUsers := s.getConnectedUsersCount()
 	log.Printf("Connection from %s\n", c.RemoteAddr().String())
 	log.Printf("Connected users: %d\n", connectedUsers)
 
-	s.sendSystemNotice(name, c, "joined")
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		s.sendSystemNotice(name, c, "joined")
+
+	}()
+
+	go func() {
+		defer wg.Done()
+		s.sendActiveUsers()
+	}()
+
+	// Wait for both messages to be sent
+	wg.Wait()
+
 	s.handleConnection(c)
 }
 
@@ -145,6 +158,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		info, _ := s.getConnectionInfoAndDelete(c)
 		if info != nil {
 			s.sendSystemNotice(info.OwnerName, nil, "left")
+			s.sendActiveUsers()
 		}
 		c.Close()
 	}()
@@ -178,10 +192,6 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			s.broadcastMessage(msgPayload, c)
 		case protocol.MessageTypeWSP:
 			s.sendWhisper(msgPayload, c)
-		case protocol.MessageTypeACT_USRS:
-			activeUsers := s.getActiveUsers()
-			msg := []byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
-			c.Write(msg)
 		case protocol.MessageTypeHSTRY:
 			msg := []byte(s.encodeFn(protocol.Payload{
 				MessageType:        protocol.MessageTypeHSTRY,
@@ -196,6 +206,13 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		}
 	}
 	log.Printf("Connection closed for %s\n", c.RemoteAddr().String())
+}
+
+func (s *TCPServer) sendActiveUsers() {
+	activeUsers := s.getActiveUsers()
+	log.Printf("Sending active user list %s", activeUsers)
+	msg := []byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
+	s.broadcastToAll(msg, "Error broadcasting active users", nil)
 }
 
 func (s *TCPServer) sendEncryptionKey(msgPayload protocol.Payload, c net.Conn) {

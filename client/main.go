@@ -47,7 +47,7 @@ func runClient() error {
 	if err != nil {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
-	client.Close()
+	defer client.Close()
 
 	if err := client.Connect(); err != nil {
 		return fmt.Errorf("failed to connect server: %v", err)
@@ -58,13 +58,12 @@ func runClient() error {
 	}
 
 	chatUI := chat_ui.NewChatUI(client.GetUsername())
+	defer chatUI.Close()
 	header, commandBox, chatBox, inputBox, userList, err := chatUI.InitUI()
-	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [System: Welcome %s to the chat!](fg:cyan)", time.Now().Format("15:04"), client.GetUsername()), chatBox)
-
 	if err != nil {
 		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
-	defer chatUI.Close()
+	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [System: Welcome to the chat!](fg:cyan)", time.Now().Format("15:04")), chatBox)
 
 	draw := chatUI.Draw(header, commandBox, chatBox, inputBox, userList)
 	draw()
@@ -82,6 +81,10 @@ func runClient() error {
 		select {
 		case e := <-uiEvents:
 			switch e.ID {
+			case "<Up>":
+				userList.ScrollUp()
+			case "<Down>":
+				userList.ScrollDown()
 			case "<MouseWheelUp>":
 				chatUI.ScrollChatBox(chatBox, -1)
 			case "<MouseWheelDown>":
@@ -120,7 +123,20 @@ func runClient() error {
 				}
 			}
 		case payload := <-incomingChan:
-			//TODO format incoming messages
+			if payload.MessageType == protocol.MessageTypeACT_USRS {
+				// If we recieve MessageTypeACT_USRS it means either someone joined or left. We have to update userList UI.
+				fakeNames := []string{
+					"Alice", "Bob", "Charlie", "David", "Eve",
+					"Frank", "Grace", "Henry", "Ivy", "Jack",
+					"Kate", "Liam", "Mia", "Noah", "Olivia",
+					"Peter", "Quinn", "Rachel", "Sam", "Tina",
+					"Ursula", "Victor", "Wendy", "Xander", "Yara",
+				}
+				payload.ActiveUsers = append(payload.ActiveUsers, fakeNames...)
+				chatUI.UpdateUserList(userList, payload.ActiveUsers)
+				draw()
+				continue
+			}
 			chatUI.UpdateChatBox(client.HandleReceive(payload), chatBox)
 		case err := <-errorChan:
 			return err
