@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
@@ -38,18 +37,20 @@ func preparePublicMessagePayload(message, sender string) string {
 
 //RECEIVER
 
-func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.Payload) {
+func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.Payload, errorChan chan error) {
 	reader := bufio.NewReader(c.conn)
 	for {
 		select {
 		case <-ctx.Done():
 			// Context was canceled, time to exit
+			close(incomingChan) // Close channel to signal the end of incoming messages
+			close(errorChan)    // Close channel to signal the end of error reporting
 			return
 		default:
 			// Set a deadline for the read operation
 			err := c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			if err != nil {
-				fmt.Print(terminal.ColorifyWithTimestamp("Failed to set read deadline: "+err.Error(), terminal.Red, 0))
+				errorChan <- fmt.Errorf("failed to set read deadline: %w", err)
 				continue
 			}
 
@@ -60,16 +61,17 @@ func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.
 					continue
 				}
 				if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
-					// Connection was closed, time to exit
+					// Connection was closed, signal the end
+					errorChan <- io.EOF
 					return
 				}
-				fmt.Print(terminal.ColorifyWithTimestamp("Read error: "+err.Error(), terminal.Red, 0))
+				errorChan <- io.EOF
 				continue
 			}
 
 			payload, err := protocol.DecodeProtocol(message)
 			if err != nil {
-				fmt.Print(terminal.ColorifyWithTimestamp("Decode error: "+err.Error(), terminal.Red, 0))
+				// Client keep reading it payload is broken, its safe
 				continue
 			}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -29,7 +30,7 @@ func main() {
 		retry.Delay(time.Second),
 		retry.DelayType(retry.BackOffDelay),
 		retry.OnRetry(func(n uint, err error) {
-			if err.Error() == "EOF" {
+			if err.Error() == io.EOF.Error() {
 				err = fmt.Errorf("server is not responding")
 			}
 			fmt.Println(terminal.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but %v", err), terminal.Red, 0))
@@ -58,7 +59,7 @@ func runClient() error {
 
 	chatUI := chat_ui.NewChatUI(client.GetUsername())
 	header, commandBox, chatBox, inputBox, userList, err := chatUI.InitUI()
-	chatBox.Text += fmt.Sprintf("[%s] [System: Welcome %s to the chat!](fg:cyan)", time.Now().Format("15:04"), client.GetUsername())
+	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [System: Welcome %s to the chat!](fg:cyan)", time.Now().Format("15:04"), client.GetUsername()), chatBox)
 
 	if err != nil {
 		return fmt.Errorf("failed to initialize termui: %v", err)
@@ -70,11 +71,12 @@ func runClient() error {
 
 	uiEvents := ui.PollEvents()
 	incomingChan := make(chan protocol.Payload)
+	errorChan := make(chan error, 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // This will signal all operations to stop
 
-	go client.ReadMessages(ctx, incomingChan)
+	go client.ReadMessages(ctx, incomingChan, errorChan)
 
 	for {
 		select {
@@ -111,6 +113,8 @@ func runClient() error {
 		case payload := <-incomingChan:
 			//TODO format incoming messages
 			chatUI.UpdateChatBox(client.HandleReceive(payload), chatBox)
+		case err := <-errorChan:
+			return err
 		}
 		draw()
 	}
