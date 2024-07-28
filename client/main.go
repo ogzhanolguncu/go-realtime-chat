@@ -59,11 +59,12 @@ func runClient() error {
 
 	chatUI := chat_ui.NewChatUI(client.GetUsername())
 	defer chatUI.Close()
+
 	header, commandBox, chatBox, inputBox, userList, err := chatUI.InitUI()
 	if err != nil {
 		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
-	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [System: Welcome to the chat!](fg:cyan)", time.Now().Format("15:04")), chatBox)
+	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the chat!](fg:cyan)", time.Now().Format("15:04")), chatBox)
 
 	draw := chatUI.Draw(header, commandBox, chatBox, inputBox, userList)
 	draw()
@@ -75,6 +76,7 @@ func runClient() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // This will signal all operations to stop
 
+	go client.FetchChatHistory()
 	go client.ReadMessages(ctx, incomingChan, errorChan)
 
 	for {
@@ -123,6 +125,18 @@ func runClient() error {
 				}
 			}
 		case payload := <-incomingChan:
+			//TODO: reimplement groupChatKey encryption.
+			if payload.MessageType == protocol.MessageTypeHSTRY {
+				chatUI.UpdateChatBox("---- CHAT HISTORY ----", chatBox)
+				for _, v := range payload.DecodedChatHistory {
+					chatUI.UpdateChatBox(client.HandleReceive(v), chatBox)
+				}
+				if len(payload.DecodedChatHistory) != 0 {
+					chatUI.UpdateChatBox("---- CHAT HISTORY ----", chatBox)
+				}
+				draw()
+				continue
+			}
 			if payload.MessageType == protocol.MessageTypeACT_USRS {
 				// If we recieve MessageTypeACT_USRS it means either someone joined or left. We have to update userList UI.
 				fakeNames := []string{

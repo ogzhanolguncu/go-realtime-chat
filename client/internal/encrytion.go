@@ -16,7 +16,7 @@ import (
 // Server converts base64 to publicKey
 // Server encrypts groupChatKey using publicKey
 // Server sends encrypted groupChatKey
-// Client reads encrypted
+// Client reads encrypted groupChatKey
 // Client decrypts encryptedData and gets groupChatKey
 
 // Each user (e.g., Alice, Bob, Charlie) connects to the server and provides their public key.

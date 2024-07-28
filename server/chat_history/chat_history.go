@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,8 +37,10 @@ func (ch *ChatHistory) AddMessage(messages ...string) {
 
 // Get messages from memory if they are from requester user and contain allowed messageTypes
 func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string {
+	log.Printf("Calling GetHistory")
 	if len(ch.messages) == 0 {
 		ch.ReadFromDiskToInMemory()
+		log.Printf("Loaded %d messages from disk to memory", len(ch.messages))
 	}
 
 	msgs := pie.Filter(ch.messages, func(msg string) bool {
@@ -57,6 +60,7 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 		//If message is WSP make sure recipient or sender is user
 		return decodedMsg.Recipient == user || decodedMsg.Sender == user
 	})
+	log.Printf("Returning %d messages from GetHistory", len(msgs))
 	return msgs
 }
 
@@ -106,6 +110,7 @@ func (ch *ChatHistory) ReadFromDiskToInMemory() error {
 
 	// Remove empty strings that may result from splitting
 	ch.messages = removeEmpty(ch.messages)
+	log.Printf("Reading messages from disk to memory. Count is: %d", len(ch.messages))
 	return nil
 }
 
