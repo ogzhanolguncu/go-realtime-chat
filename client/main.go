@@ -2,10 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -81,7 +77,6 @@ func runClient() error {
 	defer cancel() // This will signal all operations to stop
 
 	go client.FetchChatHistory()
-	go client.FetchGroupChatKey(errorChan)
 	go client.ReadMessages(ctx, incomingChan, errorChan)
 
 	for {
@@ -130,22 +125,10 @@ func runClient() error {
 				}
 			}
 		case payload := <-incomingChan:
-			if payload.MessageType == protocol.MessageTypeENC {
-				keyBytes, err := base64.StdEncoding.DecodeString(payload.EncryptedKey)
-				if err != nil {
-					return fmt.Errorf("failed to decode base64 group chat key: %w", err)
-				}
-
-				groupChatKey, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, client.GetPrivateKey(), keyBytes, nil)
-				if err != nil {
-					return fmt.Errorf("failed to decrypt group chat key: %w", err)
-				}
-
-				client.SetGroupChatKey(string(groupChatKey))
-				continue
-			}
 			if payload.MessageType == protocol.MessageTypeHSTRY {
-				chatUI.UpdateChatBox("---- CHAT HISTORY ----", chatBox)
+				if len(payload.DecodedChatHistory) != 0 {
+					chatUI.UpdateChatBox("---- CHAT HISTORY ----", chatBox)
+				}
 				for _, v := range payload.DecodedChatHistory {
 					chatUI.UpdateChatBox(client.HandleReceive(v), chatBox)
 				}

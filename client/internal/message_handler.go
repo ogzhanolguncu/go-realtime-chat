@@ -130,6 +130,7 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 	case protocol.MessageTypeMSG:
 		return fmt.Sprintf("[%s] [%s: %s](fg:green)", unixTimeUTC.Format("01-02 15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeWSP:
+		c.lastWhispererFromGroupChat = payload.Sender
 		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:magenta)", unixTimeUTC.Format("01-02 15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeSYS:
 		if payload.Status == "fail" {

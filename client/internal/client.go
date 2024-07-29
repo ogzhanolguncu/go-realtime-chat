@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"flag"
 	"fmt"
 	"log"
@@ -17,21 +15,11 @@ type Client struct {
 	name                       string
 	lastWhispererFromGroupChat string
 
-	privateKey   *rsa.PrivateKey
-	publicKey    *rsa.PublicKey
-	groupChatKey string
-
 	encodeFn func(payload protocol.Payload) string
 	decodeFn func(message string) (protocol.Payload, error)
 }
 
 func NewClient(config Config) (*Client, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate RSA key: %w", err)
-	}
-	publicKey := &privateKey.PublicKey
-
 	encoding := flag.Bool("encoding", false, "enable encoding")
 	flag.Parse()
 
@@ -45,11 +33,9 @@ func NewClient(config Config) (*Client, error) {
 	log.Printf("------ ENCODING SET TO %s ------", encodingType)
 
 	return &Client{
-		config:     config,
-		privateKey: privateKey,
-		publicKey:  publicKey,
-		decodeFn:   protocol.InitDecodeProtocol(*encoding),
-		encodeFn:   protocol.InitEncodeProtocol(*encoding),
+		config:   config,
+		decodeFn: protocol.InitDecodeProtocol(*encoding),
+		encodeFn: protocol.InitEncodeProtocol(*encoding),
 	}, nil
 }
 
@@ -70,16 +56,4 @@ func (c *Client) Close() {
 
 func (c *Client) GetUsername() string {
 	return c.name
-}
-
-func (c *Client) GetPrivateKey() *rsa.PrivateKey {
-	return c.privateKey
-}
-
-func (c *Client) GetGroupChatKey() string {
-	return c.groupChatKey
-}
-
-func (c *Client) SetGroupChatKey(secretKey string) {
-	c.groupChatKey = secretKey
 }
