@@ -71,3 +71,15 @@ func (c *Client) Close() {
 func (c *Client) GetUsername() string {
 	return c.name
 }
+
+func (c *Client) GetPrivateKey() *rsa.PrivateKey {
+	return c.privateKey
+}
+
+func (c *Client) GetGroupChatKey() string {
+	return c.groupChatKey
+}
+
+func (c *Client) SetGroupChatKey(secretKey string) {
+	c.groupChatKey = secretKey
+}
