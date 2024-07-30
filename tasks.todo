@@ -85,15 +85,15 @@ Chat Application Todo List:
                 ☐ Implement a timeout mechanism for typing indicators
                     - Automatically clear the typing indicator if no updates are received for a certain period (e.g., 5 seconds)
         Command System:
-            ☐ Create a robust command system (e.g., /help, /mute, /unmute, /block)
+            ☐ Create a robust command system (e.g. /mute, /unmute, /block)
                 Help:
-                    ✔ Client only. Show relevant commands @done(24-07-16 00:42)
+                    ✔ Client only. Show relevant commands @done(24-07-16 00:42) - Later change to commands ui box
                 Unlock/Block:
                     ☐ When a client blocks someone, the client's messages won't be sent to or received by the blocked user.
                     ☐ Server shouldn't broadcast to blocked user. Similar whisper, but everyone except that user.
                     ☐ Blocked user's active users list should exclude blocker. For instance, if Oz blocks John, John shouldn't able to see Oz in active list.
                 Mute:
-                    ☐ Don't show muted users texts
+                    ✔ Don't show muted users texts @done(24-07-31 01:17)
         Notification System:
         ☐   Notify users of mentions or important messages when not actively viewing chat
         Active User Management:
