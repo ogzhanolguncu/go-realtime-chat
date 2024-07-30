@@ -71,14 +71,18 @@ func (c *Client) CheckIfUserMuted(user string) bool {
 	})
 }
 
-func (c *Client) AddUserToMutedList(user string) []string {
+func (c *Client) AddUserToMutedList(user string) bool {
+	if c.CheckIfUserMuted(user) {
+		return false
+	}
 	c.mutedUsers = append(c.mutedUsers, user)
-	return c.mutedUsers
+	return true
 }
 
-func (c *Client) RemoveUserFromMutedList(user string) []string {
+func (c *Client) RemoveUserFromMutedList(user string) bool {
+	initialLength := len(c.mutedUsers)
 	c.mutedUsers = slices.DeleteFunc(c.mutedUsers, func(u string) bool {
 		return u == user
 	})
-	return c.mutedUsers
+	return len(c.mutedUsers) < initialLength
 }

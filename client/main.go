@@ -126,6 +126,7 @@ func runClient() error {
 			}
 		case payload := <-incomingChan:
 			if client.CheckIfUserMuted(payload.Sender) {
+				// Skip if user is muted
 				continue
 			}
 			if payload.MessageType == protocol.MessageTypeHSTRY {
