@@ -55,8 +55,13 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	// Command Box
 	commandBox = widgets.NewParagraph()
 	commandBox.Title = "Commands"
-	commandBox.Text = "/whisper, /reply, /clear, /quit, /mute, /unmute"
-	commandBox.SetRect(0, 3, termWidth*3/4, 6)
+	commandBox.Text = "/whisper <user> <message> - Send a private message\n" +
+		"/reply <message> - Reply to the last private message\n" +
+		"/clear - Clear the chat window\n" +
+		"/quit - Exit the chat\n" +
+		"/mute <user> - Mute messages from a user\n" +
+		"/unmute <user> - Unmute a previously muted user"
+	commandBox.SetRect(0, 3, termWidth*3/4, 11) // Increased height from 6 to 13
 	commandBox.Border = true
 	commandBox.TitleStyle.Fg = ui.ColorYellow
 	commandBox.BorderStyle.Fg = ui.ColorCyan
@@ -66,7 +71,7 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	// Chat Box
 	chatBox = widgets.NewParagraph()
 	chatBox.Title = "Chat Messages"
-	chatBox.SetRect(0, 6, termWidth*3/4, termHeight-3)
+	chatBox.SetRect(0, 11, termWidth*3/4, termHeight-3) // Start from 13 instead of 6
 	chatBox.BorderStyle.Fg = ui.ColorCyan
 	chatBox.TitleStyle.Fg = ui.ColorYellow
 	chatBox.WrapText = true
