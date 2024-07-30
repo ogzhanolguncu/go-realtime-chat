@@ -117,6 +117,20 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 
 			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("01-02 15:04"), message), nil
 		}
+	case "/mute":
+		if len(parts) < 2 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /mute <user>"), nil
+		}
+		user := parts[1]
+		c.AddUserToMutedList(user)
+		return fmt.Sprintf("[%s] [%s successfully muted](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
+	case "/unmute":
+		if len(parts) < 2 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /unmute <user>"), nil
+		}
+		user := parts[1]
+		c.RemoveUserFromMutedList(user)
+		return fmt.Sprintf("[%s] [%s successfully unmuted](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
 	default:
 		return fmt.Sprintf("[%s] [Unknown '%s' command](fg:red)", time.Now().Format("01-02 15:04"), parts[0]), nil
 	}

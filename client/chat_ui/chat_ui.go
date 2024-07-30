@@ -55,7 +55,7 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	// Command Box
 	commandBox = widgets.NewParagraph()
 	commandBox.Title = "Commands"
-	commandBox.Text = "/whisper, /reply, /clear, /quit"
+	commandBox.Text = "/whisper, /reply, /clear, /quit, /mute, /unmute"
 	commandBox.SetRect(0, 3, termWidth*3/4, 6)
 	commandBox.Border = true
 	commandBox.TitleStyle.Fg = ui.ColorYellow

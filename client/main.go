@@ -125,6 +125,9 @@ func runClient() error {
 				}
 			}
 		case payload := <-incomingChan:
+			if client.CheckIfUserMuted(payload.Sender) {
+				continue
+			}
 			if payload.MessageType == protocol.MessageTypeHSTRY {
 				if len(payload.DecodedChatHistory) != 0 {
 					chatUI.UpdateChatBox("---- CHAT HISTORY ----", chatBox)

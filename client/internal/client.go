@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"slices"
 
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
@@ -17,6 +18,8 @@ type Client struct {
 
 	encodeFn func(payload protocol.Payload) string
 	decodeFn func(message string) (protocol.Payload, error)
+
+	mutedUsers []string
 }
 
 func NewClient(config Config) (*Client, error) {
@@ -56,4 +59,26 @@ func (c *Client) Close() {
 
 func (c *Client) GetUsername() string {
 	return c.name
+}
+
+func (c *Client) GetMutedList() []string {
+	return c.mutedUsers
+}
+
+func (c *Client) CheckIfUserMuted(user string) bool {
+	return slices.ContainsFunc(c.mutedUsers, func(u string) bool {
+		return u == user
+	})
+}
+
+func (c *Client) AddUserToMutedList(user string) []string {
+	c.mutedUsers = append(c.mutedUsers, user)
+	return c.mutedUsers
+}
+
+func (c *Client) RemoveUserFromMutedList(user string) []string {
+	c.mutedUsers = slices.DeleteFunc(c.mutedUsers, func(u string) bool {
+		return u == user
+	})
+	return c.mutedUsers
 }
