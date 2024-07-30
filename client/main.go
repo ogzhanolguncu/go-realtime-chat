@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	ui "github.com/gizak/termui/v3"
 	"github.com/joho/godotenv"
+	"github.com/ogzhanolguncu/go-chat/client/chat_ui"
 	"github.com/ogzhanolguncu/go-chat/client/internal"
 	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
@@ -27,7 +30,7 @@ func main() {
 		retry.Delay(time.Second),
 		retry.DelayType(retry.BackOffDelay),
 		retry.OnRetry(func(n uint, err error) {
-			if err.Error() == "EOF" {
+			if err.Error() == io.EOF.Error() {
 				err = fmt.Errorf("server is not responding")
 			}
 			fmt.Println(terminal.ColorifyWithTimestamp(fmt.Sprintf("Trying to reconnect, but %v", err), terminal.Red, 0))
@@ -47,51 +50,116 @@ func runClient() error {
 	defer client.Close()
 
 	if err := client.Connect(); err != nil {
-		return err
+		return fmt.Errorf("failed to connect server: %v", err)
 	}
 
-	internal.PrintHeader(true)
 	if err := client.SetUsername(); err != nil {
 		return fmt.Errorf("failed to set username: %v", err)
 	}
 
-	if err := client.FetchActiveUsersAfterUsername(); err != nil {
-		return fmt.Errorf("failed to fetch active users: %v", err)
-	}
+	chatUI := chat_ui.NewChatUI(client.GetUsername())
+	defer chatUI.Close()
 
-	if err := client.FetchChatHistory(); err != nil {
-		return fmt.Errorf("failed to fetch chat history: %v", err)
+	header, commandBox, chatBox, inputBox, userList, err := chatUI.InitUI()
+	if err != nil {
+		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
+	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the chat!](fg:cyan)", time.Now().Format("15:04")), chatBox)
 
-	if err := client.FetchGroupChatKey(); err != nil {
-		return fmt.Errorf("failed to fetch chat history: %v", err)
-	}
+	draw := chatUI.Draw(header, commandBox, chatBox, inputBox, userList)
+	draw()
 
+	uiEvents := ui.PollEvents()
 	incomingChan := make(chan protocol.Payload)
-	outgoingChan := make(chan string)
-	errChan := make(chan error, 1) // Buffered channel to prevent goroutine leak
-	done := make(chan struct{})
+	errorChan := make(chan error, 1)
 
-	var wg sync.WaitGroup
-	wg.Add(2) // Add 2 for readMessages and sendMessages goroutines
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // This will signal all operations to stop
 
-	go func() {
-		defer wg.Done()
-		client.ReadMessages(incomingChan, errChan, done)
-	}()
+	go client.FetchChatHistory()
+	go client.ReadMessages(ctx, incomingChan, errorChan)
 
-	go func() {
-		defer wg.Done()
-		client.SendMessages(outgoingChan, done)
-	}()
-
-	err = client.MessageLoop(incomingChan, outgoingChan, errChan, done)
-
-	// Signal to stop goroutines
-	close(done)
-
-	// Wait for goroutines to finish
-	wg.Wait()
-
-	return err
+	for {
+		select {
+		case e := <-uiEvents:
+			switch e.ID {
+			case "<Up>":
+				userList.ScrollUp()
+			case "<Down>":
+				userList.ScrollDown()
+			case "<MouseWheelUp>":
+				chatUI.ScrollChatBox(chatBox, -1)
+			case "<MouseWheelDown>":
+				chatUI.ScrollChatBox(chatBox, 1)
+			case "<C-c>":
+				return nil
+			case "<Enter>":
+				if chatUI.IsInputMode() && len(inputBox.Text) > 0 {
+					if inputBox.Text == "/quit" {
+						return nil
+					}
+					if inputBox.Text == "/clear" {
+						chatUI.ClearChatBox(chatBox)
+						inputBox.Text = ""
+						draw()   // Redraw the UI
+						continue // Skip the rest of the loop iteration
+					}
+					message, err := client.HandleSend(inputBox.Text)
+					if err != nil {
+						return err
+					}
+					chatUI.UpdateChatBox(message, chatBox)
+					inputBox.Text = ""
+				}
+			case "<Backspace>":
+				if len(inputBox.Text) > 0 {
+					inputBox.Text = inputBox.Text[:len(inputBox.Text)-1]
+				}
+			case "<Resize>":
+				chatUI.ResizeUI(header, commandBox, chatBox, inputBox, userList)
+			case "<Space>":
+				inputBox.Text += " "
+			default:
+				if len(e.ID) == 1 {
+					inputBox.Text += e.ID
+				}
+			}
+		case payload := <-incomingChan:
+			if client.CheckIfUserMuted(payload.Sender) {
+				// Skip if user is muted
+				continue
+			}
+			if payload.MessageType == protocol.MessageTypeHSTRY {
+				if len(payload.DecodedChatHistory) != 0 {
+					chatUI.UpdateChatBox("---- CHAT HISTORY ----", chatBox)
+				}
+				for _, v := range payload.DecodedChatHistory {
+					chatUI.UpdateChatBox(client.HandleReceive(v), chatBox)
+				}
+				if len(payload.DecodedChatHistory) != 0 {
+					chatUI.UpdateChatBox("---- CHAT HISTORY ----", chatBox)
+				}
+				draw()
+				continue
+			}
+			if payload.MessageType == protocol.MessageTypeACT_USRS {
+				// If we recieve MessageTypeACT_USRS it means either someone joined or left. We have to update userList UI.
+				fakeNames := []string{
+					"Alice", "Bob", "Charlie", "David", "Eve",
+					"Frank", "Grace", "Henry", "Ivy", "Jack",
+					"Kate", "Liam", "Mia", "Noah", "Olivia",
+					"Peter", "Quinn", "Rachel", "Sam", "Tina",
+					"Ursula", "Victor", "Wendy", "Xander", "Yara",
+				}
+				payload.ActiveUsers = append(payload.ActiveUsers, fakeNames...)
+				chatUI.UpdateUserList(userList, payload.ActiveUsers)
+				draw()
+				continue
+			}
+			chatUI.UpdateChatBox(client.HandleReceive(payload), chatBox)
+		case err := <-errorChan:
+			return err
+		}
+		draw()
+	}
 }

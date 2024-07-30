@@ -2,175 +2,159 @@ package internal
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"log"
-	"os"
+	"io"
+	"net"
 	"strings"
+	"time"
 
-	"github.com/ogzhanolguncu/go-chat/client/terminal"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-type Command struct {
-	name    string
-	handler func(message, sender, recipient string) (string, error)
-}
+func (c *Client) prepareReplyPayload(message, sender, recipient string) string {
 
-var commands = []Command{
-	{name: "/whisper", handler: prepareWhisperPayload},
-	{name: "/reply", handler: prepareReplyPayload},
-	{name: "/users", handler: prepareActiveUserPayload},
-}
-
-func (c *Client) SendMessages(outgoingChan chan<- string, done <-chan struct{}) {
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			log.Println("Error reading input:", err)
-			continue
-		}
-
-		text = strings.TrimSpace(text)
-		if text == "/quit" {
-			os.Exit(0)
-		}
-		if text == "/clear" {
-			fmt.Print("\033[H\033[2J") //Clears terminal
-		}
-		if text == "/help" {
-			fmt.Println("")
-			PrintHeader(false)
-		}
-
-		message, err := processInput(text, c.name, c.lastWhispererFromGroupChat)
-		if err != nil {
-			log.Println("Error preparing message:", err)
-			continue
-		}
-
-		select {
-		case outgoingChan <- message:
-			// Message sent successfully
-		case <-done:
-			return
-		}
-	}
-}
-
-func processInput(input, sender, recipient string) (string, error) {
-	for _, cmd := range commands {
-		if strings.HasPrefix(input, cmd.name) {
-			return cmd.handler(input, sender, recipient)
-		}
-	}
-	return preparePublicMessagePayload(input, sender), nil
-}
-
-func prepareReplyPayload(input, sender, recipient string) (string, error) {
-	parts := strings.SplitN(input, " ", 2)
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid reply format. Use: /reply <message>")
-	}
-	message := parts[1]
-	if recipient == "" {
-		return "", fmt.Errorf("no one to reply to")
-	}
-	return protocol.EncodeProtocol(protocol.Payload{
+	return c.encodeFn(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
 		Sender:      sender,
-	}), nil
+	})
 }
 
-func prepareActiveUserPayload(_, _, _ string) (string, error) {
-	return protocol.EncodeProtocol(protocol.Payload{
-		MessageType: protocol.MessageTypeACT_USRS, Status: "req",
-	}), nil
-}
-
-func prepareChatHistoryPayload(requester string) (string, error) {
-	return protocol.EncodeProtocol(protocol.Payload{
-		MessageType: protocol.MessageTypeHSTRY, Status: "req", Sender: requester,
-	}), nil
-}
-
-func prepareWhisperPayload(input, sender, _ string) (string, error) {
-	parts := strings.SplitN(input, " ", 3)
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid whisper format. Use: /whisper <recipient> <message>")
-	}
-	recipient := parts[1]
-	message := parts[2]
-
-	return protocol.EncodeProtocol(protocol.Payload{
+func (c *Client) prepareWhisperPayload(message, sender, recipient string) string {
+	return c.encodeFn(protocol.Payload{
 		MessageType: protocol.MessageTypeWSP,
 		Recipient:   recipient,
 		Content:     message,
 		Sender:      sender,
-	}), nil
+	})
 }
 
-func preparePublicMessagePayload(input, sender string) (message string) {
-	return protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: input})
+func (c *Client) preparePublicMessagePayload(message, sender string) string {
+	return c.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: message})
 }
 
 //RECEIVER
 
-func (c *Client) ReadMessages(incomingChan chan<- protocol.Payload, errChan chan<- error, done <-chan struct{}) {
+func (c *Client) ReadMessages(ctx context.Context, incomingChan chan<- protocol.Payload, errorChan chan error) {
+	reader := bufio.NewReader(c.conn)
 	for {
-		message, err := bufio.NewReader(c.conn).ReadString('\n')
-		if err != nil {
-			select {
-			case errChan <- err:
-			case <-done:
-			}
-			return
-		}
-		payload, err := protocol.DecodeProtocol(message)
-		if err != nil {
-			fmt.Print(terminal.ColorifyWithTimestamp(err.Error(), terminal.Red, 0))
-			continue
-		}
 		select {
-		case incomingChan <- payload:
-		case <-done:
+		case <-ctx.Done():
+			// Context was canceled, time to exit
+			close(incomingChan) // Close channel to signal the end of incoming messages
+			close(errorChan)    // Close channel to signal the end of error reporting
 			return
+		default:
+			// Set a deadline for the read operation
+			err := c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			if err != nil {
+				errorChan <- fmt.Errorf("failed to set read deadline: %w", err)
+				continue
+			}
+
+			message, err := reader.ReadString('\n')
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					// This is a timeout, just continue the loop
+					continue
+				}
+				if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
+					// Connection was closed, signal the end
+					errorChan <- io.EOF
+					return
+				}
+				errorChan <- io.EOF
+				continue
+			}
+
+			payload, err := c.decodeFn(message)
+			if err != nil {
+				// Client keep reading it payload is broken, its safe
+				continue
+			}
+
+			incomingChan <- payload
 		}
 	}
 }
 
-//MESSAGE LOOP
-
-func (c *Client) MessageLoop(incomingChan <-chan protocol.Payload, outgoingChan <-chan string, errChan <-chan error, done chan struct{}) error {
-	for {
-		askForInput(c.name)
-		select {
-		case incMessage, ok := <-incomingChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			if incMessage.MessageType == protocol.MessageTypeWSP {
-				c.lastWhispererFromGroupChat = incMessage.Sender
-			}
-			colorifyAndFormatContent(incMessage)
-		case outMessage, ok := <-outgoingChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			_, err := c.conn.Write([]byte(outMessage))
-			if err != nil {
-				return fmt.Errorf("error sending message: %v", err)
-			}
-		case err, ok := <-errChan:
-			if !ok {
-				return nil // Channel closed, exit loop
-			}
-			return err
-		case <-done:
-			return nil // Done signal received, exit loop
+func (c *Client) HandleSend(userInput string) (string, error) {
+	if !strings.HasPrefix(userInput, "/") {
+		if _, err := c.conn.Write([]byte(c.preparePublicMessagePayload(userInput, c.name))); err != nil {
+			return "", fmt.Errorf("error sending message: %v", err)
 		}
+		return fmt.Sprintf("[%s] [You: %s](fg:cyan)", time.Now().Format("01-02 15:04"), userInput), nil
+
 	}
+	parts := strings.Fields(userInput)
+	switch parts[0] {
+	case "/whisper":
+		if len(parts) < 3 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /whisper <recipient> <message>"), nil
+		} else {
+			recipient := parts[1]
+			message := strings.Join(parts[2:], " ")
+
+			if _, err := c.conn.Write([]byte(c.prepareWhisperPayload(message, c.name, recipient))); err != nil {
+				return "", fmt.Errorf("error sending whisper: %v", err)
+			}
+			return fmt.Sprintf("[%s] [Whispered to %s: %s](fg:magenta)", time.Now().Format("01-02 15:04"), recipient, message), nil
+		}
+	case "/reply":
+		if len(parts) < 2 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /reply <message>"), nil
+		} else {
+			message := strings.Join(parts[1:], " ")
+			if c.lastWhispererFromGroupChat == "" {
+				return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "No one to reply to"), nil
+			}
+
+			if _, err := c.conn.Write([]byte(c.prepareReplyPayload(message, c.name, c.lastWhispererFromGroupChat))); err != nil {
+				return "", fmt.Errorf("error sending whisper: %v", err)
+			}
+
+			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("01-02 15:04"), message), nil
+		}
+	case "/mute":
+		if len(parts) < 2 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /mute <user>"), nil
+		}
+		user := parts[1]
+		c.AddUserToMutedList(user)
+		return fmt.Sprintf("[%s] [%s successfully muted](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
+	case "/unmute":
+		if len(parts) < 2 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /unmute <user>"), nil
+		}
+		user := parts[1]
+		c.RemoveUserFromMutedList(user)
+		return fmt.Sprintf("[%s] [%s successfully unmuted](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
+	default:
+		return fmt.Sprintf("[%s] [Unknown '%s' command](fg:red)", time.Now().Format("01-02 15:04"), parts[0]), nil
+	}
+}
+
+func (c *Client) HandleReceive(payload protocol.Payload) string {
+	var message string
+
+	unixTimeUTC := time.Unix(payload.Timestamp, 0)
+	switch payload.MessageType {
+	case protocol.MessageTypeMSG:
+		return fmt.Sprintf("[%s] [%s: %s](fg:green)", unixTimeUTC.Format("01-02 15:04"), payload.Sender, payload.Content)
+	case protocol.MessageTypeWSP:
+		c.lastWhispererFromGroupChat = payload.Sender
+		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:magenta)", unixTimeUTC.Format("01-02 15:04"), payload.Sender, payload.Content)
+	case protocol.MessageTypeSYS:
+		if payload.Status == "fail" {
+			message = fmt.Sprintf("[%s] [System: %s](fg:red)", unixTimeUTC.Format("01-02 15:04"), payload.Content)
+		} else {
+			message = fmt.Sprintf("[%s] [System: %s](fg:cyan)", unixTimeUTC.Format("01-02 15:04"), payload.Content)
+		}
+	default:
+		return fmt.Sprintf("[%s] [Unknown message](fg:red)", unixTimeUTC.Format("01-02 15:04"))
+	}
+
+	return message
 }

@@ -7,7 +7,12 @@ import (
 	"time"
 )
 
-func EncodeProtocol(payload Payload) string {
+func InitEncodeProtocol(isBase64 bool) func(payload Payload) string {
+	return func(payload Payload) string {
+		return encodeProtocol(isBase64, payload)
+	}
+}
+func encodeProtocol(isBase64 bool, payload Payload) string {
 	var sb strings.Builder
 	timestamp := time.Now().Unix()
 
@@ -60,5 +65,9 @@ func EncodeProtocol(payload Payload) string {
 	}
 
 	sb.WriteString("\r\n")
-	return base64.StdEncoding.EncodeToString([]byte(sb.String())) + "\r\n"
+	if isBase64 {
+		return base64.StdEncoding.EncodeToString([]byte(sb.String())) + "\r\n"
+	}
+	return sb.String()
+
 }

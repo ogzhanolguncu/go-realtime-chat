@@ -10,7 +10,6 @@ Chat Application Todo List:
     User Interface:
         ✔ Send messages from server with prefix (MSG, WSP)
         ✔ Display allowed commands when someone joins. This should be handled on client side. @started(24-07-15 00:04) @done(24-07-15 00:32) @lasted(28m41s)
-        ☐ Client errors should have "Client:" prefix with a different color
         ✔ Implement Active User display: @done(24-07-15 15:44)
         ```
         Active Users (25): Alice, Bob, Charlie [+22 more] (Use /users for full list)
@@ -65,14 +64,7 @@ Chat Application Todo List:
             Decrypt them using history key and re-encrypt them when requested using group key.
     Advanced Features:
         Auth:
-            ☐ Persist everything on disk using JSON
-                This will allow users to safely fetch histories without exposing their private messages.
-            ```
-            [{
-                "username": "Oz",
-                "password": "xxxxx" -> Maybe encrypt it
-            }]
-            ```
+            ☐ Persist everything on sqlite
         Chatrooms:
             ☐ Allow users to create and join different chatrooms
             ☐ Ensure it server deleted private chat after 1 minute inactivity
@@ -112,9 +104,21 @@ Chat Application Todo List:
         Performance and Security:
             ☐ Implement rate limiting to prevent spam and abuse
     Bug Fixes:
-        ☐ Don't let clients send empty message
-        ☐ If someone new joins current input clears itself
+        ✔ Don't let clients send empty message @done(24-07-30 00:52)
+        ✔ If someone new joins current input clears itself @done(24-07-30 00:52)
+            Fixed this by implement this completely new ui from scratch using termui
         ✔ Fix: Server locks when two users join simultaneously
         ✔ Check whisper logic: Ensure robustness and correctness
         ✔ When client reconnects after successful connection it required one more extra input before sending username. @done(24-07-14 16:04)
             Make sure all goroutines are closed before retrying using waitGroups and additional channel called done @Solution
+
+Implementation Order:
+    ☐ Command System
+    ☐ Notification System
+    ☐ Connect chat history to auth
+    ☐ Auth system
+    ☐ Chatrooms
+    ☐ Presence System
+    ☐ Typing Indicators (for private chats)
+    ☐ Performance and Security
+    ☐ Message encryption

@@ -2,6 +2,7 @@
 BINARY_NAME=client
 SRC_DIR=client
 MAIN_FILE=$(SRC_DIR)/main.go
+encoding?=false  # Default encoding value
 
 # Default target to build, vet, format, and run
 .PHONY: all
@@ -35,8 +36,7 @@ test:
 .PHONY: run
 run:
 	@echo "Running $(BINARY_NAME)..."
-	@./$(BINARY_NAME)
-
+	@./$(BINARY_NAME) --encoding=$(encoding)
 # Clean the build files
 .PHONY: clean
 clean:

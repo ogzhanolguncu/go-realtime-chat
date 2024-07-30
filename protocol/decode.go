@@ -7,15 +7,21 @@ import (
 	"strings"
 )
 
-func DecodeProtocol(message string) (Payload, error) {
-	decodedMessage, err := base64.StdEncoding.DecodeString(message)
-	if err != nil {
-		return Payload{}, fmt.Errorf("something went wrong when decoding message: %v", err)
+func InitDecodeProtocol(encoding bool) func(message string) (Payload, error) {
+	return func(message string) (Payload, error) {
+		return decodeProtocol(encoding, message)
 	}
-	return _decodeProtocol(string(decodedMessage))
 }
 
-func _decodeProtocol(message string) (Payload, error) {
+func decodeProtocol(encoding bool, message string) (Payload, error) {
+	if encoding {
+		decodedMsg, err := base64.StdEncoding.DecodeString(message)
+		message = string(decodedMsg)
+		if err != nil {
+			return Payload{}, fmt.Errorf("something went wrong when decoding message: %v", err)
+		}
+	}
+
 	sanitizedMessage := strings.TrimSpace(string(message)) // Messages from server comes with \r\n, so we have to trim it
 
 	parts := strings.Split(sanitizedMessage, Separator)
@@ -108,7 +114,7 @@ func _decodeProtocol(message string) (Payload, error) {
 			return Payload{}, fmt.Errorf("insufficient parts in HSTRY message")
 		}
 
-		payloadDetails, messages := parseChatHistory(sanitizedMessage)
+		payloadDetails, messages := parseChatHistory(encoding, sanitizedMessage)
 		parts = strings.Split(payloadDetails, Separator)
 
 		timestamp := parts[1]
@@ -117,7 +123,7 @@ func _decodeProtocol(message string) (Payload, error) {
 
 		var parsedChatHistory []Payload
 		for _, v := range messages {
-			msg, err := DecodeProtocol(v)
+			msg, err := decodeProtocol(encoding, v)
 			if err != nil {
 				continue
 			}
@@ -147,9 +153,8 @@ func _decodeProtocol(message string) (Payload, error) {
 	}
 }
 
-func parseChatHistory(input string) (string, []string) {
+func parseChatHistory(encoding bool, input string) (string, []string) {
 	parts := strings.Split(input, "|")
-
 	if len(parts) < 5 {
 		return input, nil // Return original input if it doesn't have enough parts
 	}
@@ -157,8 +162,16 @@ func parseChatHistory(input string) (string, []string) {
 	// Construct the first part (HSTRY metadata)
 	part1 := fmt.Sprintf("%s|%s|%s|%s", parts[0], parts[1], parts[2], parts[len(parts)-1])
 
-	// Get the comma-separated messages
-	messages := strings.Split(parts[3], ",")
+	// Get the messages
+	messagesPart := strings.Join(parts[3:len(parts)-1], "|")
+	messages := strings.Split(messagesPart, ",")
 
+	// If not encoding (i.e., plain text), we're done
+	if !encoding {
+		return part1, messages
+	}
+
+	// For base64 encoding (not implemented here)
+	// You would add your base64 decoding logic here
 	return part1, messages
 }

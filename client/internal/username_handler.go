@@ -51,7 +51,7 @@ func (c *Client) readAndValidateInitialMessage(reader *bufio.Reader) error {
 		return fmt.Errorf("error reading from server: %w", err)
 	}
 
-	decodedMessage, err := protocol.DecodeProtocol(message)
+	decodedMessage, err := c.decodeFn(message)
 	if err != nil {
 		return fmt.Errorf("error reading server response: %w", err)
 	}
@@ -66,7 +66,7 @@ func (c *Client) readAndValidateInitialMessage(reader *bufio.Reader) error {
 var errRetry = errors.New("retry username")
 
 func (c *Client) sendUsernameAndHandleResponse(username string, reader *bufio.Reader) error {
-	if _, err := c.conn.Write([]byte(protocol.EncodeProtocol(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: username}))); err != nil {
+	if _, err := c.conn.Write([]byte(c.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: username}))); err != nil {
 		return fmt.Errorf("error sending username to server: %w", err)
 	}
 
@@ -75,17 +75,16 @@ func (c *Client) sendUsernameAndHandleResponse(username string, reader *bufio.Re
 		return fmt.Errorf("error reading server response: %w", err)
 	}
 
-	decodedMessage, err := protocol.DecodeProtocol(message)
+	decodedMessage, err := c.decodeFn(message)
 	if err != nil {
 		return fmt.Errorf("error decoding server message: %w", err)
 	}
 
 	switch decodedMessage.Status {
 	case "fail":
-		colorifyAndFormatContent(decodedMessage)
 		return errRetry
 	case "success":
-		colorifyAndFormatContent(decodedMessage)
+		// colorifyAndFormatContent(decodedMessage)
 		c.name = decodedMessage.Username
 		return nil
 	default:
