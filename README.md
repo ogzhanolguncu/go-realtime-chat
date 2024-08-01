@@ -49,19 +49,19 @@ This project implements a simple real-time chat server and client using Go. The 
 
     Chat History:
         ✔ Add timestamp to all message types @done(24-07-15 23:43)
-        ☐ Add new data structure to save history to memory
+        ✔ Add new data structure to save history to memory
             - Implement a simple slice for general messages
             - Add a map for quick access to private messages
-        ☐ Filter messages before dispatching them to clients
+        ✔ Filter messages before dispatching them to clients
             - Delete private messages if user is not recipient or sender
             - Ensure private messages are not exposed to unintended recipients
-        ☐ Store chat history for late-joining clients (limit to ~200 messages)
-        ☐ Implement /history command
+        ✔ Store chat history for late-joining clients (limit to ~200 messages)
+        ✔ Implement /history command
             - Return recent messages (up to 200)
             - Include only relevant private messages for the requesting user
-        ☐ Client should format timestamps carefully because some messages are from past
+        ✔ Client should format timestamps carefully because some messages are from past
             - Implement a function to format timestamps relative to current time
-        ☐ Server should persist history to file and restore on restart
+        ✔ Server should persist history to file and restore on restart
             - Implement SaveToFile and LoadFromFile functions
             - Only persist general and private messages, not system or error messages
             - Saved file should be named as chat_history_TIMESTAMP.txt. So we can easily check if its old enough to be deleted.
@@ -105,7 +105,7 @@ This project implements a simple real-time chat server and client using Go. The 
                     ☐ Server shouldn't broadcast to blocked user. Similar whisper, but everyone except that user.
                     ☐ Blocked user's active users list should exclude blocker. For instance, if Oz blocks John, John shouldn't able to see Oz in active list.
                 Mute:
-                    ☐ Don't show muted users texts
+                    ✔ Don't show muted users texts
         Notification System:
         ☐   Notify users of mentions or important messages when not actively viewing chat
         Active User Management:
