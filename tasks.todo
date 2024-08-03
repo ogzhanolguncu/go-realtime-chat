@@ -95,7 +95,7 @@ Chat Application Todo List:
                 Mute:
                     ✔ Don't show muted users texts @done(24-07-31 01:17)
         Notification System:
-        ☐   Notify users of mentions or important messages when not actively viewing chat
+        ✔   Notify users of mentions or important messages when not actively viewing chat @done(24-08-03 20:14)
         Active User Management:
             ✔ Server: Maintain list/map of all active users @done(24-07-16 00:53)
             ✔ Server: Send updates with total count and subset of names @done(24-07-16 00:53)
@@ -116,7 +116,7 @@ Chat Application Todo List:
 
 Implementation Order:
     ✔ Command System @done(24-08-03 15:24)
-    ☐ Notification System
+    ✔ Notification System @done(24-08-03 20:14)
     ☐ Connect chat history to auth
     ☐ Auth system
     ☐ Chatrooms

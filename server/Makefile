@@ -1,7 +1,6 @@
 # Define variables
 BINARY_NAME=server
 SRC_DIR=server
-MAIN_FILE=$(SRC_DIR)/main.go
 encoding?=false  # Default encoding value
 
 # Default target to build, vet, format, and run
@@ -30,7 +29,7 @@ fmt:
 .PHONY: test
 test:
 	@echo "Running tests..."
-	@go test -v $(TEST_DIR) || (echo "Tests failed"; exit 1)
+	@go test ./... || (echo "Tests failed"; exit 1)
 
 # Run the application
 .PHONY: run
