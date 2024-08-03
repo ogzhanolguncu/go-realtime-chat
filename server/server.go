@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -24,8 +25,9 @@ const maxMessageLimit = 200
 const groupKey = "SuperSecretGroupKey"
 
 type ConnectionInfo struct {
-	Connection net.Conn
-	OwnerName  string
+	Connection   net.Conn
+	OwnerName    string
+	blockedUsers []net.Conn
 }
 
 type TCPServer struct {
@@ -88,7 +90,16 @@ func (s *TCPServer) getActiveUsers() []string {
 }
 
 func (s *TCPServer) getConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, bool) {
-	value, ok := s.connectionMap.LoadAndDelete(c)
+	info, ok := s.getConnectionInfo(c)
+	if !ok {
+		return nil, false
+	}
+	s.connectionMap.Delete(c)
+	return info, ok
+}
+
+func (s *TCPServer) getConnectionInfo(c net.Conn) (*ConnectionInfo, bool) {
+	value, ok := s.connectionMap.Load(c)
 	if !ok {
 		return nil, false
 	}
@@ -192,6 +203,32 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			s.broadcastMessage(msgPayload, c)
 		case protocol.MessageTypeWSP:
 			s.sendWhisper(msgPayload, c)
+		case protocol.MessageTypeBLCK_USR:
+			blocker, _ := s.connectionMap.Load(c)
+
+			blockerUser := blocker.(*ConnectionInfo)
+			blockedUser, ok := s.findConnectionByOwnerName(msgPayload.Recipient)
+			if !ok {
+				c.Write([]byte(s.encodeFn(protocol.Payload{
+					MessageType: protocol.MessageTypeSYS,
+					Content:     "Recipient not found or connection lost",
+					Status:      "fail",
+				})))
+				continue
+			}
+
+			if msgPayload.Content == "block" {
+				blockerUser.blockedUsers = append(blockerUser.blockedUsers, blockedUser)
+				s.connectionMap.Store(c, blockerUser)
+				log.Printf("%s blocked %s", msgPayload.Sender, msgPayload.Recipient)
+			} else {
+				blockerUser.blockedUsers = slices.DeleteFunc(blockerUser.blockedUsers, func(u net.Conn) bool {
+					return u == blockedUser
+				})
+				s.connectionMap.Store(c, blockerUser)
+				log.Printf("%s unblocked %s", msgPayload.Sender, msgPayload.Recipient)
+			}
+
 		case protocol.MessageTypeHSTRY:
 			msg := []byte(s.encodeFn(protocol.Payload{
 				MessageType:        protocol.MessageTypeHSTRY,
@@ -270,8 +307,43 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 
 // broadcastMessage sends a message to all connections except the sender
 func (s *TCPServer) broadcastMessage(msgPayload protocol.Payload, sender net.Conn) {
+	excludedUsers := getExcludedUsers(s, sender)
 	msg := []byte(s.encodeFn(msgPayload))
-	s.broadcastToAll(msg, "Error broadcasting message", sender)
+	s.broadcastToAll(msg, "Error broadcasting message", excludedUsers...)
+}
+
+// This function gives us users who are excluded when broadcasting, whisper or sending active users.
+// Mainly used for blocking logic.
+func getExcludedUsers(s *TCPServer, sender net.Conn) []net.Conn {
+	var excludedUsers []net.Conn
+	senderInfo, _ := s.getConnectionInfo(sender)
+
+	s.connectionMap.Range(func(key, value any) bool {
+		conn, ok := key.(net.Conn)
+		if !ok {
+			fmt.Printf("Unexpected key type in connectionMap: %T\n", key)
+			return true
+		}
+
+		info, ok := value.(*ConnectionInfo)
+		if !ok {
+			fmt.Printf("Unexpected value type in connectionMap: %T\n", value)
+			return true
+		}
+
+		if slices.Contains(senderInfo.blockedUsers, conn) {
+			excludedUsers = append(excludedUsers, conn)
+		}
+
+		if slices.Contains(info.blockedUsers, sender) {
+			excludedUsers = append(excludedUsers, conn)
+		}
+
+		return true
+	})
+
+	excludedUsers = append(excludedUsers, sender)
+	return excludedUsers
 }
 
 // sendSystemNotice sends a system notice to all connections except the sender.
@@ -282,10 +354,10 @@ func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action 
 }
 
 // broadcastMessage sends a message to all connections except the sender
-func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn net.Conn) {
+func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn ...net.Conn) {
 	s.connectionMap.Range(func(key, value interface{}) bool {
 		conn := key.(net.Conn)
-		if conn != excludeConn {
+		if !slices.Contains(excludeConn, conn) {
 			_, err := conn.Write(b)
 			if err != nil {
 				log.Printf("%s %s\n", errLog, err)

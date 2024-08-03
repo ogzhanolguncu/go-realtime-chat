@@ -29,6 +29,10 @@ func encodeProtocol(isBase64 bool, payload Payload) string {
 			writeCommonPrefix(payload.MessageType)
 			sb.WriteString(fmt.Sprintf("%s|%s|%s", payload.Sender, payload.Recipient, payload.Content))
 		},
+		MessageTypeBLCK_USR: func() {
+			writeCommonPrefix(payload.MessageType)
+			sb.WriteString(fmt.Sprintf("%s|%s|%s", payload.Sender, payload.Recipient, payload.Content))
+		},
 		MessageTypeSYS: func() {
 			writeCommonPrefix(payload.MessageType)
 			sb.WriteString(payload.Content)

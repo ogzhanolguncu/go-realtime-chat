@@ -31,6 +31,15 @@ func (c *Client) prepareWhisperPayload(message, sender, recipient string) string
 	})
 }
 
+func (c *Client) prepareBlockPayload(message, sender, recipient string) string {
+	return c.encodeFn(protocol.Payload{
+		MessageType: protocol.MessageTypeBLCK_USR,
+		Recipient:   recipient,
+		Content:     message,
+		Sender:      sender,
+	})
+}
+
 func (c *Client) preparePublicMessagePayload(message, sender string) string {
 	return c.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeMSG, Sender: sender, Content: message})
 }
@@ -117,6 +126,24 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 
 			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("01-02 15:04"), message), nil
 		}
+	case "/block":
+		if len(parts) < 2 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /block <user>"), nil
+		}
+		user := parts[1]
+		if _, err := c.conn.Write([]byte(c.prepareBlockPayload("block", c.name, user))); err != nil {
+			return "", fmt.Errorf("error sending blocking: %v", err)
+		}
+		return fmt.Sprintf("[%s] [%s successfully blocked](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
+	case "/unblock":
+		if len(parts) < 2 {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /block <user>"), nil
+		}
+		user := parts[1]
+		if _, err := c.conn.Write([]byte(c.prepareBlockPayload("unblock", c.name, user))); err != nil {
+			return "", fmt.Errorf("error sending blocking: %v", err)
+		}
+		return fmt.Sprintf("[%s] [%s successfully unblocked](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
 	case "/mute":
 		if len(parts) < 2 {
 			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /mute <user>"), nil

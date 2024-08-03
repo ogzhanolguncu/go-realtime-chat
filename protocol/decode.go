@@ -56,10 +56,24 @@ func decodeProtocol(encoding bool, message string) (Payload, error) {
 
 		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in MSG message: %v", err)
+			return Payload{}, fmt.Errorf("invalid timestamp format in WSP message: %v", err)
+		}
+		return Payload{MessageType: MessageTypeWSP, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
+	case MessageTypeBLCK_USR:
+		if len(parts) < 5 {
+			return Payload{}, fmt.Errorf("insufficient parts in BLCK_USR message")
 		}
 
-		return Payload{MessageType: MessageTypeWSP, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
+		timestamp := parts[1]
+		sender := parts[2]
+		recipient := parts[3]
+		content := parts[4]
+
+		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			return Payload{}, fmt.Errorf("invalid timestamp format in BLCK_USR message: %v", err)
+		}
+		return Payload{MessageType: MessageTypeBLCK_USR, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
 	case MessageTypeSYS:
 		if len(parts) < 4 {
 			return Payload{}, fmt.Errorf("insufficient parts in SYS message")
