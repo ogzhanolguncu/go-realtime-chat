@@ -109,11 +109,13 @@ Chat Application Todo List:
             Fixed this by implement this completely new ui from scratch using termui
         ✔ Fix: Server locks when two users join simultaneously
         ✔ Check whisper logic: Ensure robustness and correctness
+        ✔ Fix: when actual message contains our separator "|" parsing fails. @done(24-08-03 17:29)
+            Fixed this by cutting exact parts instead of splitting entire text with given separator.
         ✔ When client reconnects after successful connection it required one more extra input before sending username. @done(24-07-14 16:04)
             Make sure all goroutines are closed before retrying using waitGroups and additional channel called done @Solution
 
 Implementation Order:
-    ☐ Command System
+    ✔ Command System @done(24-08-03 15:24)
     ☐ Notification System
     ☐ Connect chat history to auth
     ☐ Auth system

@@ -7,6 +7,20 @@ import (
 	"strings"
 )
 
+const (
+	errInvalidFormat      = "invalid %s format: %s"
+	errMissingTimestamp   = "missing timestamp separator"
+	errMissingSender      = "missing sender separator"
+	errMissingName        = "missing name separator"
+	errMissingRecipient   = "missing recipient separator"
+	errMissingMessage     = "missing message separator"
+	errMissingRequester   = "missing requester separator"
+	errMissingActiveUsers = "missing rawActiveUsers separator"
+	errMissingContent     = "missing content separator"
+	errInvalidTimestamp   = "invalid timestamp format: %v"
+	errUnsupportedMsgType = "unsupported message type %s"
+)
+
 func InitDecodeProtocol(encoding bool) func(message string) (Payload, error) {
 	return func(message string) (Payload, error) {
 		return decodeProtocol(encoding, message)
@@ -23,169 +37,211 @@ func decodeProtocol(encoding bool, message string) (Payload, error) {
 	}
 
 	sanitizedMessage := strings.TrimSpace(string(message)) // Messages from server comes with \r\n, so we have to trim it
-
-	parts := strings.Split(sanitizedMessage, Separator)
-	messageType := parts[0]
+	messageType, parts, found := strings.Cut(sanitizedMessage, "|")
+	if !found {
+		return Payload{}, fmt.Errorf("message has missing parts")
+	}
 
 	switch MessageType(messageType) {
 	case MessageTypeMSG:
-		if len(parts) < 4 {
-			return Payload{}, fmt.Errorf("insufficient parts in MSG message")
-		}
-
-		timestamp := parts[1]
-		sender := parts[2]
-		content := parts[3]
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		timestamp, sender, content, err := parseMSG(parts)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in MSG message: %v", err)
+			return Payload{}, err
 		}
-
-		return Payload{Content: content, Timestamp: unixTimestamp, Sender: sender, MessageType: MessageTypeMSG}, nil
-
+		return Payload{
+			Content:     content,
+			Timestamp:   timestamp,
+			Sender:      sender,
+			MessageType: MessageTypeMSG,
+		}, nil
 	case MessageTypeWSP:
-		if len(parts) < 5 {
-			return Payload{}, fmt.Errorf("insufficient parts in WSP message")
-		}
-
-		timestamp := parts[1]
-		sender := parts[2]
-		recipient := parts[3]
-		content := parts[4]
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		timestamp, sender, recipient, content, err := parseWSP(parts)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in WSP message: %v", err)
+			return Payload{}, err
 		}
-		return Payload{MessageType: MessageTypeWSP, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
-	case MessageTypeBLCK_USR:
-		if len(parts) < 5 {
-			return Payload{}, fmt.Errorf("insufficient parts in BLCK_USR message")
-		}
-
-		timestamp := parts[1]
-		sender := parts[2]
-		recipient := parts[3]
-		content := parts[4]
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
-		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in BLCK_USR message: %v", err)
-		}
-		return Payload{MessageType: MessageTypeBLCK_USR, Timestamp: unixTimestamp, Content: content, Sender: sender, Recipient: recipient}, nil
+		return Payload{MessageType: MessageTypeWSP, Timestamp: timestamp, Content: content, Sender: sender, Recipient: recipient}, nil
 	case MessageTypeSYS:
-		if len(parts) < 4 {
-			return Payload{}, fmt.Errorf("insufficient parts in SYS message")
-		}
-
-		timestamp := parts[1]
-		content := parts[2]
-		status := parts[3]
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		timestamp, content, status, err := parseSYS(parts)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in SYS message: %v", err)
+			return Payload{}, err
 		}
-
-		return Payload{Content: content, Timestamp: unixTimestamp, MessageType: MessageTypeSYS, Status: status}, nil
+		return Payload{Content: content, Timestamp: timestamp, MessageType: MessageTypeSYS, Status: status}, nil
 
 	case MessageTypeUSR:
-		if len(parts) < 4 {
-			return Payload{}, fmt.Errorf("insufficient parts in USR message")
-		}
-
-		timestamp := parts[1]
-		name := parts[2]
-		status := parts[3]
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		timestamp, name, status, err := parseUSR(parts)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in USR message: %v", err)
+			return Payload{}, err
 		}
 
-		return Payload{MessageType: MessageTypeUSR, Timestamp: unixTimestamp, Username: name, Status: status}, nil
+		return Payload{MessageType: MessageTypeUSR, Timestamp: timestamp, Username: name, Status: status}, nil
 	case MessageTypeACT_USRS:
-		if len(parts) < 4 {
-			return Payload{}, fmt.Errorf("insufficient parts in ACT_USRS message")
-		}
-
-		timestamp := parts[1]
-		var activeUsers []string
-		if parts[2] != "" {
-			activeUsers = strings.Split(parts[2], ",")
-		}
-		status := parts[3]
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		timestamp, activeUsers, status, err := parseACT_USRS(parts)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in ACT_USRS message: %v", err)
+			return Payload{}, err
 		}
 
-		return Payload{MessageType: MessageTypeACT_USRS, Timestamp: unixTimestamp, ActiveUsers: activeUsers, Status: status}, nil
+		return Payload{MessageType: MessageTypeACT_USRS, Timestamp: timestamp, ActiveUsers: activeUsers, Status: status}, nil
 	case MessageTypeHSTRY:
-		if len(parts) < 4 {
-			return Payload{}, fmt.Errorf("insufficient parts in HSTRY message")
-		}
-
-		payloadDetails, messages := parseChatHistory(encoding, sanitizedMessage)
-		parts = strings.Split(payloadDetails, Separator)
-
-		timestamp := parts[1]
-		requester := parts[2]
-		status := parts[3]
-
-		var parsedChatHistory []Payload
-		for _, v := range messages {
-			msg, err := decodeProtocol(encoding, v)
-			if err != nil {
-				continue
-			}
-			parsedChatHistory = append(parsedChatHistory, msg)
-		}
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+		timestamp, requester, status, parsedChatHistory, err := parseHSTRY(parts, encoding)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in HSTRY message: %v", err)
+			return Payload{}, err
 		}
-		return Payload{MessageType: MessageTypeHSTRY, Sender: requester, Timestamp: unixTimestamp, DecodedChatHistory: parsedChatHistory, Status: status}, nil
+		return Payload{MessageType: MessageTypeHSTRY, Sender: requester, Timestamp: timestamp, DecodedChatHistory: parsedChatHistory, Status: status}, nil
 
-	case MessageTypeENC:
-		if len(parts) < 3 {
-			return Payload{}, fmt.Errorf("insufficient parts in ENC message")
-		}
-		timestamp := parts[1]
-		encryptedKey := parts[2]
-
-		unixTimestamp, err := strconv.ParseInt(timestamp, 10, 64)
+	case MessageTypeBLCK_USR:
+		timestamp, sender, recipient, content, err := parseBLCK_USR(parts)
 		if err != nil {
-			return Payload{}, fmt.Errorf("invalid timestamp format in USR message: %v", err)
+			return Payload{}, err
 		}
-		return Payload{MessageType: MessageTypeENC, EncryptedKey: encryptedKey, Timestamp: unixTimestamp}, nil
+		return Payload{MessageType: MessageTypeBLCK_USR, Timestamp: timestamp, Content: content, Sender: sender, Recipient: recipient}, nil
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)
 	}
 }
 
-func parseChatHistory(encoding bool, input string) (string, []string) {
-	parts := strings.Split(input, "|")
-	if len(parts) < 5 {
-		return input, nil // Return original input if it doesn't have enough parts
+func parseMSG(msg string) (timestamp int64, sender, content string, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, "", "", fmt.Errorf(errInvalidFormat, "MSG", errMissingTimestamp)
 	}
 
-	// Construct the first part (HSTRY metadata)
-	part1 := fmt.Sprintf("%s|%s|%s|%s", parts[0], parts[1], parts[2], parts[len(parts)-1])
-
-	// Get the messages
-	messagesPart := strings.Join(parts[3:len(parts)-1], "|")
-	messages := strings.Split(messagesPart, ",")
-
-	// If not encoding (i.e., plain text), we're done
-	if !encoding {
-		return part1, messages
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, "", "", fmt.Errorf(errInvalidTimestamp, err)
 	}
 
-	// For base64 encoding (not implemented here)
-	// You would add your base64 decoding logic here
-	return part1, messages
+	sender, content, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", fmt.Errorf(errInvalidFormat, "MSG", errMissingSender)
+	}
+
+	return timestamp, sender, content, nil
+}
+func parseWSP(msg string) (timestamp int64, sender, recipient, content string, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "WSP", errMissingTimestamp)
+	}
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, "", "", "", fmt.Errorf(errInvalidTimestamp, err)
+	}
+	sender, rest, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "WSP", errMissingSender)
+	}
+	recipient, content, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "WSP", errMissingRecipient)
+	}
+
+	return timestamp, sender, recipient, content, nil
+}
+
+func parseSYS(msg string) (timestamp int64, content, status string, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, "", "", fmt.Errorf(errInvalidFormat, "SYS", errMissingTimestamp)
+	}
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, "", "", fmt.Errorf(errInvalidTimestamp, err)
+	}
+	content, status, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", fmt.Errorf(errInvalidFormat, "SYS", errMissingContent)
+	}
+
+	return timestamp, content, status, nil
+}
+
+func parseUSR(msg string) (timestamp int64, name, status string, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, "", "", fmt.Errorf(errInvalidFormat, "USR", errMissingTimestamp)
+	}
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, "", "", fmt.Errorf(errInvalidTimestamp, err)
+	}
+	name, status, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", fmt.Errorf(errInvalidFormat, "USR", errMissingName)
+	}
+
+	return timestamp, name, status, nil
+}
+
+func parseACT_USRS(msg string) (timestamp int64, activeUsers []string, status string, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, nil, "", fmt.Errorf(errInvalidFormat, "ACT_USRS", errMissingTimestamp)
+	}
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, nil, "", fmt.Errorf(errInvalidTimestamp, err)
+	}
+
+	rawActiveUsers, status, found := strings.Cut(rest, "|")
+	if !found {
+		return 0, nil, "", fmt.Errorf(errInvalidFormat, "ACT_USRS", errMissingActiveUsers)
+	}
+
+	if rawActiveUsers != "" {
+		activeUsers = strings.Split(rawActiveUsers, ",")
+	}
+
+	return timestamp, activeUsers, status, nil
+}
+
+func parseHSTRY(msg string, encoding bool) (timestamp int64, requester, status string, parsedChatHistory []Payload, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, "", "", nil, fmt.Errorf(errInvalidFormat, "HSTRY", errMissingTimestamp)
+	}
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, "", "", nil, fmt.Errorf(errInvalidTimestamp, err)
+	}
+
+	requester, rest, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", nil, fmt.Errorf(errInvalidFormat, "HSTRY", errMissingRequester)
+	}
+
+	messages, status, found := strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", nil, fmt.Errorf(errInvalidFormat, "HSTRY", messages)
+	}
+
+	for _, v := range strings.Split(messages, ",") {
+		msg, err := decodeProtocol(encoding, v)
+		if err != nil {
+			continue
+		}
+		parsedChatHistory = append(parsedChatHistory, msg)
+	}
+
+	return timestamp, requester, status, parsedChatHistory, nil
+}
+
+func parseBLCK_USR(msg string) (timestamp int64, sender, recipient, content string, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "BLCK_USR", errMissingTimestamp)
+	}
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, "", "", "", fmt.Errorf(errInvalidTimestamp, err)
+	}
+	sender, rest, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "BLCK_USR", errMissingSender)
+	}
+	recipient, content, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "BLCK_USR", recipient)
+	}
+
+	return timestamp, sender, recipient, content, nil
 }

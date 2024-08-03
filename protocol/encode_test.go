@@ -175,3 +175,28 @@ func TestEncodeChatHistory(t *testing.T) {
 		}
 	})
 }
+
+func TestEncodeBlockUserMessage(t *testing.T) {
+	t.Run("should encode blocker user message successfully", func(t *testing.T) {
+		tests := []struct {
+			content   string
+			sender    string
+			recipient string
+			expected  string
+		}{
+			{"Hello", "Oz", "John", fmt.Sprintf("BLCK_USR|%d|Oz|John|Hello\r\n", time.Now().Unix())},
+			{"World", "John", "Oz", fmt.Sprintf("BLCK_USR|%d|John|Oz|World\r\n", time.Now().Unix())},
+		}
+		for _, test := range tests {
+			result := encodeProtocol(true, Payload{
+				MessageType: MessageTypeBLCK_USR,
+				Content:     test.content,
+				Sender:      test.sender,
+				Recipient:   test.recipient,
+			})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			assert.Equal(t, test.expected, string(decoded))
+		}
+	})
+
+}
