@@ -13,6 +13,7 @@ import (
 	"github.com/ogzhanolguncu/go-chat/client/chat_ui"
 	"github.com/ogzhanolguncu/go-chat/client/internal"
 	"github.com/ogzhanolguncu/go-chat/client/terminal"
+	"github.com/ogzhanolguncu/go-chat/client/utils"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
@@ -125,6 +126,13 @@ func runClient() error {
 				}
 			}
 		case payload := <-incomingChan:
+			if payload.MessageType == protocol.MessageTypeWSP {
+				notificationMsg := payload.Content
+				if len(payload.Content) >= 10 {
+					notificationMsg = payload.Content[0:10] + "..."
+				}
+				go utils.NotifyUser(fmt.Sprintf("Whisper from %s", payload.Sender), notificationMsg, "/System/Library/Sounds/Purr.aiff")
+			}
 			if client.CheckIfUserMuted(payload.Sender) {
 				// Skip if user is muted
 				continue
