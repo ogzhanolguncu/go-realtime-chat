@@ -209,7 +209,10 @@ func parseHSTRY(msg string, encoding bool) (timestamp int64, requester, status s
 		return 0, "", "", nil, fmt.Errorf(errInvalidFormat, "HSTRY", errMissingRequester)
 	}
 
-	messages, status, found := strings.Cut(rest, "|")
+	// Picks only the status part, last part from string
+	status = rest[strings.LastIndex(rest, "|")+1:]
+	// Uses  "|" + last part to cutsuffix to end up only with messages
+	messages, found := strings.CutSuffix(rest, Separator+status)
 	if !found {
 		return 0, "", "", nil, fmt.Errorf(errInvalidFormat, "HSTRY", messages)
 	}
