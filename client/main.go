@@ -64,7 +64,7 @@ func runClient() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
-	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the chat!](fg:cyan)", time.Now().Format("15:04")), chatBox)
+	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the chat!](fg:cyan)", time.Now().Format("01-02 15:04")), chatBox)
 
 	draw := chatUI.Draw(header, commandBox, chatBox, inputBox, userList)
 	draw()

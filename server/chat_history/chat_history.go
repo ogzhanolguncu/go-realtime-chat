@@ -37,16 +37,36 @@ func (ch *ChatHistory) AddMessage(messages ...string) {
 
 // Get messages from memory if they are from requester user and contain allowed messageTypes
 func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string {
+	blockMap := make(map[string]map[string]bool)
+
 	log.Printf("Calling GetHistory")
 	if len(ch.messages) == 0 {
 		ch.ReadFromDiskToInMemory()
 		log.Printf("Loaded %d messages from disk to memory", len(ch.messages))
 	}
 
+	for _, v := range ch.messages {
+		decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(v)
+		if err != nil {
+			continue // Skip undecodable messages
+		}
+		if decodedMsg.MessageType == protocol.MessageTypeBLCK_USR {
+			if blockMap[decodedMsg.Sender] == nil {
+				blockMap[decodedMsg.Sender] = make(map[string]bool)
+			}
+			blockMap[decodedMsg.Sender][decodedMsg.Recipient] = true
+		}
+
+	}
+
 	msgs := pie.Filter(ch.messages, func(msg string) bool {
 		decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(msg)
 		if err != nil {
 			return false // Skip undecodable messages
+		}
+
+		if blockMap[decodedMsg.Sender][user] || blockMap[user][decodedMsg.Sender] {
+			return false // Skip message if requesting user was blocked by sender or sender is blocked by requesting user
 		}
 
 		msgType := string(decodedMsg.MessageType)
