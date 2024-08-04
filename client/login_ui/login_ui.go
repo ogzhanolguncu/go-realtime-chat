@@ -137,3 +137,8 @@ func (lu *LoginUI) GetCredentials() (string, string) {
 func (lu *LoginUI) Close() {
 	ui.Close()
 }
+
+func (lu *LoginUI) ResetErrorBox(errorBox *widgets.Paragraph) {
+	errorBox.Text = "Please, enter your username and passwor. If it's your first time you will be registered."
+	errorBox.TextStyle.Fg = ui.ColorYellow
+}

@@ -51,14 +51,20 @@ func (c *Client) Connect() error {
 	return nil
 }
 
-func (c *Client) Close() {
+func (c *Client) Close() error {
 	if c.conn != nil {
-		c.conn.Close()
+		err := c.conn.Close()
+		c.conn = nil
+		return err
 	}
+	return nil
 }
 
 func (c *Client) GetUsername() string {
 	return c.name
+}
+func (c *Client) SetUsername(username string) {
+	c.name = username
 }
 
 func (c *Client) GetMutedList() []string {

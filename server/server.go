@@ -381,6 +381,8 @@ func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
 			break
 		}
 		payload, err := s.decodeFn(data)
+		log.Printf("Someone is trying to login/register with '%s' from %s", payload.Username, conn.RemoteAddr().String())
+
 		_, nameIsAlreadyInUse := s.findConnectionByOwnerName(payload.Username)
 		if err != nil || len(payload.Username) < 2 {
 			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' cannot be empty or less than two characters.", payload.Username), Status: "fail"})))
