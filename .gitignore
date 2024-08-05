@@ -28,3 +28,4 @@ go.work.sum
 /server/server
 chat_history.txt
 .DS_STORE
+chat.db

@@ -70,7 +70,6 @@ func handleChatUI(client *internal.Client) error {
 		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
 	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the chat!](fg:cyan)", time.Now().Format("01-02 15:04")), chatBox)
-
 	draw := chatUI.Draw(header, commandBox, chatBox, inputBox, userList)
 	draw()
 
@@ -82,6 +81,7 @@ func handleChatUI(client *internal.Client) error {
 	defer cancel()
 
 	go client.FetchChatHistory()
+	go client.FetchActiveUserList()
 	go client.ReadMessages(ctx, incomingChan, errorChan)
 
 	for {
@@ -196,10 +196,27 @@ func handleLoginUI(client *internal.Client) error {
 	uiEvents := ui.PollEvents()
 
 	var loginAttemptInProgress bool
+	var showLoader bool
+	loaderFrame := 0
+
+	loaderTicker := time.NewTicker(100 * time.Millisecond)
+	defer loaderTicker.Stop()
+
+	cursorTicker := time.NewTicker(500 * time.Millisecond)
+	defer cursorTicker.Stop()
 
 	for {
 		draw()
 		select {
+		case <-cursorTicker.C:
+			lu.ToggleCursor()
+			lu.UpdateUsernameBox(usernameBox)
+			lu.UpdatePasswordBox(passwordBox)
+		case <-loaderTicker.C:
+			if showLoader {
+				loaderFrame++
+				lu.UpdateLoader(errorBox, loaderFrame)
+			}
 		case e := <-uiEvents:
 			switch e.ID {
 			case "<C-c>":
@@ -212,7 +229,7 @@ func handleLoginUI(client *internal.Client) error {
 				if !loginAttemptInProgress {
 					username, password := lu.GetCredentials()
 					loginAttemptInProgress = true
-					errorBox.Text = "Hang tight, trying to sweet-talk the doorman!"
+					showLoader = true
 					client.SendUsernameReq(username, password)
 				}
 			case "<Backspace>":
@@ -231,6 +248,8 @@ func handleLoginUI(client *internal.Client) error {
 			}
 		case payload := <-responseChan:
 			loginAttemptInProgress = false
+			showLoader = false
+
 			switch payload.Status {
 			case "success":
 				client.SetUsername(payload.Username)
@@ -243,6 +262,8 @@ func handleLoginUI(client *internal.Client) error {
 			}
 		case err := <-errorChan:
 			loginAttemptInProgress = false
+			showLoader = false
+
 			errorBox.Text = err.Error()
 			errorBox.TextStyle.Fg = ui.ColorYellow
 		}

@@ -9,16 +9,18 @@ import (
 )
 
 type LoginUI struct {
-	username     string
-	password     string
-	currentField int // 0 for username, 1 for password
+	username      string
+	password      string
+	currentField  int // 0 for username, 1 for password
+	cursorVisible bool
 }
 
 func NewLoginUI() *LoginUI {
 	return &LoginUI{
-		username:     "",
-		password:     "",
-		currentField: 0,
+		username:      "",
+		password:      "",
+		currentField:  0,
+		cursorVisible: true,
 	}
 }
 
@@ -90,7 +92,11 @@ func (lu *LoginUI) prepareUIItems() (container *widgets.Paragraph, description *
 }
 
 func (lu *LoginUI) UpdateUsernameBox(usernameBox *widgets.Paragraph) {
-	usernameBox.Text = lu.username
+	cursorChar := " "
+	if lu.currentField == 0 && lu.cursorVisible {
+		cursorChar = "|"
+	}
+	usernameBox.Text = lu.username + cursorChar
 	if lu.currentField == 0 {
 		usernameBox.BorderStyle.Fg = ui.ColorYellow
 	} else {
@@ -99,12 +105,20 @@ func (lu *LoginUI) UpdateUsernameBox(usernameBox *widgets.Paragraph) {
 }
 
 func (lu *LoginUI) UpdatePasswordBox(passwordBox *widgets.Paragraph) {
-	passwordBox.Text = strings.Repeat("•", len(lu.password))
+	cursorChar := " "
+	if lu.currentField == 1 && lu.cursorVisible {
+		cursorChar = "|"
+	}
+	passwordBox.Text = strings.Repeat("•", len(lu.password)) + cursorChar
 	if lu.currentField == 1 {
 		passwordBox.BorderStyle.Fg = ui.ColorYellow
 	} else {
 		passwordBox.BorderStyle.Fg = ui.ColorCyan
 	}
+}
+
+func (lu *LoginUI) ToggleCursor() {
+	lu.cursorVisible = !lu.cursorVisible
 }
 
 func (lu *LoginUI) SwitchField() {
@@ -142,4 +156,15 @@ func (lu *LoginUI) Close() {
 func (lu *LoginUI) ResetErrorBox(errorBox *widgets.Paragraph) {
 	errorBox.Text = "Please, enter your username and passwor. If it's your first time you will be registered."
 	errorBox.TextStyle.Fg = ui.ColorYellow
+}
+
+func (lu *LoginUI) UpdateLoader(errorBox *widgets.Paragraph, frame int) {
+	gradient := []string{"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"}
+	width := 20
+	loader := ""
+	for i := 0; i < width; i++ {
+		index := (i + frame) % len(gradient)
+		loader += gradient[index]
+	}
+	errorBox.Text = fmt.Sprintf("Logging in... %s", loader)
 }

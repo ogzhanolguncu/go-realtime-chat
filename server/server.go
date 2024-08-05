@@ -117,7 +117,7 @@ func (s *TCPServer) getConnectionInfo(c net.Conn) (*ConnectionInfo, bool) {
 }
 
 func (s *TCPServer) handleNewConnection(c net.Conn) {
-	name := s.handleUsernameSet(c)
+	name := s.handleAuth(c)
 	// If the username is an empty string after exhausting retries,
 	// close the connection to prevent clients with no username from connecting.
 	if len(name) == 0 {
@@ -248,6 +248,8 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 				EncodedChatHistory: s.history.GetHistory(msgPayload.Sender, "MSG", "WSP"),
 				Status:             "res"}))
 			c.Write(msg)
+		case protocol.MessageTypeACT_USRS:
+			s.sendActiveUsers()
 		case protocol.MessageTypeENC:
 			s.sendEncryptionKey(msgPayload, c)
 		default:
@@ -379,7 +381,7 @@ func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn ...net.C
 	})
 }
 
-func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
+func (s *TCPServer) handleAuth(conn net.Conn) string {
 	requiredMsg := s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Status: "required"})
 	conn.Write([]byte(requiredMsg))
 	connReader := bufio.NewReader(conn)
@@ -401,7 +403,6 @@ func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
 		}
 
 		log.Printf("Login/register attempt for '%s' from %s", payload.Username, conn.RemoteAddr().String())
-
 		err = s.authManager.AddUser(payload.Username, payload.Password)
 		if err == nil {
 			name = payload.Username

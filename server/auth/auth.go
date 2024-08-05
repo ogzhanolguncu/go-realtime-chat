@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"unicode"
 
-	sq "github.com/Masterminds/squirrel"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 )
 
-const bcryptCost = 14
+const bcryptCost = 8
 const minimumPasswordLength = 8
 
 type AuthManager struct {
-	db *sql.DB
+	db              *sql.DB
+	getUserStmt     *sql.Stmt
+	addUserStmt     *sql.Stmt
+	getPasswordStmt *sql.Stmt
 }
 
 func NewAuthManager(dbPath string) (*AuthManager, error) {
@@ -35,21 +37,55 @@ func NewAuthManager(dbPath string) (*AuthManager, error) {
 		return nil, err
 	}
 
-	return &AuthManager{db: db}, nil
+	// Create index on username
+	_, err = db.Exec(`
+        CREATE INDEX IF NOT EXISTS idx_username ON users(username)
+    `)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create index: %v", err)
+	}
+
+	am := &AuthManager{db: db}
+	if err := am.prepareStatements(); err != nil {
+		return nil, err
+	}
+
+	return am, nil
+}
+
+func (am *AuthManager) prepareStatements() error {
+	var err error
+	am.getUserStmt, err = am.db.Prepare("SELECT username FROM users WHERE username = ?")
+	if err != nil {
+		return err
+	}
+	am.addUserStmt, err = am.db.Prepare("INSERT INTO users (username, password) VALUES (?, ?)")
+	if err != nil {
+		am.getUserStmt.Close()
+		return err
+	}
+	am.getPasswordStmt, err = am.db.Prepare("SELECT password FROM users WHERE username = ?")
+	if err != nil {
+		am.getUserStmt.Close()
+		am.addUserStmt.Close()
+		return err
+	}
+	return nil
 }
 
 func (am *AuthManager) Close() error {
+	am.getUserStmt.Close()
+	am.addUserStmt.Close()
+	am.getPasswordStmt.Close()
 	return am.db.Close()
 }
 
 func (am *AuthManager) AddUser(username, password string) error {
 	var exists string
-	query := "SELECT username FROM users WHERE username = ?"
-	err := am.db.QueryRow(query, username).Scan(&exists)
+	err := am.getUserStmt.QueryRow(username).Scan(&exists)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("error checking existing user: %v", err)
 	}
-
 	if exists != "" {
 		return fmt.Errorf("username already exists")
 	}
@@ -67,10 +103,11 @@ func (am *AuthManager) AddUser(username, password string) error {
 		return fmt.Errorf("could not hash user: %s's password - %v", username, err)
 	}
 
-	_, err = sq.Insert("users").Columns("username", "password").Values(username, hashedPass).RunWith(am.db).Exec()
+	_, err = am.addUserStmt.Exec(username, hashedPass)
 	if err != nil {
 		return fmt.Errorf("could not add user to users table - %v", err)
 	}
+
 	return nil
 }
 
@@ -78,12 +115,7 @@ func checkPasswordStrength(password string, minLength int) bool {
 	if len(password) < minLength {
 		return false
 	}
-
-	hasUpper := false
-	hasLower := false
-	hasDigit := false
-	hasSpecial := false
-
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
 	for _, char := range password {
 		switch {
 		case unicode.IsUpper(char):
@@ -95,10 +127,11 @@ func checkPasswordStrength(password string, minLength int) bool {
 		case unicode.IsPunct(char) || unicode.IsSymbol(char):
 			hasSpecial = true
 		}
-
+		if hasUpper && hasLower && hasDigit && hasSpecial {
+			return true
+		}
 	}
-
-	return hasUpper && hasLower && hasDigit && hasSpecial
+	return false
 }
 
 func hashPassword(password string) (string, error) {
@@ -108,28 +141,16 @@ func hashPassword(password string) (string, error) {
 
 func (am *AuthManager) AuthenticateUser(username, password string) (bool, error) {
 	var storedPassword string
-
-	err := sq.Select("password").
-		From("users").
-		Where(sq.Eq{"username": username}).
-		RunWith(am.db).
-		QueryRow().
-		Scan(&storedPassword)
-
+	err := am.getPasswordStmt.QueryRow(username).Scan(&storedPassword)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, fmt.Errorf("authentication failed")
 		}
 		return false, fmt.Errorf("error querying user %s: %v", username, err)
 	}
-
-	// Compare the stored password with the provided password
-	if checkPasswordHash(password, storedPassword) {
-		return true, nil
-	}
-
-	return false, nil
+	return checkPasswordHash(password, storedPassword), nil
 }
+
 func checkPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
