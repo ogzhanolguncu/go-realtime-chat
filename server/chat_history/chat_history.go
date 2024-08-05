@@ -7,14 +7,13 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/elliotchance/pie/v2"
 	"github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/server/utils"
 )
 
 const fileName = "chat_history.txt"
@@ -85,7 +84,7 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string 
 }
 
 func (ch *ChatHistory) SaveToDisk(msgLimit int) error {
-	filePath := filepath.Join(rootDir(), fileName)
+	filePath := filepath.Join(utils.RootDir(), fileName)
 
 	if checkIfFileExists(filePath) {
 		file, err := os.Open(filePath)
@@ -113,13 +112,13 @@ func (ch *ChatHistory) SaveToDisk(msgLimit int) error {
 
 // Remove file from disk if it exists.
 func (ch *ChatHistory) DeleteFromDisk() error {
-	filePath := filepath.Join(rootDir(), fileName)
+	filePath := filepath.Join(utils.RootDir(), fileName)
 	return os.Remove(filePath)
 }
 
 // Read chat_history.txt from disk to in-memory.
 func (ch *ChatHistory) ReadFromDiskToInMemory() error {
-	filePath := filepath.Join(rootDir(), fileName)
+	filePath := filepath.Join(utils.RootDir(), fileName)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("could not read file: %w", err)
@@ -143,12 +142,6 @@ func removeEmpty(s []string) []string {
 		}
 	}
 	return r
-}
-
-func rootDir() string {
-	_, b, _, _ := runtime.Caller(0)
-	d := path.Join(path.Dir(b))
-	return filepath.Dir(d)
 }
 
 // https://stackoverflow.com/questions/24562942/golang-how-do-i-determine-the-number-of-lines-in-a-file-efficiently

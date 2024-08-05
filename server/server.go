@@ -17,7 +17,9 @@ import (
 	"time"
 
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/server/auth"
 	"github.com/ogzhanolguncu/go-chat/server/chat_history"
+	"github.com/ogzhanolguncu/go-chat/server/utils"
 )
 
 // ConnectionInfo holds connection-related information.
@@ -33,6 +35,7 @@ type ConnectionInfo struct {
 type TCPServer struct {
 	connectionMap sync.Map
 	history       chat_history.ChatHistory
+	authManager   *auth.AuthManager
 	groupKey      string
 	encodeFn      func(payload protocol.Payload) string
 	decodeFn      func(message string) (protocol.Payload, error)
@@ -58,11 +61,17 @@ func newServer() *TCPServer {
 
 	log.Printf("------ ENCODING SET TO %s ------", encodingType)
 
+	authManager, err := auth.NewAuthManager(fmt.Sprintf(utils.RootDir() + "/chat.db"))
+	if err != nil {
+		log.Printf("Failed to initialize auth manager: %v", err)
+	}
+
 	return &TCPServer{
-		groupKey: key,
-		decodeFn: protocol.InitDecodeProtocol(*encoding),
-		encodeFn: protocol.InitEncodeProtocol(*encoding),
-		history:  *chat_history.NewChatHistory(*encoding),
+		groupKey:    key,
+		decodeFn:    protocol.InitDecodeProtocol(*encoding),
+		encodeFn:    protocol.InitEncodeProtocol(*encoding),
+		history:     *chat_history.NewChatHistory(*encoding),
+		authManager: authManager,
 	}
 }
 
@@ -379,22 +388,41 @@ func (s *TCPServer) handleUsernameSet(conn net.Conn) string {
 
 	for {
 		data, err := connReader.ReadString('\n')
-
 		if err != nil {
+			log.Printf("Error reading string: %v", err)
 			break
 		}
-		payload, err := s.decodeFn(data)
-		log.Printf("Someone is trying to login/register with '%s' from %s", payload.Username, conn.RemoteAddr().String())
 
-		_, nameIsAlreadyInUse := s.findConnectionByOwnerName(payload.Username)
-		if err != nil || len(payload.Username) < 2 {
-			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' cannot be empty or less than two characters.", payload.Username), Status: "fail"})))
-		} else if nameIsAlreadyInUse {
-			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: fmt.Sprintf("Username '%s' is already in use.", payload.Username), Status: "fail"})))
-		} else {
+		payload, err := s.decodeFn(data)
+		if err != nil {
+			log.Printf("Failed to decode data: %s. Error: %v", data, err)
+			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: "Invalid data format", Status: "fail"})))
+			continue
+		}
+
+		log.Printf("Login/register attempt for '%s' from %s", payload.Username, conn.RemoteAddr().String())
+
+		err = s.authManager.AddUser(payload.Username, payload.Password)
+		if err == nil {
 			name = payload.Username
 			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
 			break
+		}
+
+		if err.Error() == "username already exists" {
+			ok, authErr := s.authManager.AuthenticateUser(payload.Username, payload.Password)
+			if authErr != nil {
+				conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: authErr.Error(), Status: "fail"})))
+			} else if ok {
+				name = payload.Username
+				conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
+				break
+			} else {
+				conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: "Invalid credentials", Status: "fail"})))
+			}
+		} else {
+			errMsg := strings.ToUpper(err.Error()[:1]) + err.Error()[1:]
+			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: errMsg, Status: "fail"})))
 		}
 	}
 	return name

@@ -49,12 +49,17 @@ func (am *AuthManager) AddUser(username, password string) error {
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("error checking existing user: %v", err)
 	}
+
 	if exists != "" {
 		return fmt.Errorf("username already exists")
 	}
 
+	if len(username) < 2 {
+		return fmt.Errorf("username '%s' cannot be empty or less than two characters", username)
+	}
+
 	if !checkPasswordStrength(password, minimumPasswordLength) {
-		return fmt.Errorf("password is not strong enough. it has to contain at least %d characters, one upper, one lower, one symbol and one digit", minimumPasswordLength)
+		return fmt.Errorf("password is not strong enough. It has to contain at least %d characters, one upper, one lower, one symbol and one digit", minimumPasswordLength)
 	}
 
 	hashedPass, err := hashPassword(password)
@@ -119,7 +124,6 @@ func (am *AuthManager) AuthenticateUser(username, password string) (bool, error)
 	}
 
 	// Compare the stored password with the provided password
-	// Note: In a real application, you should use proper password hashing
 	if checkPasswordHash(password, storedPassword) {
 		return true, nil
 	}

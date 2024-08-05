@@ -80,6 +80,7 @@ func (lu *LoginUI) prepareUIItems() (container *widgets.Paragraph, description *
 	passwordBox.BorderStyle.Fg = ui.ColorCyan
 	passwordBox.TextStyle.Fg = ui.ColorWhite
 
+	// Error Box
 	errorText = widgets.NewParagraph()
 	errorText.SetRect(containerStartX+1, containerStartY+12, containerStartX+containerWidth-1, containerStartY+13)
 	errorText.TextStyle.Fg = ui.ColorRed

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	utils "github.com/ogzhanolguncu/go-chat/server/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -73,10 +74,10 @@ func TestSaveToDisk(t *testing.T) {
 		"MSG|1721160403|Oz|aaaaa")
 	err := chatHistory.SaveToDisk(4)
 	require.NoError(t, err)
-	require.FileExists(t, filepath.Join(rootDir(), "chat_history.txt"))
+	require.FileExists(t, filepath.Join(utils.RootDir(), "chat_history.txt"))
 
 	// Read the file to verify its contents
-	content, err := os.ReadFile(filepath.Join(rootDir(), "chat_history.txt"))
+	content, err := os.ReadFile(filepath.Join(utils.RootDir(), "chat_history.txt"))
 	require.NoError(t, err)
 	lines := strings.Split(strings.ReplaceAll(string(content), "\r", ""), "\n")
 	require.GreaterOrEqual(t, len(lines), 3) // Timestamp + 3 messages
@@ -97,7 +98,7 @@ func TestDeleteFromDisk(t *testing.T) {
 
 	err = chatHistory.DeleteFromDisk()
 	require.NoError(t, err)
-	require.NoFileExists(t, filepath.Join(rootDir(), "chat_history.txt"))
+	require.NoFileExists(t, filepath.Join(utils.RootDir(), "chat_history.txt"))
 }
 
 func TestReadFromDiskToInMemory(t *testing.T) {
@@ -110,7 +111,7 @@ func TestReadFromDiskToInMemory(t *testing.T) {
 		"MSG|1721160403|Oz|5|aaaaa\r",
 	}
 
-	testFile := filepath.Join(rootDir(), "chat_history.txt")
+	testFile := filepath.Join(utils.RootDir(), "chat_history.txt")
 	err := os.WriteFile(testFile, []byte(strings.Join(testMessages, "\n")), 0644)
 	require.NoError(t, err)
 

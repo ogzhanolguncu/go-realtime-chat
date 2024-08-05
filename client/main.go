@@ -210,14 +210,10 @@ func handleLoginUI(client *internal.Client) error {
 
 			case "<Enter>":
 				if !loginAttemptInProgress {
-					username, _ := lu.GetCredentials()
+					username, password := lu.GetCredentials()
 					loginAttemptInProgress = true
-					go func() {
-						err := client.SendUsernameReq(username)
-						if err != nil {
-							errorChan <- fmt.Errorf("error sending username: %v", err)
-						}
-					}()
+					errorBox.Text = "Hang tight, trying to sweet-talk the doorman!"
+					client.SendUsernameReq(username, password)
 				}
 			case "<Backspace>":
 				lu.DeleteLastChar()
