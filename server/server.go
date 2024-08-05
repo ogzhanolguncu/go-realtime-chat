@@ -221,12 +221,15 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 				blockerUser.blockedUsers = append(blockerUser.blockedUsers, blockedUser)
 				s.connectionMap.Store(c, blockerUser)
 				log.Printf("%s blocked %s", msgPayload.Sender, msgPayload.Recipient)
-			} else {
+			}
+			if msgPayload.Content == "unblock" {
 				blockerUser.blockedUsers = slices.DeleteFunc(blockerUser.blockedUsers, func(u net.Conn) bool {
 					return u == blockedUser
 				})
 				s.connectionMap.Store(c, blockerUser)
 				log.Printf("%s unblocked %s", msgPayload.Sender, msgPayload.Recipient)
+			} else {
+				log.Printf("Unknown block message received from %s\n", c.RemoteAddr().String())
 			}
 
 		case protocol.MessageTypeHSTRY:

@@ -118,13 +118,14 @@ func TestEncodeUsrMessage(t *testing.T) {
 	t.Run("should encode username message successfully", func(t *testing.T) {
 		tests := []struct {
 			username string
+			password string
 			status   string
 			expected string
 		}{
-			{"Oz", "success", fmt.Sprintf("USR|%d|Oz|success\r\n", time.Now().Unix())},
+			{"Oz", "123456", "success", fmt.Sprintf("USR|%d|Oz|123456|success\r\n", time.Now().Unix())},
 		}
 		for _, test := range tests {
-			result := encodeProtocol(true, Payload{MessageType: MessageTypeUSR, Username: test.username, Status: test.status})
+			result := encodeProtocol(true, Payload{MessageType: MessageTypeUSR, Password: test.password, Username: test.username, Status: test.status})
 			decoded, _ := base64.StdEncoding.DecodeString(result)
 			assert.Equal(t, test.expected, string(decoded))
 		}

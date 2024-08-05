@@ -68,12 +68,12 @@ func decodeProtocol(encoding bool, message string) (Payload, error) {
 		return Payload{Content: content, Timestamp: timestamp, MessageType: MessageTypeSYS, Status: status}, nil
 
 	case MessageTypeUSR:
-		timestamp, name, status, err := parseUSR(parts)
+		timestamp, name, password, status, err := parseUSR(parts)
 		if err != nil {
 			return Payload{}, err
 		}
 
-		return Payload{MessageType: MessageTypeUSR, Timestamp: timestamp, Username: name, Status: status}, nil
+		return Payload{MessageType: MessageTypeUSR, Timestamp: timestamp, Username: name, Password: password, Status: status}, nil
 	case MessageTypeACT_USRS:
 		timestamp, activeUsers, status, err := parseACT_USRS(parts)
 		if err != nil {
@@ -155,21 +155,25 @@ func parseSYS(msg string) (timestamp int64, content, status string, err error) {
 	return timestamp, content, status, nil
 }
 
-func parseUSR(msg string) (timestamp int64, name, status string, err error) {
+func parseUSR(msg string) (timestamp int64, name, password, status string, err error) {
 	timestampStr, rest, found := strings.Cut(msg, "|")
 	if !found {
-		return 0, "", "", fmt.Errorf(errInvalidFormat, "USR", errMissingTimestamp)
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "USR", errMissingTimestamp)
 	}
 	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
 	if err != nil {
-		return 0, "", "", fmt.Errorf(errInvalidTimestamp, err)
+		return 0, "", "", "", fmt.Errorf(errInvalidTimestamp, err)
 	}
-	name, status, found = strings.Cut(rest, "|")
+	name, rest, found = strings.Cut(rest, "|")
 	if !found {
-		return 0, "", "", fmt.Errorf(errInvalidFormat, "USR", errMissingName)
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "USR", errMissingName)
+	}
+	password, status, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", fmt.Errorf(errInvalidFormat, "USR", errMissingName)
 	}
 
-	return timestamp, name, status, nil
+	return timestamp, name, password, status, nil
 }
 
 func parseACT_USRS(msg string) (timestamp int64, activeUsers []string, status string, err error) {

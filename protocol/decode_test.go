@@ -59,10 +59,10 @@ func TestDecodeSystemMessage(t *testing.T) {
 func TestDecodeUsernameMessage(t *testing.T) {
 	timestamp := time.Now().Unix()
 	t.Run("should decode system message into payload successfully", func(t *testing.T) {
-		encodedString := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("USR|%d|Oz|success\r\n", timestamp)))
+		encodedString := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("USR|%d|Oz|123456|success\r\n", timestamp)))
 
 		payload, _ := decodeProtocol(true, encodedString)
-		assert.Equal(t, Payload{MessageType: MessageTypeUSR, Timestamp: timestamp, Username: "Oz", Status: "success"}, payload)
+		assert.Equal(t, Payload{MessageType: MessageTypeUSR, Timestamp: timestamp, Username: "Oz", Password: "123456", Status: "success"}, payload)
 	})
 
 	t.Run("should check for at least 4 parts of message USR", func(t *testing.T) {
