@@ -154,17 +154,13 @@ func (lu *LoginUI) Close() {
 }
 
 func (lu *LoginUI) ResetErrorBox(errorBox *widgets.Paragraph) {
-	errorBox.Text = "Please, enter your username and passwor. If it's your first time you will be registered."
+	errorBox.Text = "Enter credentials (new users will be registered)"
 	errorBox.TextStyle.Fg = ui.ColorYellow
 }
 
-func (lu *LoginUI) UpdateLoader(errorBox *widgets.Paragraph, frame int) {
-	gradient := []string{"▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"}
-	width := 20
-	loader := ""
-	for i := 0; i < width; i++ {
-		index := (i + frame) % len(gradient)
-		loader += gradient[index]
-	}
-	errorBox.Text = fmt.Sprintf("Logging in... %s", loader)
+func (lu *LoginUI) UpdateLoader(errorBox *widgets.Paragraph, iteration int) {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	frame := frames[iteration%len(frames)]
+
+	errorBox.Text = fmt.Sprintf("%s Loading...", frame)
 }

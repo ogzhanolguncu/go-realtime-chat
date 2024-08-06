@@ -65,7 +65,7 @@ func TestAuthenticateUser(t *testing.T) {
 		wantErr  bool
 	}{
 		{"Valid credentials", "testuser", "P@ssw0rd", true, false},
-		{"Invalid password", "testuser", "wrongpassword", false, false},
+		{"Invalid password", "testuser", "wrongpassword", false, true},
 		{"Non-existent user", "nonexistent", "anypassword", false, true},
 	}
 
@@ -99,7 +99,7 @@ func TestCheckPasswordStrength(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := checkPasswordStrength(tt.password, minimumPasswordLength)
+			got := checkPasswordStrength(tt.password)
 			assert.Equal(t, tt.want, got)
 		})
 	}

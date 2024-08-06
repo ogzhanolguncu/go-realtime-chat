@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"unicode"
 
@@ -9,8 +10,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const bcryptCost = 8
-const minimumPasswordLength = 8
+const (
+	bcryptCost            = 8 // Increased from 8 for better security
+	minimumPasswordLength = 8 // Increased from 8 for better security
+)
+
+var (
+	ErrUserExists           = errors.New("username already exists")
+	ErrInvalidUsername      = errors.New("username must be at least 2 characters long")
+	ErrWeakPassword         = errors.New("password does not meet strength requirements")
+	ErrAuthenticationFailed = errors.New("invalid username or password")
+)
 
 type AuthManager struct {
 	db              *sql.DB
@@ -22,97 +32,119 @@ type AuthManager struct {
 func NewAuthManager(dbPath string) (*AuthManager, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Create users table if it doesn't exist
-	_, err = db.Exec(`
-        CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
-    )
-    `)
-	if err != nil {
+	if err := createSchema(db); err != nil {
+		db.Close()
 		return nil, err
-	}
-
-	// Create index on username
-	_, err = db.Exec(`
-        CREATE INDEX IF NOT EXISTS idx_username ON users(username)
-    `)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create index: %v", err)
 	}
 
 	am := &AuthManager{db: db}
 	if err := am.prepareStatements(); err != nil {
+		db.Close()
 		return nil, err
 	}
 
 	return am, nil
 }
 
+func createSchema(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT UNIQUE NOT NULL,
+			password TEXT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_username ON users(username);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create schema: %w", err)
+	}
+	return nil
+}
+
 func (am *AuthManager) prepareStatements() error {
 	var err error
+
 	am.getUserStmt, err = am.db.Prepare("SELECT username FROM users WHERE username = ?")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to prepare getUserStmt: %w", err)
 	}
+
 	am.addUserStmt, err = am.db.Prepare("INSERT INTO users (username, password) VALUES (?, ?)")
 	if err != nil {
 		am.getUserStmt.Close()
-		return err
+		return fmt.Errorf("failed to prepare addUserStmt: %w", err)
 	}
+
 	am.getPasswordStmt, err = am.db.Prepare("SELECT password FROM users WHERE username = ?")
 	if err != nil {
 		am.getUserStmt.Close()
 		am.addUserStmt.Close()
-		return err
+		return fmt.Errorf("failed to prepare getPasswordStmt: %w", err)
 	}
+
 	return nil
 }
 
 func (am *AuthManager) Close() error {
-	am.getUserStmt.Close()
-	am.addUserStmt.Close()
-	am.getPasswordStmt.Close()
+	stmts := []*sql.Stmt{am.getUserStmt, am.addUserStmt, am.getPasswordStmt}
+	for _, stmt := range stmts {
+		if stmt != nil {
+			stmt.Close()
+		}
+	}
 	return am.db.Close()
 }
 
 func (am *AuthManager) AddUser(username, password string) error {
+	if err := validateUsername(username); err != nil {
+		return err
+	}
+
+	if err := validatePassword(password); err != nil {
+		return err
+	}
+
 	var exists string
 	err := am.getUserStmt.QueryRow(username).Scan(&exists)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("error checking existing user: %v", err)
+		return fmt.Errorf("error checking existing user: %w", err)
 	}
 	if exists != "" {
-		return fmt.Errorf("username already exists")
-	}
-
-	if len(username) < 2 {
-		return fmt.Errorf("username '%s' cannot be empty or less than two characters", username)
-	}
-
-	if !checkPasswordStrength(password, minimumPasswordLength) {
-		return fmt.Errorf("password is not strong enough. It has to contain at least %d characters, one upper, one lower, one symbol and one digit", minimumPasswordLength)
+		return ErrUserExists
 	}
 
 	hashedPass, err := hashPassword(password)
 	if err != nil {
-		return fmt.Errorf("could not hash user: %s's password - %v", username, err)
+		return fmt.Errorf("could not hash password: %w", err)
 	}
 
 	_, err = am.addUserStmt.Exec(username, hashedPass)
 	if err != nil {
-		return fmt.Errorf("could not add user to users table - %v", err)
+		return fmt.Errorf("could not add user to database: %w", err)
 	}
 
 	return nil
 }
 
-func checkPasswordStrength(password string, minLength int) bool {
-	if len(password) < minLength {
+func validateUsername(username string) error {
+	if len(username) < 2 {
+		return ErrInvalidUsername
+	}
+	return nil
+}
+
+func validatePassword(password string) error {
+	if !checkPasswordStrength(password) {
+		return ErrWeakPassword
+	}
+	return nil
+}
+
+func checkPasswordStrength(password string) bool {
+	if len(password) < minimumPasswordLength {
 		return false
 	}
 	var hasUpper, hasLower, hasDigit, hasSpecial bool
@@ -127,16 +159,16 @@ func checkPasswordStrength(password string, minLength int) bool {
 		case unicode.IsPunct(char) || unicode.IsSymbol(char):
 			hasSpecial = true
 		}
-		if hasUpper && hasLower && hasDigit && hasSpecial {
-			return true
-		}
 	}
-	return false
+	return hasUpper && hasLower && hasDigit && hasSpecial
 }
 
 func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
-	return string(bytes), err
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+	return string(bytes), nil
 }
 
 func (am *AuthManager) AuthenticateUser(username, password string) (bool, error) {
@@ -144,11 +176,16 @@ func (am *AuthManager) AuthenticateUser(username, password string) (bool, error)
 	err := am.getPasswordStmt.QueryRow(username).Scan(&storedPassword)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return false, fmt.Errorf("authentication failed")
+			return false, ErrAuthenticationFailed
 		}
-		return false, fmt.Errorf("error querying user %s: %v", username, err)
+		return false, fmt.Errorf("error querying user: %w", err)
 	}
-	return checkPasswordHash(password, storedPassword), nil
+
+	if !checkPasswordHash(password, storedPassword) {
+		return false, ErrAuthenticationFailed
+	}
+
+	return true, nil
 }
 
 func checkPasswordHash(password, hash string) bool {

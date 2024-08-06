@@ -55,9 +55,14 @@ func runClient() error {
 		return fmt.Errorf("failed to connect server: %v", err)
 	}
 
-	if err := handleLoginUI(client); err != nil {
+	terminate, err := handleLoginUI(client)
+	if terminate {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
+
 	return handleChatUI(client)
 }
 
@@ -176,7 +181,7 @@ func handleChatUI(client *internal.Client) error {
 	}
 }
 
-func handleLoginUI(client *internal.Client) error {
+func handleLoginUI(client *internal.Client) (bool, error) {
 	lu := login_ui.NewLoginUI()
 	defer lu.Close()
 
@@ -220,7 +225,7 @@ func handleLoginUI(client *internal.Client) error {
 		case e := <-uiEvents:
 			switch e.ID {
 			case "<C-c>":
-				return nil
+				return true, nil
 			case "<Tab>":
 				lu.SwitchField()
 				lu.ResetErrorBox(errorBox)
@@ -253,7 +258,7 @@ func handleLoginUI(client *internal.Client) error {
 			switch payload.Status {
 			case "success":
 				client.SetUsername(payload.Username)
-				return nil // Login successful
+				return false, nil // Login successful
 			case "fail":
 				errorBox.Text = payload.Username
 				errorBox.TextStyle.Fg = ui.ColorRed

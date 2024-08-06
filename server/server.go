@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -385,7 +386,6 @@ func (s *TCPServer) handleAuth(conn net.Conn) string {
 	requiredMsg := s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Status: "required"})
 	conn.Write([]byte(requiredMsg))
 	connReader := bufio.NewReader(conn)
-
 	var name string
 
 	for {
@@ -398,35 +398,54 @@ func (s *TCPServer) handleAuth(conn net.Conn) string {
 		payload, err := s.decodeFn(data)
 		if err != nil {
 			log.Printf("Failed to decode data: %s. Error: %v", data, err)
-			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: "Invalid data format", Status: "fail"})))
+			s.sendAuthResponse(conn, "Invalid data format", "fail")
 			continue
 		}
 
 		log.Printf("Login/register attempt for '%s' from %s", payload.Username, conn.RemoteAddr().String())
+
+		// First, try to add the user (register)
 		err = s.authManager.AddUser(payload.Username, payload.Password)
 		if err == nil {
+			// Registration successful
 			name = payload.Username
-			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
+			s.sendAuthResponse(conn, payload.Username, "success")
 			break
 		}
 
-		if err.Error() == "username already exists" {
+		// If registration failed, handle the specific error
+		switch {
+		case errors.Is(err, auth.ErrUserExists):
+			// User exists, so this is a login attempt
 			ok, authErr := s.authManager.AuthenticateUser(payload.Username, payload.Password)
 			if authErr != nil {
-				conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: authErr.Error(), Status: "fail"})))
+				log.Printf("Authentication error: %v", authErr)
+				s.sendAuthResponse(conn, "Invalid username or password", "fail")
 			} else if ok {
 				name = payload.Username
-				conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: payload.Username, Status: "success"})))
-				break
+				s.sendAuthResponse(conn, payload.Username, "success")
+				return name
 			} else {
-				conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: "Invalid credentials", Status: "fail"})))
+				s.sendAuthResponse(conn, "Invalid username or password", "fail")
 			}
-		} else {
-			errMsg := strings.ToUpper(err.Error()[:1]) + err.Error()[1:]
-			conn.Write([]byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Username: errMsg, Status: "fail"})))
+		case errors.Is(err, auth.ErrWeakPassword):
+			s.sendAuthResponse(conn, "Password does not meet strength requirements", "fail")
+		case errors.Is(err, auth.ErrInvalidUsername):
+			s.sendAuthResponse(conn, "Username must be at least 2 characters long", "fail")
+		default:
+			log.Printf("Registration error: %s", err.Error())
+			s.sendAuthResponse(conn, "Registration failed", "fail")
 		}
 	}
 	return name
+}
+
+func (s *TCPServer) sendAuthResponse(conn net.Conn, message, status string) {
+	conn.Write([]byte(s.encodeFn(protocol.Payload{
+		MessageType: protocol.MessageTypeUSR,
+		Username:    message,
+		Status:      status,
+	})))
 }
 
 func setInterval(callback func(), interval time.Duration) chan bool {
