@@ -64,7 +64,7 @@ Chat Application Todo List:
             Decrypt them using history key and re-encrypt them when requested using group key.
     Advanced Features:
         Auth:
-            ☐ Persist everything on sqlite
+            ✔ Persist everything on sqlite @done(24-08-08 00:29)
         Chatrooms:
             ☐ Allow users to create and join different chatrooms
             ☐ Ensure it server deleted private chat after 1 minute inactivity
@@ -118,7 +118,7 @@ Implementation Order:
     ✔ Command System @done(24-08-03 15:24)
     ✔ Notification System @done(24-08-03 20:14)
     ☐ Connect chat history to auth
-    ☐ Auth system
+    ✔ Auth system @done(24-08-08 00:30)
     ☐ Chatrooms
     ☐ Presence System
     ☐ Typing Indicators (for private chats)

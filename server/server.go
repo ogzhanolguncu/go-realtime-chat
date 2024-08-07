@@ -15,7 +15,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 	"github.com/ogzhanolguncu/go-chat/server/auth"
@@ -24,8 +23,8 @@ import (
 )
 
 // ConnectionInfo holds connection-related information.
-const maxMessageLimit = 200
 const groupKey = "SuperSecretGroupKey"
+const dbName = "/chat.db"
 
 type ConnectionInfo struct {
 	Connection   net.Conn
@@ -35,7 +34,7 @@ type ConnectionInfo struct {
 
 type TCPServer struct {
 	connectionMap sync.Map
-	history       chat_history.ChatHistory
+	history       *chat_history.ChatHistory
 	authManager   *auth.AuthManager
 	groupKey      string
 	encodeFn      func(payload protocol.Payload) string
@@ -61,8 +60,12 @@ func newServer() *TCPServer {
 	}
 
 	log.Printf("------ ENCODING SET TO %s ------", encodingType)
-
-	authManager, err := auth.NewAuthManager(fmt.Sprintf(utils.RootDir() + "/chat.db"))
+	dbPath := fmt.Sprintf(utils.RootDir() + dbName)
+	authManager, err := auth.NewAuthManager(dbPath)
+	if err != nil {
+		log.Printf("Failed to initialize auth manager: %v", err)
+	}
+	chatManager, err := chat_history.NewChatHistory(*encoding, dbPath)
 	if err != nil {
 		log.Printf("Failed to initialize auth manager: %v", err)
 	}
@@ -71,7 +74,7 @@ func newServer() *TCPServer {
 		groupKey:    key,
 		decodeFn:    protocol.InitDecodeProtocol(*encoding),
 		encodeFn:    protocol.InitEncodeProtocol(*encoding),
-		history:     *chat_history.NewChatHistory(*encoding),
+		history:     chatManager,
 		authManager: authManager,
 	}
 }
@@ -182,12 +185,8 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			s.sendActiveUsers()
 		}
 		c.Close()
+		s.history.Close()
 	}()
-
-	//Save chat history to disk every five second.
-	stopInterval = setInterval(func() {
-		s.history.SaveToDisk(maxMessageLimit)
-	}, 5*time.Second)
 
 	connReader := bufio.NewReader(c)
 
@@ -199,8 +198,8 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		}
 
 		rawMessage := strings.TrimSpace(data)
-		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 		s.history.AddMessage(rawMessage)
+		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 
 		msgPayload, err := s.decodeFn(rawMessage)
 		if err != nil {
@@ -243,12 +242,27 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			}
 
 		case protocol.MessageTypeHSTRY:
-			msg := []byte(s.encodeFn(protocol.Payload{
+			history, err := s.history.GetHistory(msgPayload.Sender, "MSG", "WSP")
+			if err != nil {
+				errMsg := s.encodeFn(protocol.Payload{
+					MessageType: protocol.MessageTypeSYS,
+					Content:     "Chat history not available",
+					Status:      "fail",
+				})
+				c.Write([]byte(errMsg))
+			}
+
+			historyMsg := s.encodeFn(protocol.Payload{
 				MessageType:        protocol.MessageTypeHSTRY,
 				Sender:             msgPayload.Sender,
-				EncodedChatHistory: s.history.GetHistory(msgPayload.Sender, "MSG", "WSP"),
-				Status:             "res"}))
-			c.Write(msg)
+				EncodedChatHistory: history,
+				Status:             "res",
+			})
+			log.Printf("Requested chat history length: %d", len(history))
+			_, err = c.Write([]byte(historyMsg))
+			if err != nil {
+				log.Printf("failed to write history message: %v", err)
+			}
 		case protocol.MessageTypeACT_USRS:
 			s.sendActiveUsers()
 		case protocol.MessageTypeENC:
@@ -446,24 +460,6 @@ func (s *TCPServer) sendAuthResponse(conn net.Conn, message, status string) {
 		Username:    message,
 		Status:      status,
 	})))
-}
-
-func setInterval(callback func(), interval time.Duration) chan bool {
-	// Create a channel to signal the interval to stop
-	stop := make(chan bool)
-
-	go func() {
-		for {
-			select {
-			case <-time.After(interval):
-				callback()
-			case <-stop:
-				return
-			}
-		}
-	}()
-
-	return stop
 }
 
 func generateSecureKey(keyLength int) (string, error) {
