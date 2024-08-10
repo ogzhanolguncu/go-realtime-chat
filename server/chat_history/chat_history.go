@@ -130,23 +130,20 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) ([]string
 
 	params := map[string]interface{}{
 		"user":         user,
-		"message_type": messageTypes, // Pass the slice directly
+		"message_type": messageTypes,
 		"limit":        messageLimit,
 	}
 
-	// Use sqlx.Named to expand the IN clause
 	query, args, err := sqlx.Named(query, params)
 	if err != nil {
 		return nil, fmt.Errorf("error in named query: %w", err)
 	}
 
-	// Use sqlx.In to handle the IN clause
 	query, args, err = sqlx.In(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error expanding IN clause: %w", err)
 	}
 
-	// Prepare the query for your specific DB
 	query = ch.db.Rebind(query)
 
 	log.Printf("Executing query: %s with args: %v", query, args)
