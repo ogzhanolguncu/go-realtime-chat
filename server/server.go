@@ -2,11 +2,6 @@ package main
 
 import (
 	"bufio"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,41 +10,32 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 	"github.com/ogzhanolguncu/go-chat/server/auth"
+	"github.com/ogzhanolguncu/go-chat/server/block_user"
 	"github.com/ogzhanolguncu/go-chat/server/chat_history"
 	"github.com/ogzhanolguncu/go-chat/server/utils"
 )
 
 // ConnectionInfo holds connection-related information.
-const maxMessageLimit = 200
-const groupKey = "SuperSecretGroupKey"
+const dbName = "/chat.db"
 
 type ConnectionInfo struct {
-	Connection   net.Conn
-	OwnerName    string
-	blockedUsers []net.Conn
+	Connection net.Conn
+	OwnerName  string
 }
 
 type TCPServer struct {
-	connectionMap sync.Map
-	history       chat_history.ChatHistory
-	authManager   *auth.AuthManager
-	groupKey      string
-	encodeFn      func(payload protocol.Payload) string
-	decodeFn      func(message string) (protocol.Payload, error)
+	connectionMap    sync.Map
+	history          *chat_history.ChatHistory
+	authManager      *auth.AuthManager
+	blockUserManager *block_user.BlockUserManager
+	encodeFn         func(payload protocol.Payload) string
+	decodeFn         func(message string) (protocol.Payload, error)
 }
 
 func newServer() *TCPServer {
-	// Generate a 32-byte key
-	key, err := generateSecureKey(32)
-	if err != nil {
-		log.Printf("Failed to create secure key moving forward with hardcoded key: %v", err)
-		key = groupKey
-	}
-
 	encoding := flag.Bool("encoding", false, "enable encoding")
 	flag.Parse()
 
@@ -61,18 +47,27 @@ func newServer() *TCPServer {
 	}
 
 	log.Printf("------ ENCODING SET TO %s ------", encodingType)
+	dbPath := fmt.Sprintf(utils.RootDir() + dbName)
 
-	authManager, err := auth.NewAuthManager(fmt.Sprintf(utils.RootDir() + "/chat.db"))
+	authManager, err := auth.NewAuthManager(dbPath)
+	if err != nil {
+		log.Printf("Failed to initialize auth manager: %v", err)
+	}
+	chatManager, err := chat_history.NewChatHistory(*encoding, dbPath)
+	if err != nil {
+		log.Printf("Failed to initialize auth manager: %v", err)
+	}
+	blockUserManager, err := block_user.NewBlockUserManager(dbPath)
 	if err != nil {
 		log.Printf("Failed to initialize auth manager: %v", err)
 	}
 
 	return &TCPServer{
-		groupKey:    key,
-		decodeFn:    protocol.InitDecodeProtocol(*encoding),
-		encodeFn:    protocol.InitEncodeProtocol(*encoding),
-		history:     *chat_history.NewChatHistory(*encoding),
-		authManager: authManager,
+		decodeFn:         protocol.InitDecodeProtocol(*encoding),
+		encodeFn:         protocol.InitEncodeProtocol(*encoding),
+		history:          chatManager,
+		blockUserManager: blockUserManager,
+		authManager:      authManager,
 	}
 }
 
@@ -125,6 +120,7 @@ func (s *TCPServer) handleNewConnection(c net.Conn) {
 		c.Close()
 		return
 	}
+
 	log.Printf("Recently joined user's name: %s\n", name)
 	s.addConnection(c, &ConnectionInfo{Connection: c, OwnerName: name})
 	connectedUsers := s.getConnectedUsersCount()
@@ -136,12 +132,14 @@ func (s *TCPServer) handleNewConnection(c net.Conn) {
 
 	go func() {
 		defer wg.Done()
+		//Todo: Prevent blocked users to see each other join
 		s.sendSystemNotice(name, c, "joined")
 
 	}()
 
 	go func() {
 		defer wg.Done()
+		//TODO: Prevent blocked users to see each other join
 		s.sendActiveUsers()
 	}()
 
@@ -184,11 +182,6 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		c.Close()
 	}()
 
-	//Save chat history to disk every five second.
-	stopInterval = setInterval(func() {
-		s.history.SaveToDisk(maxMessageLimit)
-	}, 5*time.Second)
-
 	connReader := bufio.NewReader(c)
 
 	for {
@@ -199,8 +192,8 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		}
 
 		rawMessage := strings.TrimSpace(data)
-		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 		s.history.AddMessage(rawMessage)
+		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 
 		msgPayload, err := s.decodeFn(rawMessage)
 		if err != nil {
@@ -214,45 +207,50 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		case protocol.MessageTypeWSP:
 			s.sendWhisper(msgPayload, c)
 		case protocol.MessageTypeBLCK_USR:
-			blocker, _ := s.connectionMap.Load(c)
-
-			blockerUser := blocker.(*ConnectionInfo)
-			blockedUser, ok := s.findConnectionByOwnerName(msgPayload.Recipient)
-			if !ok {
-				c.Write([]byte(s.encodeFn(protocol.Payload{
-					MessageType: protocol.MessageTypeSYS,
-					Content:     "Recipient not found or connection lost",
-					Status:      "fail",
-				})))
-				continue
-			}
-
+			//TODO: check if msgPayload.recipient (blockedUser) actually exist in users table
 			if msgPayload.Content == "block" {
-				blockerUser.blockedUsers = append(blockerUser.blockedUsers, blockedUser)
-				s.connectionMap.Store(c, blockerUser)
+				err := s.blockUserManager.BlockUser(msgPayload.Sender, msgPayload.Recipient)
+				if err != nil {
+					log.Printf("Failed to block %v", err)
+					s.sendSysResponse(c, fmt.Sprintf("Could not block %s due to an error", msgPayload.Recipient), "fail")
+				}
 				log.Printf("%s blocked %s", msgPayload.Sender, msgPayload.Recipient)
 			}
 			if msgPayload.Content == "unblock" {
-				blockerUser.blockedUsers = slices.DeleteFunc(blockerUser.blockedUsers, func(u net.Conn) bool {
-					return u == blockedUser
-				})
-				s.connectionMap.Store(c, blockerUser)
+				err := s.blockUserManager.UnblockUser(msgPayload.Sender, msgPayload.Recipient)
+				if err != nil {
+					log.Printf("Failed to unblock %v", err)
+					s.sendSysResponse(c, fmt.Sprintf("Could not unblock %s due to an error", msgPayload.Recipient), "fail")
+				}
 				log.Printf("%s unblocked %s", msgPayload.Sender, msgPayload.Recipient)
 			} else {
 				log.Printf("Unknown block message received from %s\n", c.RemoteAddr().String())
 			}
 
 		case protocol.MessageTypeHSTRY:
-			msg := []byte(s.encodeFn(protocol.Payload{
+			history, err := s.history.GetHistory(msgPayload.Sender, "MSG", "WSP")
+			if err != nil {
+				errMsg := s.encodeFn(protocol.Payload{
+					MessageType: protocol.MessageTypeSYS,
+					Content:     "Chat history not available",
+					Status:      "fail",
+				})
+				c.Write([]byte(errMsg))
+			}
+
+			historyMsg := s.encodeFn(protocol.Payload{
 				MessageType:        protocol.MessageTypeHSTRY,
 				Sender:             msgPayload.Sender,
-				EncodedChatHistory: s.history.GetHistory(msgPayload.Sender, "MSG", "WSP"),
-				Status:             "res"}))
-			c.Write(msg)
+				EncodedChatHistory: history,
+				Status:             "res",
+			})
+			log.Printf("Requested chat history length: %d", len(history))
+			_, err = c.Write([]byte(historyMsg))
+			if err != nil {
+				log.Printf("failed to write history message: %v", err)
+			}
 		case protocol.MessageTypeACT_USRS:
 			s.sendActiveUsers()
-		case protocol.MessageTypeENC:
-			s.sendEncryptionKey(msgPayload, c)
 		default:
 			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
 		}
@@ -265,36 +263,6 @@ func (s *TCPServer) sendActiveUsers() {
 	log.Printf("Sending active user list %s", activeUsers)
 	msg := []byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
 	s.broadcastToAll(msg, "Error broadcasting active users", nil)
-}
-
-func (s *TCPServer) sendEncryptionKey(msgPayload protocol.Payload, c net.Conn) {
-	usersPublicKey, err := stringToPublicKey(msgPayload.EncryptedKey)
-	if err != nil {
-		log.Printf("Could not decode users public key, closing the connection: %v", err)
-		c.Close()
-		return
-	}
-
-	groupChatKey, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, usersPublicKey, []byte(s.groupKey), nil)
-	if err != nil {
-		log.Printf("Could not encrypt group chat key using users public key, closing the connection: %v", err)
-		c.Close()
-		return
-	}
-
-	base64EncryptedKey := base64.StdEncoding.EncodeToString(groupChatKey)
-	msg := []byte(s.encodeFn(protocol.Payload{
-		MessageType:  protocol.MessageTypeENC,
-		EncryptedKey: base64EncryptedKey,
-	}))
-
-	_, err = c.Write(msg)
-	if err != nil {
-		log.Printf("Failed to send encrypted group chat key: %v", err)
-		c.Close()
-		return
-	}
-	log.Printf("Successfully sent encrypted group chat key to client")
 }
 
 // sendWhisper looks up the recipient's connection in the connectionList. If found, it sends a whisper message to the recipient.
@@ -322,43 +290,49 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 
 // broadcastMessage sends a message to all connections except the sender
 func (s *TCPServer) broadcastMessage(msgPayload protocol.Payload, sender net.Conn) {
-	excludedUsers := getExcludedUsers(s, sender)
+	excludedUsers, err := getExcludedConnections(s, sender)
+	if err != nil {
+		s.sendSysResponse(sender, err.Error(), "fail")
+	}
 	msg := []byte(s.encodeFn(msgPayload))
 	s.broadcastToAll(msg, "Error broadcasting message", excludedUsers...)
 }
 
 // This function gives us users who are excluded when broadcasting, whisper or sending active users.
 // Mainly used for blocking logic.
-func getExcludedUsers(s *TCPServer, sender net.Conn) []net.Conn {
-	var excludedUsers []net.Conn
-	senderInfo, _ := s.getConnectionInfo(sender)
+func getExcludedConnections(s *TCPServer, sender net.Conn) ([]net.Conn, error) {
+	var excludedConns []net.Conn
+	senderInfo, ok := s.getConnectionInfo(sender)
+	if !ok {
+		return nil, fmt.Errorf("failed to get sender info")
+	}
+
+	blockerUsers, err := s.blockUserManager.GetBlockerUsers(senderInfo.OwnerName)
+	if err != nil {
+		return []net.Conn{sender}, fmt.Errorf("could not fetch blocked users. Blocked users will be able to message you: %w", err)
+	}
+
+	blockedUsers, err := s.blockUserManager.GetBlockedUsers(senderInfo.OwnerName)
+	if err != nil {
+		return []net.Conn{sender}, fmt.Errorf("could not fetch blocked users. Blocked users will be able to message you: %w", err)
+	}
+
+	blockedSet := make(map[string]struct{}, len(blockedUsers)+len(blockerUsers))
+	for _, user := range append(blockedUsers, blockerUsers...) {
+		blockedSet[user] = struct{}{}
+	}
 
 	s.connectionMap.Range(func(key, value any) bool {
-		conn, ok := key.(net.Conn)
-		if !ok {
-			fmt.Printf("Unexpected key type in connectionMap: %T\n", key)
-			return true
+		conn := key.(net.Conn)
+		connInfo := value.(*ConnectionInfo)
+		if _, blocked := blockedSet[connInfo.OwnerName]; blocked {
+			excludedConns = append(excludedConns, conn)
 		}
-
-		info, ok := value.(*ConnectionInfo)
-		if !ok {
-			fmt.Printf("Unexpected value type in connectionMap: %T\n", value)
-			return true
-		}
-
-		if slices.Contains(senderInfo.blockedUsers, conn) {
-			excludedUsers = append(excludedUsers, conn)
-		}
-
-		if slices.Contains(info.blockedUsers, sender) {
-			excludedUsers = append(excludedUsers, conn)
-		}
-
 		return true
 	})
 
-	excludedUsers = append(excludedUsers, sender)
-	return excludedUsers
+	excludedConns = append(excludedConns, sender)
+	return excludedConns, nil
 }
 
 // sendSystemNotice sends a system notice to all connections except the sender.
@@ -448,49 +422,11 @@ func (s *TCPServer) sendAuthResponse(conn net.Conn, message, status string) {
 	})))
 }
 
-func setInterval(callback func(), interval time.Duration) chan bool {
-	// Create a channel to signal the interval to stop
-	stop := make(chan bool)
-
-	go func() {
-		for {
-			select {
-			case <-time.After(interval):
-				callback()
-			case <-stop:
-				return
-			}
-		}
-	}()
-
-	return stop
-}
-
-func generateSecureKey(keyLength int) (string, error) {
-	key := make([]byte, keyLength)
-	_, err := rand.Read(key)
-	if err != nil {
-		return "", err
-	}
-	strKey := base64.StdEncoding.EncodeToString(key)
-	log.Printf("Generating group chat key %s", strKey)
-
-	return strKey, nil
-}
-
-func stringToPublicKey(keyStr string) (*rsa.PublicKey, error) {
-	keyBytes, err := base64.StdEncoding.DecodeString(keyStr)
-	if err != nil {
-		return nil, err
-	}
-	pubKey, err := x509.ParsePKIXPublicKey(keyBytes)
-	if err != nil {
-		return nil, err
-	}
-	rsaPubKey, ok := pubKey.(*rsa.PublicKey)
-
-	if !ok {
-		return nil, fmt.Errorf("not an RSA public key")
-	}
-	return rsaPubKey, nil
+// Status is either fail or success
+func (s *TCPServer) sendSysResponse(conn net.Conn, message, status string) {
+	conn.Write([]byte(s.encodeFn(protocol.Payload{
+		MessageType: protocol.MessageTypeSYS,
+		Content:     message,
+		Status:      status,
+	})))
 }

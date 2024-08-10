@@ -1,172 +1,185 @@
 package chat_history
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
 	"log"
-	"os"
-	"path/filepath"
-	"slices"
 	"strings"
+	"time"
 
-	"github.com/elliotchance/pie/v2"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/ogzhanolguncu/go-chat/protocol"
-	"github.com/ogzhanolguncu/go-chat/server/utils"
 )
 
-const fileName = "chat_history.txt"
-
 type ChatHistory struct {
-	messages []string
+	db       *sqlx.DB
 	encoding bool
 }
 
-func NewChatHistory(encoding bool) *ChatHistory {
-	return &ChatHistory{
-		messages: []string{},
-		encoding: encoding,
-	}
+type MessageEntry struct {
+	Sender       string               `db:"sender"`
+	Recipient    string               `db:"recipient"`
+	MessageType  protocol.MessageType `db:"message_type"`
+	Content      string               `db:"content"`
+	BlockedUsers string               `db:"blocked_users"`
+	Timestamp    time.Time            `db:"timestamp"`
 }
 
-func (ch *ChatHistory) AddMessage(messages ...string) {
-	ch.messages = append(ch.messages, messages...)
-}
-
-// Get messages from memory if they are from requester user and contain allowed messageTypes
-func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) []string {
-	blockMap := make(map[string]map[string]bool)
-
-	log.Printf("Calling GetHistory")
-	if len(ch.messages) == 0 {
-		ch.ReadFromDiskToInMemory()
-		log.Printf("Loaded %d messages from disk to memory", len(ch.messages))
-	}
-
-	for _, v := range ch.messages {
-		decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(v)
-		if err != nil {
-			continue // Skip undecodable messages
-		}
-		if decodedMsg.MessageType == protocol.MessageTypeBLCK_USR {
-			if blockMap[decodedMsg.Sender] == nil {
-				blockMap[decodedMsg.Sender] = make(map[string]bool)
-			}
-			blockMap[decodedMsg.Sender][decodedMsg.Recipient] = true
-		}
-
-	}
-
-	msgs := pie.Filter(ch.messages, func(msg string) bool {
-		decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(msg)
-		if err != nil {
-			return false // Skip undecodable messages
-		}
-
-		if blockMap[decodedMsg.Sender][user] || blockMap[user][decodedMsg.Sender] {
-			return false // Skip message if requesting user was blocked by sender or sender is blocked by requesting user
-		}
-
-		msgType := string(decodedMsg.MessageType)
-		if !slices.Contains(messageTypes, msgType) {
-			return false // Skip messages with unallowed types
-		}
-		//If message is not WSP return it
-		if decodedMsg.MessageType != "WSP" {
-			return true
-		}
-		//If message is WSP make sure recipient or sender is user
-		return decodedMsg.Recipient == user || decodedMsg.Sender == user
-	})
-	log.Printf("Returning %d messages from GetHistory", len(msgs))
-	return msgs
-}
-
-func (ch *ChatHistory) SaveToDisk(msgLimit int) error {
-	filePath := filepath.Join(utils.RootDir(), fileName)
-
-	if checkIfFileExists(filePath) {
-		file, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open file: %w", err)
-		}
-		defer file.Close()
-		lineCount, err := lineCounter(file)
-
-		if err != nil {
-			return fmt.Errorf("line count failed: %w", err)
-		}
-
-		if lineCount > msgLimit {
-			ch.messages = pie.DropTop(ch.messages, msgLimit)
-			if err := os.Remove(filePath); err != nil {
-				return fmt.Errorf("failed to remove old file: %w", err)
-			}
-		}
-	}
-
-	// // Write new content
-	return os.WriteFile(filePath, []byte(strings.Join(ch.messages, "\n")), 0644)
-}
-
-// Remove file from disk if it exists.
-func (ch *ChatHistory) DeleteFromDisk() error {
-	filePath := filepath.Join(utils.RootDir(), fileName)
-	return os.Remove(filePath)
-}
-
-// Read chat_history.txt from disk to in-memory.
-func (ch *ChatHistory) ReadFromDiskToInMemory() error {
-	filePath := filepath.Join(utils.RootDir(), fileName)
-	data, err := os.ReadFile(filePath)
+func NewChatHistory(encoding bool, dbPath string) (*ChatHistory, error) {
+	db, err := sqlx.Open("sqlite3", dbPath)
 	if err != nil {
-		return fmt.Errorf("could not read file: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+	if err := createSchema(db); err != nil {
+		db.Close() // Close the database if schema creation fails
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+	return &ChatHistory{
+		encoding: encoding,
+		db:       db,
+	}, nil
+}
 
-	// Split the data by newline character
-	ch.messages = strings.Split(string(data), "\n")
-
-	// Remove empty strings that may result from splitting
-	ch.messages = removeEmpty(ch.messages)
-	log.Printf("Reading messages from disk to memory. Count is: %d", len(ch.messages))
+func createSchema(db *sqlx.DB) error {
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS messages (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			sender TEXT NOT NULL,
+			recipient TEXT,
+			message_type TEXT NOT NULL,
+			content TEXT NOT NULL,
+			blocked_users TEXT,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)`,
+	}
+	for _, stmt := range statements {
+		_, err := db.Exec(stmt)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// Helper function to remove empty strings from a slice
-func removeEmpty(s []string) []string {
-	var r []string
-	for _, str := range s {
-		if str != "" {
-			r = append(r, str)
-		}
+func (ch *ChatHistory) AddMessage(message string) error {
+	decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(message)
+	if err != nil {
+		return fmt.Errorf("failed to decode message: %w", err)
 	}
-	return r
+
+	entry := MessageEntry{
+		Sender:      decodedMsg.Sender,
+		Recipient:   decodedMsg.Recipient,
+		MessageType: decodedMsg.MessageType,
+		Content:     decodedMsg.Content,
+		Timestamp:   time.Now(),
+	}
+
+	// Dynamically fetches blocked users for that sender and puts them into blocked_users table without extra call.
+	query := `
+   INSERT INTO messages (sender, recipient, message_type, content, timestamp, blocked_users)
+SELECT :sender, :recipient, :message_type, :content, :timestamp,
+    COALESCE(
+        (SELECT GROUP_CONCAT(blocked, ',')
+         FROM blocked_users
+         WHERE blocker = :sender),
+        ''
+    ) || ',' ||
+    COALESCE(
+        (SELECT GROUP_CONCAT(blocker, ',')
+         FROM blocked_users
+         WHERE blocked = :sender),
+        ''
+    ) ||
+    CASE WHEN :recipient != '' THEN ',' || :recipient ELSE '' END
+	`
+
+	_, err = ch.db.NamedExec(query, entry)
+
+	if err != nil {
+		return fmt.Errorf("failed to insert message: %w", err)
+	}
+	return nil
 }
 
-// https://stackoverflow.com/questions/24562942/golang-how-do-i-determine-the-number-of-lines-in-a-file-efficiently
-func lineCounter(r io.Reader) (int, error) {
-	buf := make([]byte, 32*1024)
-	count := 0
-	lineSep := []byte{'\n'}
+func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) ([]string, error) {
+	const messageLimit = 200
+	// Default message types if none provided
+	if len(messageTypes) == 0 {
+		messageTypes = []string{"WSP", "MSG"}
+	}
 
-	for {
-		c, err := r.Read(buf)
-		count += bytes.Count(buf[:c], lineSep)
+	query := `
+    SELECT sender, recipient, message_type, content, timestamp
+    FROM messages
+    WHERE message_type IN (:message_type)
+    AND (sender = :user OR recipient = '' OR recipient = :user)
+    AND (
+		(blocked_users = '' OR blocked_users = ',')
+        OR NOT(
+            blocked_users LIKE :user || ',%'
+            OR blocked_users LIKE '%,' || :user || ',%'
+            OR blocked_users LIKE '%,' || :user
+            OR blocked_users LIKE '%' || :user || '%'
+        )
+    )
+    ORDER BY timestamp ASC
+    LIMIT :limit
+    `
 
-		switch {
-		case err == io.EOF:
-			return count, nil
+	params := map[string]interface{}{
+		"user":         user,
+		"message_type": messageTypes,
+		"limit":        messageLimit,
+	}
 
-		case err != nil:
-			return count, err
+	query, args, err := sqlx.Named(query, params)
+	if err != nil {
+		return nil, fmt.Errorf("error in named query: %w", err)
+	}
+
+	query, args, err = sqlx.In(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error expanding IN clause: %w", err)
+	}
+
+	query = ch.db.Rebind(query)
+
+	log.Printf("Executing query: %s with args: %v", query, args)
+
+	rows, err := ch.db.Queryx(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query messages: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []MessageEntry
+	for rows.Next() {
+		var entry MessageEntry
+		err := rows.StructScan(&entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan message entry: %w", err)
 		}
+		entries = append(entries, entry)
 	}
-}
 
-func checkIfFileExists(name string) bool {
-	if _, err := os.Stat(name); errors.Is(err, os.ErrNotExist) {
-		return false
+	encodedMessages := make([]string, len(entries))
+	for i, entry := range entries {
+		msg := protocol.Payload{
+			Sender:      entry.Sender,
+			Recipient:   entry.Recipient,
+			MessageType: entry.MessageType,
+			Content:     entry.Content,
+		}
+		encodedMessage := protocol.InitEncodeProtocol(ch.encoding)(msg)
+		encodedMessages[i] = strings.TrimSpace(encodedMessage)
 	}
-	return true
+	return encodedMessages, nil
+}
+func (ch *ChatHistory) Close() error {
+	if err := ch.db.Close(); err != nil {
+		return fmt.Errorf("failed to close database: %w", err)
+	}
+	return nil
 }
