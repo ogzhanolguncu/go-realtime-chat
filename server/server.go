@@ -185,7 +185,6 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			s.sendActiveUsers()
 		}
 		c.Close()
-		s.history.Close()
 	}()
 
 	connReader := bufio.NewReader(c)

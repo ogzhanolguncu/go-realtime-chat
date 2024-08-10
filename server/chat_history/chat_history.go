@@ -64,7 +64,6 @@ func (ch *ChatHistory) AddMessage(message string) error {
 	return nil
 }
 
-// TODO: When new message is received server can't return it to clients without restart fix here.
 func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) ([]string, error) {
 	const messageLimit = 200
 	query := `
@@ -84,7 +83,7 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) ([]string
 	}
 
 	query += `
-	ORDER BY timestamp DESC
+	ORDER BY timestamp ASC
 	LIMIT ?
 	`
 	params = append(params, messageLimit)

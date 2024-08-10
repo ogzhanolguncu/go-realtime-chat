@@ -15,6 +15,7 @@ func main() {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 	defer listener.Close()
+	defer s.history.Close()
 
 	log.Printf("Chat server started on port %d\n", port)
 	//Add some messages to in-memory from disk before any chat starts.
