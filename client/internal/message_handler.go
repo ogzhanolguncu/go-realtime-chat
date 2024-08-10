@@ -124,7 +124,7 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 				return "", fmt.Errorf("error sending whisper: %v", err)
 			}
 
-			return fmt.Sprintf("[%s] [Replied: %s](fg:magenta)", time.Now().Format("01-02 15:04"), message), nil
+			return fmt.Sprintf("[%s] [Replied to %s: %s](fg:magenta)", time.Now().Format("01-02 15:04"), c.lastWhispererFromGroupChat, message), nil
 		}
 	case "/block":
 		if len(parts) < 2 {
@@ -137,11 +137,11 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 		return fmt.Sprintf("[%s] [%s successfully blocked](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
 	case "/unblock":
 		if len(parts) < 2 {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /block <user>"), nil
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /unblock <user>"), nil
 		}
 		user := parts[1]
 		if _, err := c.conn.Write([]byte(c.prepareBlockPayload("unblock", c.name, user))); err != nil {
-			return "", fmt.Errorf("error sending blocking: %v", err)
+			return "", fmt.Errorf("error sending unblocking: %v", err)
 		}
 		return fmt.Sprintf("[%s] [%s successfully unblocked](fg:magenta)", time.Now().Format("01-02 15:04"), user), nil
 	case "/mute":

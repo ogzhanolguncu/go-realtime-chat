@@ -55,13 +55,16 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	// Command Box
 	commandBox = widgets.NewParagraph()
 	commandBox.Title = "Commands"
-	commandBox.Text = "/whisper <user> <message> - Send a private message\n" +
-		"/reply <message> - Reply to the last private message\n" +
-		"/clear - Clear the chat window\n" +
-		"/quit - Exit the chat\n" +
-		"/mute <user> - Mute messages from a user\n" +
-		"/unmute <user> - Unmute a previously muted user"
-	commandBox.SetRect(0, 3, termWidth*3/4, 11) // Increased height from 6 to 13
+	commandBox.Text = "/whisper <username> <message> - Send a private message to a specific user\n" +
+		"/reply <message> - Reply to the last private message received\n" +
+		"/clear - Clear all messages from the chat window\n" +
+		"/quit - Exit the chat application\n" +
+		"/mute <username> - Temporarily hide messages from a specific user\n" +
+		"/unmute <username> - Resume showing messages from a previously muted user\n" +
+		"/block <username> - Permanently prevent messages from a specific user\n" +
+		"/unblock <username> - Allow messages from a previously blocked user\n" +
+		"/help - Display this list of commands"
+	commandBox.SetRect(0, 3, termWidth*3/4, 14) // Increased height to 14 (11 lines of text + 3 for borders and title)
 	commandBox.Border = true
 	commandBox.TitleStyle.Fg = ui.ColorYellow
 	commandBox.BorderStyle.Fg = ui.ColorCyan
@@ -71,7 +74,7 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	// Chat Box
 	chatBox = widgets.NewParagraph()
 	chatBox.Title = "Chat Messages"
-	chatBox.SetRect(0, 11, termWidth*3/4, termHeight-3) // Start from 13 instead of 6
+	chatBox.SetRect(0, 14, termWidth*3/4, termHeight-3) // Adjusted starting position to 14
 	chatBox.BorderStyle.Fg = ui.ColorCyan
 	chatBox.TitleStyle.Fg = ui.ColorYellow
 	chatBox.WrapText = true
@@ -97,7 +100,6 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 
 	return header, commandBox, chatBox, inputBox, userList
 }
-
 func (cu *ChatUI) UpdateChatBox(input string, chatBox *widgets.Paragraph) {
 	cu.chatMessages = append(cu.chatMessages, input)
 	cu.chatScrollOffset = len(cu.chatMessages) - (chatBox.Inner.Dy() - 1)
@@ -119,8 +121,8 @@ func (cu *ChatUI) ResizeUI(header *widgets.Paragraph, commandBox *widgets.Paragr
 	termWidth, termHeight := ui.TerminalDimensions()
 
 	header.SetRect(0, 0, termWidth, 3)
-	commandBox.SetRect(0, 3, termWidth*3/4, 13)
-	chatBox.SetRect(0, 13, termWidth*3/4, termHeight-3)
+	commandBox.SetRect(0, 3, termWidth*3/4, 14)
+	chatBox.SetRect(0, 14, termWidth*3/4, termHeight-3)
 	inputBox.SetRect(0, termHeight-3, termWidth, termHeight)
 	userList.SetRect(termWidth*3/4, 3, termWidth, termHeight-3)
 

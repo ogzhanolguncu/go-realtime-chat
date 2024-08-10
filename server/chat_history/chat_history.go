@@ -1,21 +1,32 @@
 package chat_history
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
+	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 type ChatHistory struct {
-	db       *sql.DB
+	db       *sqlx.DB
 	encoding bool
 }
 
+type MessageEntry struct {
+	Sender       string               `db:"sender"`
+	Recipient    string               `db:"recipient"`
+	MessageType  protocol.MessageType `db:"message_type"`
+	Content      string               `db:"content"`
+	BlockedUsers string               `db:"blocked_users"`
+	Timestamp    time.Time            `db:"timestamp"`
+}
+
 func NewChatHistory(encoding bool, dbPath string) (*ChatHistory, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sqlx.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -29,24 +40,26 @@ func NewChatHistory(encoding bool, dbPath string) (*ChatHistory, error) {
 	}, nil
 }
 
-func createSchema(db *sql.DB) error {
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS messages (
+func createSchema(db *sqlx.DB) error {
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			sender TEXT NOT NULL,
-			recipient TEXT NOT NULL,
+			recipient TEXT,
 			message_type TEXT NOT NULL,
 			content TEXT NOT NULL,
+			blocked_users TEXT,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-		CREATE TABLE IF NOT EXISTS blocked_users (
-			blocker TEXT NOT NULL,
-			blocked TEXT NOT NULL,
-			PRIMARY KEY (blocker, blocked)
-		);
-		CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
-	`)
-	return err
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)`,
+	}
+	for _, stmt := range statements {
+		_, err := db.Exec(stmt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (ch *ChatHistory) AddMessage(message string) error {
@@ -54,10 +67,36 @@ func (ch *ChatHistory) AddMessage(message string) error {
 	if err != nil {
 		return fmt.Errorf("failed to decode message: %w", err)
 	}
-	_, err = ch.db.Exec(
-		"INSERT INTO messages (sender, recipient, message_type, content) VALUES (?, ?, ?, ?)",
-		decodedMsg.Sender, decodedMsg.Recipient, decodedMsg.MessageType, decodedMsg.Content,
-	)
+
+	entry := MessageEntry{
+		Sender:      decodedMsg.Sender,
+		Recipient:   decodedMsg.Recipient,
+		MessageType: decodedMsg.MessageType,
+		Content:     decodedMsg.Content,
+		Timestamp:   time.Now(),
+	}
+
+	// Dynamically fetches blocked users for that sender and puts them into blocked_users table without extra call.
+	query := `
+   INSERT INTO messages (sender, recipient, message_type, content, timestamp, blocked_users)
+SELECT :sender, :recipient, :message_type, :content, :timestamp,
+    COALESCE(
+        (SELECT GROUP_CONCAT(blocked, ',')
+         FROM blocked_users
+         WHERE blocker = :sender),
+        ''
+    ) || ',' ||
+    COALESCE(
+        (SELECT GROUP_CONCAT(blocker, ',')
+         FROM blocked_users
+         WHERE blocked = :sender),
+        ''
+    ) ||
+    CASE WHEN :recipient != '' THEN ',' || :recipient ELSE '' END
+	`
+
+	_, err = ch.db.NamedExec(query, entry)
+
 	if err != nil {
 		return fmt.Errorf("failed to insert message: %w", err)
 	}
@@ -66,55 +105,81 @@ func (ch *ChatHistory) AddMessage(message string) error {
 
 func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) ([]string, error) {
 	const messageLimit = 200
-	query := `
-	SELECT sender, recipient, message_type, content, timestamp
-	FROM messages
-	WHERE (sender = ? OR recipient = ?)
-	AND sender NOT IN (SELECT blocked FROM blocked_users WHERE blocker = ?)
-	AND recipient NOT IN (SELECT blocked FROM blocked_users WHERE blocker = ?)
-	`
-	params := []interface{}{user, user, user, user}
-
-	if len(messageTypes) > 0 {
-		query += fmt.Sprintf("AND message_type IN (%s) ", strings.Repeat("?,", len(messageTypes)-1)+"?")
-		for _, msgType := range messageTypes {
-			params = append(params, msgType)
-		}
+	// Default message types if none provided
+	if len(messageTypes) == 0 {
+		messageTypes = []string{"WSP", "MSG"}
 	}
 
-	query += `
-	ORDER BY timestamp ASC
-	LIMIT ?
-	`
-	params = append(params, messageLimit)
+	query := `
+    SELECT sender, recipient, message_type, content, timestamp
+    FROM messages
+    WHERE message_type IN (:message_type)
+    AND (sender = :user OR recipient = '' OR recipient = :user)
+    AND (
+		(blocked_users = '' OR blocked_users = ',')
+        OR NOT(
+            blocked_users LIKE :user || ',%'
+            OR blocked_users LIKE '%,' || :user || ',%'
+            OR blocked_users LIKE '%,' || :user
+            OR blocked_users LIKE '%' || :user || '%'
+        )
+    )
+    ORDER BY timestamp ASC
+    LIMIT :limit
+    `
 
-	log.Printf("Executing query: %s with params: %v", query, params)
-	rows, err := ch.db.Query(query, params...)
+	params := map[string]interface{}{
+		"user":         user,
+		"message_type": messageTypes, // Pass the slice directly
+		"limit":        messageLimit,
+	}
+
+	// Use sqlx.Named to expand the IN clause
+	query, args, err := sqlx.Named(query, params)
 	if err != nil {
+		return nil, fmt.Errorf("error in named query: %w", err)
+	}
 
+	// Use sqlx.In to handle the IN clause
+	query, args, err = sqlx.In(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error expanding IN clause: %w", err)
+	}
+
+	// Prepare the query for your specific DB
+	query = ch.db.Rebind(query)
+
+	log.Printf("Executing query: %s with args: %v", query, args)
+
+	rows, err := ch.db.Queryx(query, args...)
+	if err != nil {
 		return nil, fmt.Errorf("failed to query messages: %w", err)
 	}
 	defer rows.Close()
 
-	var encodedMessages []string
+	var entries []MessageEntry
 	for rows.Next() {
-		var msg protocol.Payload
-		var timestamp string
-		if err := rows.Scan(&msg.Sender, &msg.Recipient, &msg.MessageType, &msg.Content, &timestamp); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+		var entry MessageEntry
+		err := rows.StructScan(&entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan message entry: %w", err)
+		}
+		entries = append(entries, entry)
+	}
+
+	encodedMessages := make([]string, len(entries))
+	for i, entry := range entries {
+		msg := protocol.Payload{
+			Sender:      entry.Sender,
+			Recipient:   entry.Recipient,
+			MessageType: entry.MessageType,
+			Content:     entry.Content,
 		}
 		encodedMessage := protocol.InitEncodeProtocol(ch.encoding)(msg)
-		encodedMessage = strings.TrimSpace(encodedMessage)
-		encodedMessages = append(encodedMessages, encodedMessage)
+		encodedMessages[i] = strings.TrimSpace(encodedMessage)
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating over rows: %w", err)
-	}
-
 	return encodedMessages, nil
 }
-
 func (ch *ChatHistory) Close() error {
 	if err := ch.db.Close(); err != nil {
 		return fmt.Errorf("failed to close database: %w", err)
