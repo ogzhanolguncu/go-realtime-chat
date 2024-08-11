@@ -169,6 +169,11 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 	unixTimeUTC := time.Unix(payload.Timestamp, 0)
 	switch payload.MessageType {
 	case protocol.MessageTypeMSG:
+		// If the sender is the current user, display "You" instead of the username
+		if payload.Sender == c.name {
+			return fmt.Sprintf("[%s] [You: %s](fg:cyan)", unixTimeUTC.Format("01-02 15:04"), payload.Content)
+		}
+		// For messages from other users, display their username
 		return fmt.Sprintf("[%s] [%s: %s](fg:green)", unixTimeUTC.Format("01-02 15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeWSP:
 		c.lastWhispererFromGroupChat = payload.Sender
