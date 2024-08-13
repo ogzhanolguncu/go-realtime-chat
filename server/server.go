@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elliotchance/pie/v2"
 	protocol "github.com/ogzhanolguncu/go-chat/protocol"
 	"github.com/ogzhanolguncu/go-chat/server/auth"
 	"github.com/ogzhanolguncu/go-chat/server/block_user"
@@ -133,14 +134,14 @@ func (s *TCPServer) handleNewConnection(c net.Conn) {
 	go func() {
 		defer wg.Done()
 		//Todo: Prevent blocked users to see each other join
-		s.sendSystemNotice(name, c, "joined")
+		s.sendSysNotice(name, c, "joined")
 
 	}()
 
 	go func() {
 		defer wg.Done()
 		//TODO: Prevent blocked users to see each other join
-		s.sendActiveUsers()
+		s.sendActiveUsers(c)
 	}()
 
 	// Wait for both messages to be sent
@@ -168,19 +169,14 @@ func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool)
 }
 
 func (s *TCPServer) handleConnection(c net.Conn) {
-	var stopInterval chan bool
-	defer func() {
-		//Cleanup for chat history save disk
-		if stopInterval != nil {
-			stopInterval <- true
-		}
-		info, _ := s.getConnectionInfoAndDelete(c)
+	defer func(conn net.Conn) {
+		info, _ := s.getConnectionInfoAndDelete(conn)
 		if info != nil {
-			s.sendSystemNotice(info.OwnerName, nil, "left")
-			s.sendActiveUsers()
+			s.sendSysNotice(info.OwnerName, conn, "left")
+			s.sendActiveUsers(conn)
 		}
-		c.Close()
-	}()
+		conn.Close()
+	}(c)
 
 	connReader := bufio.NewReader(c)
 
@@ -250,7 +246,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 				log.Printf("failed to write history message: %v", err)
 			}
 		case protocol.MessageTypeACT_USRS:
-			s.sendActiveUsers()
+			s.sendActiveUsers(c)
 		default:
 			log.Printf("Unknown message type received from %s\n", c.RemoteAddr().String())
 		}
@@ -258,10 +254,36 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 	log.Printf("Connection closed for %s\n", c.RemoteAddr().String())
 }
 
-func (s *TCPServer) sendActiveUsers() {
+func (s *TCPServer) sendActiveUsers(conn net.Conn) {
 	activeUsers := s.getActiveUsers()
+	connectionInfo, ok := s.getConnectionInfo(conn)
+	// If we can find the connectionInfo start excludingUser from activeList
+	if ok {
+		log.Printf("Logged in user %+v", connectionInfo)
+		blockedUsers, err := s.blockUserManager.GetBlockedUsers(connectionInfo.OwnerName)
+		if err != nil {
+			s.sendSysResponse(conn, "Could not fetch blocked users. Blocked users will be able to message you", "fail")
+			return
+		}
+
+		blockerUsers, err := s.blockUserManager.GetBlockerUsers(connectionInfo.OwnerName)
+		if err != nil {
+			s.sendSysResponse(conn, "Could not fetch blocked users. Blocked users will be able to message you:", "fail")
+			return
+		}
+
+		activeUsers = pie.Filter(activeUsers, func(user string) bool {
+			return !pie.Contains(blockedUsers, user) && !pie.Contains(blockerUsers, user)
+		})
+	}
+
 	log.Printf("Sending active user list %s", activeUsers)
-	msg := []byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeACT_USRS, ActiveUsers: activeUsers, Status: "res"}))
+	msg := []byte(s.encodeFn(protocol.Payload{
+		MessageType: protocol.MessageTypeACT_USRS,
+		ActiveUsers: activeUsers,
+		Status:      "res",
+	}))
+
 	s.broadcastToAll(msg, "Error broadcasting active users", nil)
 }
 
@@ -335,11 +357,35 @@ func getExcludedConnections(s *TCPServer, sender net.Conn) ([]net.Conn, error) {
 	return excludedConns, nil
 }
 
-// sendSystemNotice sends a system notice to all connections except the sender.
+// sendSysNotice sends a system notice to all connections except the sender.
 // The notice informs about an action performed by the sender (e.g., joining or leaving the chat).
-func (s *TCPServer) sendSystemNotice(senderName string, sender net.Conn, action string) {
+func (s *TCPServer) sendSysNotice(senderName string, sender net.Conn, action string) {
+	blockedUsers, err := s.blockUserManager.GetBlockedUsers(senderName)
+	if err != nil {
+		s.sendSysResponse(sender, "Could not fetch blocked users. Blocked users will be able to message you", "fail")
+		return
+	}
+
+	blockerUsers, err := s.blockUserManager.GetBlockerUsers(senderName)
+	if err != nil {
+		s.sendSysResponse(sender, "Could not fetch blocked users. Blocked users will be able to message you:", "fail")
+		return
+	}
+	namesToExclude := append(blockedUsers, blockerUsers...)
+	namesToExclude = pie.Unique(namesToExclude)
+
+	var finalExcludedList []net.Conn
+	for _, v := range namesToExclude {
+		foundConn, ok := s.findConnectionByOwnerName(v)
+		if !ok {
+			continue
+		}
+		finalExcludedList = append(finalExcludedList, foundConn)
+	}
+	finalExcludedList = append(finalExcludedList, sender)
+
 	msg := []byte(s.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeSYS, Content: fmt.Sprintf("%s has %s the chat.", senderName, action), Status: "success"}))
-	s.broadcastToAll(msg, "Error sending system notice", sender)
+	s.broadcastToAll(msg, "Error sending system notice", finalExcludedList...)
 }
 
 // broadcastMessage sends a message to all connections except the sender
