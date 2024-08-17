@@ -22,6 +22,10 @@ func (cm *Manager) AddConnection(c net.Conn, info *ConnectionInfo) {
 	cm.connectionMap.Store(c, info)
 }
 
+func (cm *Manager) DeleteConnection(c net.Conn) {
+	cm.connectionMap.Delete(c)
+}
+
 func (cm *Manager) GetConnectedUsersCount() int {
 	count := 0
 	cm.connectionMap.Range(func(key, value interface{}) bool {
@@ -39,15 +43,6 @@ func (cm *Manager) GetActiveUsers() []string {
 		return true
 	})
 	return users
-}
-
-func (cm *Manager) GetConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, bool) {
-	info, ok := cm.GetConnectionInfo(c)
-	if !ok {
-		return nil, false
-	}
-	cm.connectionMap.Delete(c)
-	return info, ok
 }
 
 func (cm *Manager) GetConnectionInfo(c net.Conn) (*ConnectionInfo, bool) {

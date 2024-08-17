@@ -98,22 +98,6 @@ func TestEncodeSystemMessage(t *testing.T) {
 	})
 }
 
-func TestEncodeErrMessage(t *testing.T) {
-	t.Run("should encode error message successfully", func(t *testing.T) {
-		tests := []struct {
-			content  string
-			expected string
-		}{
-			{"Errr!", fmt.Sprintf("ERR|%d|Errr!\r\n", time.Now().Unix())},
-		}
-		for _, test := range tests {
-			result := encodeProtocol(true, Payload{MessageType: MessageTypeERR, Content: test.content})
-			decoded, _ := base64.StdEncoding.DecodeString(result)
-			assert.Equal(t, test.expected, string(decoded))
-		}
-	})
-}
-
 func TestEncodeUsrMessage(t *testing.T) {
 	t.Run("should encode username message successfully", func(t *testing.T) {
 		tests := []struct {

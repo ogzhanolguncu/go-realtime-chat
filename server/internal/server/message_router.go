@@ -19,16 +19,19 @@ func NewMessageRouter(server *TCPServer) *MessageRouter {
 	}
 }
 
+// Main Message Routing
+// -----------------------------
+
 func (mr *MessageRouter) RouteMessage(info *connection.ConnectionInfo, message string) {
 	payload, err := mr.server.decodeFn(message)
 	if err != nil {
-		mr.sendErrorToClient(info.Connection, err.Error())
+		mr.sendSysResponse(info.Connection, err.Error(), "fail")
 		return
 	}
 
 	switch payload.MessageType {
 	case protocol.MessageTypeMSG:
-		mr.handleBroadcastMessage(payload, info)
+		mr.handleGroupMessage(payload, info)
 	case protocol.MessageTypeWSP:
 		mr.handleWhisper(payload, info)
 	case protocol.MessageTypeBLCK_USR:
@@ -42,7 +45,10 @@ func (mr *MessageRouter) RouteMessage(info *connection.ConnectionInfo, message s
 	}
 }
 
-func (mr *MessageRouter) handleBroadcastMessage(payload protocol.Payload, info *connection.ConnectionInfo) {
+// Message Handlers
+// -----------------------------
+
+func (mr *MessageRouter) handleGroupMessage(payload protocol.Payload, info *connection.ConnectionInfo) {
 	excludedConns, err := mr.getExcludedConnections(info.Connection)
 	if err != nil {
 		mr.sendSysResponse(info.Connection, fmt.Sprintf("Error preparing message broadcast: %v", err), "fail")
@@ -118,6 +124,10 @@ func (mr *MessageRouter) handleActiveUsers(info *connection.ConnectionInfo) {
 	mr.server.sendActiveUsers(info.Connection)
 }
 
+// User Filtering
+// -----------------------------
+
+// Finds connections to exclude when routing messages. This is used for filtering recipients based on block status and sender.
 func (mr *MessageRouter) getExcludedConnections(sender net.Conn) ([]net.Conn, error) {
 	senderInfo, ok := mr.server.connectionManager.GetConnectionInfo(sender)
 	if !ok {
@@ -148,6 +158,10 @@ func (mr *MessageRouter) getExcludedConnections(sender net.Conn) ([]net.Conn, er
 	return excludedConns, nil
 }
 
+// Broadcasting Methods
+// -----------------------------
+
+// broadcastToAll sends a message to all connections except those in the exclude list
 func (mr *MessageRouter) broadcastToAll(b []byte, errLog string, excludeConn ...net.Conn) {
 	mr.server.connectionManager.RangeConnections(func(conn net.Conn, _ *connection.ConnectionInfo) bool {
 		if !containsConnection(excludeConn, conn) {
@@ -160,6 +174,7 @@ func (mr *MessageRouter) broadcastToAll(b []byte, errLog string, excludeConn ...
 	})
 }
 
+// sendSysResponse sends a system response message to a specific connection
 func (mr *MessageRouter) sendSysResponse(conn net.Conn, message, status string) {
 	conn.Write([]byte(mr.server.encodeFn(protocol.Payload{
 		MessageType: protocol.MessageTypeSYS,
@@ -168,13 +183,10 @@ func (mr *MessageRouter) sendSysResponse(conn net.Conn, message, status string) 
 	})))
 }
 
-func (mr *MessageRouter) sendErrorToClient(conn net.Conn, errMsg string) {
-	conn.Write([]byte(mr.server.encodeFn(protocol.Payload{
-		MessageType: protocol.MessageTypeERR,
-		Content:     errMsg,
-	})))
-}
+// Helper Functions
+// -----------------------------
 
+// containsConnection checks if a given connection is present in a slice of connections
 func containsConnection(slice []net.Conn, conn net.Conn) bool {
 	for _, v := range slice {
 		if v == conn {

@@ -106,9 +106,11 @@ func (s *TCPServer) OnClientJoin(info *connection.ConnectionInfo) {
 	s.broadcastActiveUsers()
 }
 
+// This function broadcasts to all clients when someone leaves or joins. Blocked and blocker users are also taken
+// into consideration. The order of the function calls is crucial - do not rearrange them. Otherwise, "left" messages will be received by blocker and blocked clients.
 func (s *TCPServer) OnClientLeave(info *connection.ConnectionInfo) {
-	s.connectionManager.GetConnectionInfoAndDelete(info.Connection)
 	s.broadcastSystemNotice(fmt.Sprintf("%s has left the chat.", info.OwnerName), info.Connection)
+	s.connectionManager.DeleteConnection(info.Connection)
 	s.broadcastActiveUsers()
 }
 
@@ -126,8 +128,14 @@ func (s *TCPServer) broadcastSystemNotice(message string, excludeConn net.Conn) 
 		Content:     message,
 		Status:      "success",
 	}
+
+	excludedConns, err := s.messageRouter.getExcludedConnections(excludeConn)
+	if err != nil {
+		s.messageRouter.sendSysResponse(excludeConn, "Failed to get blocker/blocked users", "fail")
+	}
+
 	encodedMsg := []byte(s.encodeFn(payload))
-	s.messageRouter.broadcastToAll(encodedMsg, "Error sending system notice", excludeConn)
+	s.messageRouter.broadcastToAll(encodedMsg, "Error sending system notice", excludedConns...)
 }
 
 func (s *TCPServer) broadcastActiveUsers() {
