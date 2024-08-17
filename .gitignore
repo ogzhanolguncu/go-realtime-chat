@@ -25,7 +25,6 @@ go.work.sum
 .env
 
 /client/client
-/server/server
 chat_history.txt
 .DS_STORE
 chat.db

@@ -1,0 +1,124 @@
+package server
+
+import (
+	"bufio"
+	"log"
+	"net"
+
+	"github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/server/internal/auth"
+	"github.com/ogzhanolguncu/go-chat/server/internal/connection"
+)
+
+type ConnectionHandler struct {
+	conn           net.Conn
+	server         *TCPServer
+	reader         *bufio.Reader
+	encodeFn       func(payload protocol.Payload) string
+	decodeFn       func(message string) (protocol.Payload, error)
+	connectionInfo *connection.ConnectionInfo
+}
+
+func NewConnectionHandler(conn net.Conn, server *TCPServer) *ConnectionHandler {
+	return &ConnectionHandler{
+		conn:     conn,
+		server:   server,
+		reader:   bufio.NewReader(conn),
+		encodeFn: server.encodeFn,
+		decodeFn: server.decodeFn,
+	}
+}
+
+func (ch *ConnectionHandler) Handle() {
+	defer ch.conn.Close()
+
+	if !ch.authenticate() {
+		return
+	}
+
+	ch.server.OnClientJoin(ch.connectionInfo)
+	defer ch.server.OnClientLeave(ch.connectionInfo)
+
+	for {
+		message, err := ch.reader.ReadString('\n')
+		if err != nil {
+			log.Printf("Client left the chat %s: %v\n", ch.connectionInfo.OwnerName, err)
+			break
+		}
+
+		ch.server.OnMessageReceived(ch.connectionInfo, message)
+	}
+}
+
+func (ch *ConnectionHandler) authenticate() bool {
+	ch.sendAuthRequest()
+
+	for {
+		data, err := ch.reader.ReadString('\n')
+		if err != nil {
+			log.Printf("Error reading auth data: %v", err)
+			return false
+		}
+
+		payload, err := ch.decodeFn(data)
+		if err != nil {
+			log.Printf("Failed to decode auth data: %s. Error: %v", data, err)
+			ch.sendAuthResponse("Invalid data format", "fail")
+			continue
+		}
+
+		authenticated, err := ch.server.authManager.AuthenticateUser(payload.Username, payload.Password)
+		if err != nil {
+			if err == auth.ErrUserExists {
+				// Try to add the user (register)
+				err = ch.server.authManager.AddUser(payload.Username, payload.Password)
+				if err != nil {
+					ch.handleAuthError(err)
+					continue
+				}
+				authenticated = true
+			} else {
+				ch.handleAuthError(err)
+				continue
+			}
+		}
+
+		if authenticated {
+			ch.connectionInfo = &connection.ConnectionInfo{
+				Connection: ch.conn,
+				OwnerName:  payload.Username,
+			}
+			ch.sendAuthResponse(payload.Username, "success")
+			return true
+		}
+
+		ch.sendAuthResponse("Invalid username or password", "fail")
+	}
+}
+
+func (ch *ConnectionHandler) sendAuthRequest() {
+	msg := ch.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Status: "required"})
+	ch.conn.Write([]byte(msg))
+}
+
+func (ch *ConnectionHandler) sendAuthResponse(message, status string) {
+	msg := ch.encodeFn(protocol.Payload{
+		MessageType: protocol.MessageTypeUSR,
+		Username:    message,
+		Status:      status,
+	})
+	ch.conn.Write([]byte(msg))
+}
+
+func (ch *ConnectionHandler) handleAuthError(err error) {
+	var message string
+	switch err {
+	case auth.ErrWeakPassword:
+		message = "Password does not meet strength requirements"
+	case auth.ErrInvalidUsername:
+		message = "Username must be at least 2 characters long"
+	default:
+		message = "Authentication failed"
+	}
+	ch.sendAuthResponse(message, "fail")
+}

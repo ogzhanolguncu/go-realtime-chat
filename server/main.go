@@ -1,31 +1,38 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"log"
-	"net"
+	"path/filepath"
+
+	"github.com/ogzhanolguncu/go-chat/server/internal/server"
+	"github.com/ogzhanolguncu/go-chat/server/utils"
 )
 
-const port = 7007
+const (
+	port   = 7007
+	dbName = "chat.db"
+)
 
 func main() {
-	s := newServer()
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	encoding := flag.Bool("encoding", false, "enable encoding")
+	flag.Parse()
+
+	dbPath := filepath.Join(utils.RootDir(), dbName)
+
+	s, err := server.NewServer(port, dbPath, *encoding)
 	if err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("Failed to create server: %v", err)
 	}
-	defer listener.Close()
-	defer s.historyManager.Close()
 
-	log.Printf("Chat server started on port %d\n", port)
-	//Add some messages to in-memory from disk before any chat starts.
-
-	for {
-		c, err := listener.Accept()
-		if err != nil {
-			log.Printf("Error accepting connection: %v\n", err)
-			continue
+	defer func() {
+		if err := s.Close(); err != nil {
+			log.Printf("Error closing server: %v", err)
 		}
-		go s.handleNewConnection(c)
-	}
+	}()
+
+	log.Printf("Chat server starting on port %d\n", port)
+	log.Printf("Encoding: %v\n", *encoding)
+
+	s.Start()
 }

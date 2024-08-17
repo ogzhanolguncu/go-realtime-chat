@@ -1,6 +1,5 @@
 # Define variables
 BINARY_NAME=server
-SRC_DIR=server
 encoding?=false  # Default encoding value
 
 # Default target to build, vet, format, and run
