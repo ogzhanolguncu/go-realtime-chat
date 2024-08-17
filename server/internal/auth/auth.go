@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"unicode"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -16,7 +17,6 @@ const (
 )
 
 var (
-	ErrUserExists           = errors.New("username already exists")
 	ErrInvalidUsername      = errors.New("username must be at least 2 characters long")
 	ErrWeakPassword         = errors.New("password does not meet strength requirements")
 	ErrAuthenticationFailed = errors.New("invalid username or password")
@@ -107,15 +107,6 @@ func (am *AuthManager) AddUser(username, password string) error {
 		return err
 	}
 
-	var exists string
-	err := am.getUserStmt.QueryRow(username).Scan(&exists)
-	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("error checking existing user: %w", err)
-	}
-	if exists != "" {
-		return ErrUserExists
-	}
-
 	hashedPass, err := hashPassword(password)
 	if err != nil {
 		return fmt.Errorf("could not hash password: %w", err)
@@ -176,15 +167,24 @@ func (am *AuthManager) AuthenticateUser(username, password string) (bool, error)
 	err := am.getPasswordStmt.QueryRow(username).Scan(&storedPassword)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return false, ErrAuthenticationFailed
+			log.Printf("User does not exist in the database '%s' creating new record", username)
+			err = am.AddUser(username, password)
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+
 		}
 		return false, fmt.Errorf("error querying user: %w", err)
 	}
 
+	// This means we found the user in the database, but password is wrong
 	if !checkPasswordHash(password, storedPassword) {
+		log.Printf("User does exist in the database '%s' but password is wrong", username)
 		return false, ErrAuthenticationFailed
 	}
 
+	log.Printf("User '%s' has successfully logged in", username)
 	return true, nil
 }
 

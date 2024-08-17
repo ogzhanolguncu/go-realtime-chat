@@ -29,6 +29,10 @@ func NewConnectionHandler(conn net.Conn, server *TCPServer) *ConnectionHandler {
 	}
 }
 
+// Main Connection Handling
+// -----------------------------
+
+// Handle manages the lifecycle of a client connection
 func (ch *ConnectionHandler) Handle() {
 	defer ch.conn.Close()
 
@@ -39,6 +43,11 @@ func (ch *ConnectionHandler) Handle() {
 	ch.server.OnClientJoin(ch.connectionInfo)
 	defer ch.server.OnClientLeave(ch.connectionInfo)
 
+	ch.handleMessages()
+}
+
+// handleMessages continuously reads and processes incoming messages
+func (ch *ConnectionHandler) handleMessages() {
 	for {
 		message, err := ch.reader.ReadString('\n')
 		if err != nil {
@@ -50,13 +59,14 @@ func (ch *ConnectionHandler) Handle() {
 	}
 }
 
-func (ch *ConnectionHandler) authenticate() bool {
-	ch.sendAuthRequest()
+// Authentication
+// -----------------------------
 
+func (ch *ConnectionHandler) authenticate() bool {
 	for {
 		data, err := ch.reader.ReadString('\n')
 		if err != nil {
-			log.Printf("Error reading auth data: %v", err)
+			log.Printf("User closed connection during auth: %v", err)
 			return false
 		}
 
@@ -69,18 +79,8 @@ func (ch *ConnectionHandler) authenticate() bool {
 
 		authenticated, err := ch.server.authManager.AuthenticateUser(payload.Username, payload.Password)
 		if err != nil {
-			if err == auth.ErrUserExists {
-				// Try to add the user (register)
-				err = ch.server.authManager.AddUser(payload.Username, payload.Password)
-				if err != nil {
-					ch.handleAuthError(err)
-					continue
-				}
-				authenticated = true
-			} else {
-				ch.handleAuthError(err)
-				continue
-			}
+			ch.handleAuthError(err)
+			continue
 		}
 
 		if authenticated {
@@ -96,11 +96,6 @@ func (ch *ConnectionHandler) authenticate() bool {
 	}
 }
 
-func (ch *ConnectionHandler) sendAuthRequest() {
-	msg := ch.encodeFn(protocol.Payload{MessageType: protocol.MessageTypeUSR, Status: "required"})
-	ch.conn.Write([]byte(msg))
-}
-
 func (ch *ConnectionHandler) sendAuthResponse(message, status string) {
 	msg := ch.encodeFn(protocol.Payload{
 		MessageType: protocol.MessageTypeUSR,
@@ -110,6 +105,7 @@ func (ch *ConnectionHandler) sendAuthResponse(message, status string) {
 	ch.conn.Write([]byte(msg))
 }
 
+// handleAuthError processes authentication errors and sends appropriate mapped responses
 func (ch *ConnectionHandler) handleAuthError(err error) {
 	var message string
 	switch err {
