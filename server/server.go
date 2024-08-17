@@ -12,28 +12,24 @@ import (
 	"sync"
 
 	"github.com/elliotchance/pie/v2"
-	protocol "github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/protocol"
 	"github.com/ogzhanolguncu/go-chat/server/auth"
 	"github.com/ogzhanolguncu/go-chat/server/block_user"
 	"github.com/ogzhanolguncu/go-chat/server/chat_history"
+	"github.com/ogzhanolguncu/go-chat/server/connection"
 	"github.com/ogzhanolguncu/go-chat/server/utils"
 )
 
 // ConnectionInfo holds connection-related information.
 const dbName = "/chat.db"
 
-type ConnectionInfo struct {
-	Connection net.Conn
-	OwnerName  string
-}
-
 type TCPServer struct {
-	connectionMap    sync.Map
-	history          *chat_history.ChatHistory
-	authManager      *auth.AuthManager
-	blockUserManager *block_user.BlockUserManager
-	encodeFn         func(payload protocol.Payload) string
-	decodeFn         func(message string) (protocol.Payload, error)
+	connectionManager *connection.Manager
+	historyManager    *chat_history.ChatHistory
+	authManager       *auth.AuthManager
+	blockUserManager  *block_user.BlockUserManager
+	encodeFn          func(payload protocol.Payload) string
+	decodeFn          func(message string) (protocol.Payload, error)
 }
 
 func newServer() *TCPServer {
@@ -50,67 +46,28 @@ func newServer() *TCPServer {
 	log.Printf("------ ENCODING SET TO %s ------", encodingType)
 	dbPath := fmt.Sprintf(utils.RootDir() + dbName)
 
-	authManager, err := auth.NewAuthManager(dbPath)
+	am, err := auth.NewAuthManager(dbPath)
 	if err != nil {
 		log.Printf("Failed to initialize auth manager: %v", err)
 	}
-	chatManager, err := chat_history.NewChatHistory(*encoding, dbPath)
+	hm, err := chat_history.NewChatHistory(*encoding, dbPath)
 	if err != nil {
-		log.Printf("Failed to initialize auth manager: %v", err)
+		log.Printf("Failed to initialize chat history manager: %v", err)
 	}
-	blockUserManager, err := block_user.NewBlockUserManager(dbPath)
+	bum, err := block_user.NewBlockUserManager(dbPath)
 	if err != nil {
-		log.Printf("Failed to initialize auth manager: %v", err)
+		log.Printf("Failed to initialize block user manager: %v", err)
 	}
+	cm := connection.NewConnectionManager()
 
 	return &TCPServer{
-		decodeFn:         protocol.InitDecodeProtocol(*encoding),
-		encodeFn:         protocol.InitEncodeProtocol(*encoding),
-		history:          chatManager,
-		blockUserManager: blockUserManager,
-		authManager:      authManager,
+		decodeFn:          protocol.InitDecodeProtocol(*encoding),
+		encodeFn:          protocol.InitEncodeProtocol(*encoding),
+		historyManager:    hm,
+		blockUserManager:  bum,
+		authManager:       am,
+		connectionManager: cm,
 	}
-}
-
-func (s *TCPServer) addConnection(c net.Conn, info *ConnectionInfo) {
-	s.connectionMap.Store(c, info)
-}
-
-func (s *TCPServer) getConnectedUsersCount() int {
-	count := 0
-	s.connectionMap.Range(func(key, value interface{}) bool {
-		count++
-		return true
-	})
-	return count
-}
-
-func (s *TCPServer) getActiveUsers() []string {
-	var users []string
-	s.connectionMap.Range(func(key, value interface{}) bool {
-		info := value.(*ConnectionInfo)
-		users = append(users, info.OwnerName)
-		return true
-	})
-	return users
-}
-
-func (s *TCPServer) getConnectionInfoAndDelete(c net.Conn) (*ConnectionInfo, bool) {
-	info, ok := s.getConnectionInfo(c)
-	if !ok {
-		return nil, false
-	}
-	s.connectionMap.Delete(c)
-	return info, ok
-}
-
-func (s *TCPServer) getConnectionInfo(c net.Conn) (*ConnectionInfo, bool) {
-	value, ok := s.connectionMap.Load(c)
-	if !ok {
-		return nil, false
-	}
-	info, ok := value.(*ConnectionInfo)
-	return info, ok
 }
 
 func (s *TCPServer) handleNewConnection(conn net.Conn) {
@@ -123,8 +80,8 @@ func (s *TCPServer) handleNewConnection(conn net.Conn) {
 	}
 
 	log.Printf("Recently joined user's name: %s\n", name)
-	s.addConnection(conn, &ConnectionInfo{Connection: conn, OwnerName: name})
-	connectedUsers := s.getConnectedUsersCount()
+	s.connectionManager.AddConnection(conn, &connection.ConnectionInfo{Connection: conn, OwnerName: name})
+	connectedUsers := s.connectionManager.GetConnectedUsersCount()
 	log.Printf("Connection from %s\n", conn.RemoteAddr().String())
 	log.Printf("Connected users: %d\n", connectedUsers)
 
@@ -146,27 +103,8 @@ func (s *TCPServer) handleNewConnection(conn net.Conn) {
 	s.handleConnection(conn)
 }
 
-func (s *TCPServer) findConnectionByOwnerName(ownerName string) (net.Conn, bool) {
-	var foundConn net.Conn
-	var found bool
-
-	s.connectionMap.Range(func(key, value interface{}) bool {
-		conn := key.(net.Conn)
-		info := value.(*ConnectionInfo)
-
-		if info.OwnerName == ownerName {
-			foundConn = conn
-			found = true
-			return false
-		}
-		return true
-	})
-	return foundConn, found
-}
-
 func (s *TCPServer) broadcastActiveUsers() {
-	s.connectionMap.Range(func(key, value any) bool {
-		conn := key.(net.Conn)
+	s.connectionManager.RangeConnections(func(conn net.Conn, _ *connection.ConnectionInfo) bool {
 		s.sendActiveUsers(conn)
 		return true
 	})
@@ -174,7 +112,7 @@ func (s *TCPServer) broadcastActiveUsers() {
 
 func (s *TCPServer) handleConnection(c net.Conn) {
 	defer func(conn net.Conn) {
-		info, _ := s.getConnectionInfoAndDelete(conn)
+		info, _ := s.connectionManager.GetConnectionInfoAndDelete(conn)
 		if info != nil {
 			log.Printf("%+v INFO", info)
 			s.sendSysNotice(info.OwnerName, conn, "left")
@@ -193,7 +131,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 		}
 
 		rawMessage := strings.TrimSpace(data)
-		s.history.AddMessage(rawMessage)
+		s.historyManager.AddMessage(rawMessage)
 		log.Printf("Message from %s: %s\n", c.RemoteAddr().String(), rawMessage)
 
 		msgPayload, err := s.decodeFn(rawMessage)
@@ -229,7 +167,7 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 			}
 
 		case protocol.MessageTypeHSTRY:
-			history, err := s.history.GetHistory(msgPayload.Sender, "MSG", "WSP")
+			history, err := s.historyManager.GetHistory(msgPayload.Sender, "MSG", "WSP")
 			if err != nil {
 				errMsg := s.encodeFn(protocol.Payload{
 					MessageType: protocol.MessageTypeSYS,
@@ -264,8 +202,8 @@ func (s *TCPServer) handleConnection(c net.Conn) {
 // Frey joins -> Receives [John]
 // Since this is broadcasted everyone when Frey joins she sends [Frey,John] to everybody, but we should send this messages to specific users and with specific payloads
 func (s *TCPServer) sendActiveUsers(conn net.Conn) {
-	activeUsers := s.getActiveUsers()
-	connectionInfo, ok := s.getConnectionInfo(conn)
+	activeUsers := s.connectionManager.GetActiveUsers()
+	connectionInfo, ok := s.connectionManager.GetConnectionInfo(conn)
 	// If we can find the connectionInfo start excludingUser from activeList
 	if ok {
 		log.Printf("Logged in user %+v", connectionInfo)
@@ -313,7 +251,7 @@ func (s *TCPServer) sendSysNotice(senderName string, sender net.Conn, action str
 	namesToExclude = pie.Unique(namesToExclude)
 	var finalExcludedList []net.Conn
 	for _, name := range namesToExclude {
-		if conn, ok := s.findConnectionByOwnerName(name); ok {
+		if conn, ok := s.connectionManager.FindConnectionByOwnerName(name); ok {
 			finalExcludedList = append(finalExcludedList, conn)
 		}
 	}
@@ -331,7 +269,7 @@ func (s *TCPServer) sendWhisper(msgPayload protocol.Payload, sender net.Conn) {
 		return
 	}
 	// Look up the recipient's connection by their name in the connectionList
-	recipientConn, found := s.findConnectionByOwnerName(msgPayload.Recipient)
+	recipientConn, found := s.connectionManager.FindConnectionByOwnerName(msgPayload.Recipient)
 
 	// If the recipient is not found or their connection is lost, send a system failure message to the sender
 	if !found || recipientConn == nil {
@@ -369,7 +307,7 @@ func (s *TCPServer) broadcastMessage(msgPayload protocol.Payload, sender net.Con
 // This function gives us users who are excluded when broadcasting, whisper
 // Mainly used for blocking logic.
 func (s *TCPServer) getExcludedConnections(sender net.Conn) ([]net.Conn, error) {
-	senderInfo, ok := s.getConnectionInfo(sender)
+	senderInfo, ok := s.connectionManager.GetConnectionInfo(sender)
 	if !ok {
 		return nil, fmt.Errorf("failed to get sender info")
 	}
@@ -388,10 +326,8 @@ func (s *TCPServer) getExcludedConnections(sender net.Conn) ([]net.Conn, error) 
 	namesToExclude = pie.Unique(namesToExclude)
 
 	var excludedConns []net.Conn
-	s.connectionMap.Range(func(key, value any) bool {
-		conn := key.(net.Conn)
-		connInfo := value.(*ConnectionInfo)
-		if pie.Contains(namesToExclude, connInfo.OwnerName) {
+	s.connectionManager.RangeConnections(func(conn net.Conn, info *connection.ConnectionInfo) bool {
+		if pie.Contains(namesToExclude, info.OwnerName) {
 			excludedConns = append(excludedConns, conn)
 		}
 		return true
@@ -403,8 +339,7 @@ func (s *TCPServer) getExcludedConnections(sender net.Conn) ([]net.Conn, error) 
 
 // broadcastMessage sends a message to all connections except the sender
 func (s *TCPServer) broadcastToAll(b []byte, errLog string, excludeConn ...net.Conn) {
-	s.connectionMap.Range(func(key, value interface{}) bool {
-		conn := key.(net.Conn)
+	s.connectionManager.RangeConnections(func(conn net.Conn, _ *connection.ConnectionInfo) bool {
 		if !slices.Contains(excludeConn, conn) {
 			_, err := conn.Write(b)
 			if err != nil {
