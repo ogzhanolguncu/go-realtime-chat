@@ -51,7 +51,7 @@ func (ch *ConnectionHandler) handleMessages() {
 	for {
 		message, err := ch.reader.ReadString('\n')
 		if err != nil {
-			log.Printf("Client left the chat %s: %v\n", ch.connectionInfo.OwnerName, err)
+			log.Printf("Client left the chat '%s': %v\n", ch.connectionInfo.OwnerName, err)
 			break
 		}
 

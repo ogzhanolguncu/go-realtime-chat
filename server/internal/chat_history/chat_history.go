@@ -91,8 +91,7 @@ SELECT :sender, :recipient, :message_type, :content, :timestamp,
          FROM blocked_users
          WHERE blocked = :sender),
         ''
-    ) ||
-    CASE WHEN :recipient != '' THEN ',' || :recipient ELSE '' END
+    )
 	`
 
 	_, err = ch.db.NamedExec(query, entry)
