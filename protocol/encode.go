@@ -14,9 +14,12 @@ func InitEncodeProtocol(isBase64 bool) func(payload Payload) string {
 }
 func encodeProtocol(isBase64 bool, payload Payload) string {
 	var sb strings.Builder
-	timestamp := time.Now().Unix()
 
 	writeCommonPrefix := func(messageType MessageType) {
+		timestamp := payload.Timestamp
+		if timestamp == 0 {
+			timestamp = time.Now().Unix()
+		}
 		sb.WriteString(fmt.Sprintf("%s|%d|", messageType, timestamp))
 	}
 

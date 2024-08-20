@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -22,7 +21,7 @@ type MessageEntry struct {
 	MessageType  protocol.MessageType `db:"message_type"`
 	Content      string               `db:"content"`
 	BlockedUsers string               `db:"blocked_users"`
-	Timestamp    time.Time            `db:"timestamp"`
+	Timestamp    int64                `db:"timestamp"`
 }
 
 func NewChatHistory(encoding bool, dbPath string) (*ChatHistory, error) {
@@ -49,7 +48,7 @@ func createSchema(db *sqlx.DB) error {
 			message_type TEXT NOT NULL,
 			content TEXT NOT NULL,
 			blocked_users TEXT,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+			timestamp INTEGER
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)`,
 	}
@@ -73,7 +72,7 @@ func (ch *ChatHistory) AddMessage(message string) error {
 		Recipient:   decodedMsg.Recipient,
 		MessageType: decodedMsg.MessageType,
 		Content:     decodedMsg.Content,
-		Timestamp:   time.Now(),
+		Timestamp:   decodedMsg.Timestamp,
 	}
 
 	// Dynamically fetches blocked users for that sender and puts them into blocked_users table without extra call.
@@ -170,12 +169,14 @@ func (ch *ChatHistory) GetHistory(user string, messageTypes ...string) ([]string
 			Recipient:   entry.Recipient,
 			MessageType: entry.MessageType,
 			Content:     entry.Content,
+			Timestamp:   entry.Timestamp,
 		}
 		encodedMessage := protocol.InitEncodeProtocol(ch.encoding)(msg)
 		encodedMessages[i] = strings.TrimSpace(encodedMessage)
 	}
 	return encodedMessages, nil
 }
+
 func (ch *ChatHistory) Close() error {
 	if err := ch.db.Close(); err != nil {
 		return fmt.Errorf("failed to close database: %w", err)
