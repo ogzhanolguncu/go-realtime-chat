@@ -12,11 +12,14 @@ import (
 
 const dbPath = "./chat_test.db"
 
-func TestAddMessage(t *testing.T) {
+func TestGetHistoryWithBlockedUser(t *testing.T) {
 	ch, err := NewChatHistory(false, dbPath)
 	require.NoError(t, err)
-	_, err = block_user.NewBlockUserManager(dbPath)
+
+	bm, err := block_user.NewBlockUserManager(dbPath)
 	require.NoError(t, err)
+
+	require.NoError(t, bm.BlockUser("Oz", "Frey"))
 
 	tests := []struct {
 		testName      string
@@ -28,6 +31,7 @@ func TestAddMessage(t *testing.T) {
 			inputMessages: []string{
 				"MSG|1724188406|Oz|Hello there group chat\r\n",
 				"MSG|1724188406|John|Hello there group chat\r\n",
+				"MSG|1724188406|Frey|Hello there group chat\r\n",
 				"WSP|1724188406|Oz|John|John this is a whisper\r\n",
 				"SYS|1724188406|Sys messages|\r\n",
 				"ACT_USRS|1724188406|test_value|status\r\n",
@@ -49,6 +53,7 @@ func TestAddMessage(t *testing.T) {
 			output: []string{
 				"MSG|1724188406|Oz|Hello there group chat",
 				"MSG|1724188406|John|Hello there group chat",
+				"MSG|1724188406|Frey|Hello there group chat\r\n",
 				"WSP|1724188406|Oz|John|John this is a whisper",
 				"WSP|1724188406|John|Oz|I know",
 				"WSP|1724188406|John|Frey|I know",
