@@ -41,7 +41,7 @@ Chat Application Todo List:
         ✔ Implement protocol: Client read
         ✔ Implement protocol: Server sent
         ✔ Implement protocol: Client sent @done(24-07-07 12:38)
-        ✔ Implement protocol: Server read @done(24-07-07 12:38)
+        ✔ Implement protocol: Server read @done(24-08-22 00:50)
         Message encryption: Implement end-to-end encryption using:
             ✔ Initial Setup: @done(24-07-22 01:17)
 
@@ -69,10 +69,100 @@ Chat Application Todo List:
             ☐ Allow users to create and join different chatrooms
             ☐ Ensure it server deleted private chat after 1 minute inactivity
             ☐ Allow clients to switch between private chats and group chat
-            ☐ Implement commands: /create, /join, /leave
+            ☐ Implement commands: /create, /join, /leave, /kick, /ban
+
+            ## User Actions
+            ☐ Implement `/create` command
+              ☐ Format: `/create roomName roomPassword roomSize`
+              ☐ Make `roomPassword` and `roomSize` optional
+            ☐ Implement join functionality
+
+            ## Protocols
+            ☐ Implement Create Protocol: `ROOM|Oz|CREATE|testName|Test1234.|2`
+            ☐ Implement Join Protocol: `ROOM|John|JOIN|testName|Test1234.`
+
+            ## Server Structure
+            ☐ Create `roomManager` module
+              ☐ Implement in-memory storage for rooms
+              ☐ Create a map of rooms
+              ☐ Isolate from `net.Conn`
+              ☐ Accept decoded messages
+              ☐ Implement function mapping based on protocol
+
+            ## Data Structures
+            - Implement `roomDetails` struct:
+              `
+              type roomDetails struct {
+                  roomName string
+                  roomPassword string
+                  roomSize int
+                  owner string
+                  users []string
+                  lastActivity int64
+                  bannedUsers []string
+                  visibility string
+              }
+              `
+
+            ## Room-specific Methods
+            - [ ] Implement `handleJoin`
+            - [ ] Implement `handleLeave`
+            - [ ] Implement `handleGetUsers`
+            - [ ] Implement `handleCreate`
+            - [ ] Implement `clearInactive`
+              - [ ] Remove room after 1 minute of inactivity
+            - [ ] Implement `handleBan`
+              - [ ] Ensure only callable by owner
+            - [ ] Implement `handleKick`
+              - [ ] Ensure only callable by owner
+
+            ## Manager-specific Methods
+            - [ ] Implement `getActiveRooms`
+
+            ## Room Management Logic
+            - [ ] Update `lastActivity` on message receive, user join, or user leave
+            - [ ] Update `users` list on join or leave
+            - [ ] Broadcast `users` list to all channel members on join or leave
+
+            ## Protocol Implementation
+            ### Create Room
+            - [ ] Request: `ROOM|1629123456|CREATE|Oz|testRoom|password123|10|visibility=public\r\n`
+            - [ ] Success: `ROOM|1629123457|CREATE|Oz|testRoom|password123|10|status=success\r\n`
+            - [ ] Fail: `ROOM|1629123457|CREATE|Oz|testRoom|password123|10|status=fail,reason=room_already_exists\r\n`
+
+            ### Join Room
+            - [ ] Request: `ROOM|1629123458|JOIN|John|testRoom|password123|-\r\n`
+            - [ ] Success: `ROOM|1629123459|JOIN|John|testRoom|password123|-|status=success\r\n`
+            - [ ] Fail: `ROOM|1629123459|JOIN|John|testRoom|password123|-|status=fail,reason=incorrect_password\r\n`
+
+            ### Leave Room
+            - [ ] Request: `ROOM|1629123460|LEAVE|John|testRoom|-|-\r\n`
+            - [ ] Success: `ROOM|1629123461|LEAVE|John|testRoom|-|-|status=success\r\n`
+            - [ ] Fail: `ROOM|1629123461|LEAVE|John|testRoom|-|-|status=fail,reason=not_in_room\r\n`
+
+            ### Kick User
+            - [ ] Request: `ROOM|1629123462|KICK|Oz|testRoom|John|-\r\n`
+            - [ ] Success: `ROOM|1629123463|KICK|Oz|testRoom|John|-|status=success\r\n`
+            - [ ] Fail: `ROOM|1629123463|KICK|Oz|testRoom|John|-|status=fail,reason=not_owner\r\n`
+
+            ### Ban User
+            - [ ] Request: `ROOM|1629123464|BAN|Oz|testRoom|John|-\r\n`
+            - [ ] Success: `ROOM|1629123465|BAN|Oz|testRoom|John|-|status=success\r\n`
+            - [ ] Fail: `ROOM|1629123465|BAN|Oz|testRoom|John|-|status=fail,reason=user_not_found\r\n`
+
+            ### Get Room Users
+            - [ ] Request: `ROOM|1629123466|GET_USERS|John|testRoom|-|-\r\n`
+            - [ ] Success: `ROOM|1629123467|GET_USERS|John|testRoom|-|-|status=success,users=Oz,Alice,Bob\r\n`
+            - [ ] Fail: `ROOM|1629123467|GET_USERS|John|testRoom|-|-|status=fail,reason=room_not_found\r\n`
+
+            ### Get Active Rooms
+            - [ ] Request: `ROOM|1629123468|GET_ROOMS|John|-|-|-\r\n`
+            - [ ] Success: `ROOM|1629123469|GET_ROOMS|John|-|-|-|status=success,rooms=testRoom,funRoom,workRoom\r\n`
+            - [ ] Fail: `ROOM|1629123469|GET_ROOMS|John|-|-|-|status=fail,reason=no_active_rooms\r\n`
+
             Presence System:
                 ☐ Show user statuses (online, away, busy, etc.)
-                ☐ Allow users to set custom status messages
+                ☐ Allow users to set custom status message`
             Typing Indicators (for private chats):
                 ☐ Implement client-side typing detection
                     - Send "typing" signal when user starts typing in a private chat
@@ -117,7 +207,7 @@ Chat Application Todo List:
 Implementation Order:
     ✔ Command System @done(24-08-03 15:24)
     ✔ Notification System @done(24-08-03 20:14)
-    ☐ Connect chat history to auth
+    ✔ Connect chat history to auth @done(24-08-21 23:32)
     ✔ Auth system @done(24-08-08 00:30)
     ☐ Chatrooms
     ☐ Presence System

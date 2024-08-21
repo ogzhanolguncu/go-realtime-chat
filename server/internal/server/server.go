@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net"
 
 	"github.com/ogzhanolguncu/go-chat/protocol"
@@ -10,7 +9,10 @@ import (
 	"github.com/ogzhanolguncu/go-chat/server/internal/block_user"
 	"github.com/ogzhanolguncu/go-chat/server/internal/chat_history"
 	"github.com/ogzhanolguncu/go-chat/server/internal/connection"
+	"github.com/sirupsen/logrus"
 )
+
+var logger *logrus.Logger
 
 type TCPServer struct {
 	listener          net.Listener
@@ -27,6 +29,12 @@ type TCPServer struct {
 // -----------------------------
 
 func NewServer(port int, dbPath string, encoding bool) (*TCPServer, error) {
+	logger = logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{
+		ForceColors:   true,
+		FullTimestamp: true,
+	})
+
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start server: %w", err)
@@ -62,11 +70,11 @@ func NewServer(port int, dbPath string, encoding bool) (*TCPServer, error) {
 }
 
 func (s *TCPServer) Start() {
-	log.Printf("Chat server started on %s\n", s.listener.Addr().String())
+	logger.Info("Server started. Listening for connections...")
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			log.Printf("Error accepting connection: %v\n", err)
+			logger.WithError(err).Error("Error accepting connection")
 			continue
 		}
 		go s.handleNewConnection(conn)
@@ -86,6 +94,7 @@ func (s *TCPServer) Close() error {
 	if err := s.blockUserManager.Close(); err != nil {
 		return fmt.Errorf("failed to close block user manager: %w", err)
 	}
+	logger.Info("Server closed successfully")
 	return nil
 }
 
@@ -102,19 +111,23 @@ func (s *TCPServer) handleNewConnection(conn net.Conn) {
 
 func (s *TCPServer) OnClientJoin(info *connection.ConnectionInfo) {
 	s.connectionManager.AddConnection(info.Connection, info)
+	logger.WithField("user", info.OwnerName).Info("Client joined the chat")
 	s.broadcastSystemNotice(fmt.Sprintf("%s has joined the chat.", info.OwnerName), info.Connection)
 	s.broadcastActiveUsers()
 }
 
-// This function broadcasts to all clients when someone leaves or joins. Blocked and blocker users are also taken
-// into consideration. The order of the function calls is crucial - do not rearrange them. Otherwise, "left" messages will be received by blocker and blocked clients.
 func (s *TCPServer) OnClientLeave(info *connection.ConnectionInfo) {
+	logger.WithField("user", info.OwnerName).Info("Client left the chat")
 	s.broadcastSystemNotice(fmt.Sprintf("%s has left the chat.", info.OwnerName), info.Connection)
 	s.connectionManager.DeleteConnection(info.Connection)
 	s.broadcastActiveUsers()
 }
 
 func (s *TCPServer) OnMessageReceived(info *connection.ConnectionInfo, message string) {
+	logger.WithFields(logrus.Fields{
+		"user":    info.OwnerName,
+		"message": message,
+	}).Info("Message received")
 	s.historyManager.AddMessage(message)
 	s.messageRouter.RouteMessage(info, message)
 }
@@ -131,6 +144,7 @@ func (s *TCPServer) broadcastSystemNotice(message string, excludeConn net.Conn) 
 
 	excludedConns, err := s.messageRouter.getExcludedConnections(excludeConn)
 	if err != nil {
+		logger.WithError(err).Error("Failed to get blocker/blocked users")
 		s.messageRouter.sendSysResponse(excludeConn, "Failed to get blocker/blocked users", "fail")
 	}
 
@@ -139,6 +153,7 @@ func (s *TCPServer) broadcastSystemNotice(message string, excludeConn net.Conn) 
 }
 
 func (s *TCPServer) broadcastActiveUsers() {
+	logger.Info("Broadcasting active users")
 	s.connectionManager.RangeConnections(func(conn net.Conn, _ *connection.ConnectionInfo) bool {
 		s.sendActiveUsers(conn)
 		return true
@@ -161,7 +176,9 @@ func (s *TCPServer) sendActiveUsers(conn net.Conn) {
 		Status:      "res",
 	}))
 
-	conn.Write(msg)
+	if _, err := conn.Write(msg); err != nil {
+		logger.WithError(err).Error("Failed to send active users")
+	}
 }
 
 // Helper Functions
