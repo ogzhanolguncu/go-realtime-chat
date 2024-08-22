@@ -12,6 +12,8 @@ func InitEncodeProtocol(isBase64 bool) func(payload Payload) string {
 		return encodeProtocol(isBase64, payload)
 	}
 }
+
+// TODO: start adding room payload here, then tests
 func encodeProtocol(isBase64 bool, payload Payload) string {
 	var sb strings.Builder
 

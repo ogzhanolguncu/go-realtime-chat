@@ -6,7 +6,8 @@ package protocol
 // Active Users(ACT_USRS):			ACT_USRS|timestampactive_user_array|status\r\n status = "res" | "req"
 // Username Message(USR): 			USR|timestamp|username|password|status\r\n status = "fail | "success"
 // Chat History(HSTRY): 			HSTRY|timestamp|requester|messages_array|status\r\n status = "res" | "req"
-// Encryption(ENC): 				ENC|timestamp|requester_public_key|encrypted_group_chat_key
+// Chat ROOM(ROOM): 				ROOM|timestamp|room_action|requester|roomName|roomPassword|roomSize|optional_args
+
 const Separator = "|"
 
 type MessageType string
@@ -39,4 +40,6 @@ type Payload struct {
 	DecodedChatHistory []Payload
 
 	EncryptedKey string
+
+	RoomPayload *RoomPayload
 }
