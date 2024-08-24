@@ -113,3 +113,148 @@ func TestDecodeBlockUserMessage(t *testing.T) {
 		assert.EqualError(t, err, "invalid timestamp format: strconv.ParseInt: parsing \"John\": invalid syntax")
 	})
 }
+
+func TestDecodeRoomMessage(t *testing.T) {
+	timeNow := time.Now().Unix()
+	tests := []struct {
+		expected      Payload
+		expectedError bool
+		testName      string
+		input         string
+	}{
+		{
+			expected: Payload{
+				MessageType: MessageTypeROOM,
+				Timestamp:   timeNow,
+				RoomPayload: &RoomPayload{
+					RoomAction:   CreateRoom,
+					Requester:    "Oz",
+					RoomName:     "testRoom",
+					RoomPassword: "testPassword",
+					RoomSize:     2,
+					OptionalRoomArgs: &OptionalRoomArgs{
+						Visibility: VisibilityPublic,
+					},
+				},
+			},
+			input:    fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|visibility=public", timeNow),
+			testName: "Create Room Request",
+		},
+		{
+			expected: Payload{
+				MessageType: MessageTypeROOM,
+				Timestamp:   timeNow,
+				RoomPayload: &RoomPayload{
+					RoomAction:   CreateRoom,
+					Requester:    "Oz",
+					RoomName:     "testRoom",
+					RoomPassword: "testPassword",
+					RoomSize:     2,
+					OptionalRoomArgs: &OptionalRoomArgs{
+						Status: StatusSuccess,
+					},
+				},
+			},
+			input:    fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|status=success", timeNow),
+			testName: "Create Room Success",
+		},
+		{
+			expected: Payload{
+				MessageType: MessageTypeROOM,
+				Timestamp:   timeNow,
+				RoomPayload: &RoomPayload{
+					RoomAction:   JoinRoom,
+					Requester:    "John",
+					RoomName:     "testRoom",
+					RoomPassword: "testPassword",
+				},
+			},
+			input:    fmt.Sprintf("ROOM|%d|JoinRoom|John|testRoom|testPassword|-", timeNow),
+			testName: "Join Room Request",
+		},
+		{
+			expected: Payload{
+				MessageType: MessageTypeROOM,
+				Timestamp:   timeNow,
+				RoomPayload: &RoomPayload{
+					RoomAction: GetRooms,
+					Requester:  "John",
+				},
+			},
+			input:    fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-", timeNow),
+			testName: "Get Rooms Request",
+		},
+		{
+			expected: Payload{
+				MessageType: MessageTypeROOM,
+				Timestamp:   timeNow,
+				RoomPayload: &RoomPayload{
+					RoomAction: GetRooms,
+					Requester:  "John",
+					OptionalRoomArgs: &OptionalRoomArgs{
+						Status: StatusSuccess,
+						Rooms:  []string{"golang", "nodejs", "test"},
+					},
+				},
+			},
+			input:    fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-|status=success;rooms=golang,nodejs,test", timeNow),
+			testName: "Get Rooms Success",
+		},
+		{
+			expected: Payload{
+				MessageType: MessageTypeROOM,
+				Timestamp:   timeNow,
+				RoomPayload: &RoomPayload{
+					RoomAction: GetRooms,
+					Requester:  "John",
+					OptionalRoomArgs: &OptionalRoomArgs{
+						Status: StatusFail,
+						Reason: "no_active_rooms",
+					},
+				},
+			},
+			input:    fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-|status=fail;reason=no_active_rooms", timeNow),
+			testName: "Get Rooms Fail",
+		},
+		{
+			expected: Payload{
+				MessageType: MessageTypeROOM,
+				Timestamp:   timeNow,
+				RoomPayload: &RoomPayload{
+					RoomAction:   LeaveRoom,
+					Requester:    "Alice",
+					RoomName:     "specialRoom!@#$",
+					RoomPassword: "",
+					OptionalRoomArgs: &OptionalRoomArgs{
+						Status:  StatusSuccess,
+						Message: "Left the room successfully",
+						Users:   []string{"Bob", "Charlie"},
+					},
+				},
+			},
+			input:    fmt.Sprintf("ROOM|%d|LeaveRoom|Alice|specialRoom!@#$|-|-|status=success;message=Left the room successfully;users=Bob,Charlie", timeNow),
+			testName: "Leave Room with Special Characters and Multiple Optional Args",
+		},
+		{
+			expectedError: true,
+			input:         fmt.Sprintf("ROOM|%d|InvalidAction|John|-|-|-", timeNow),
+			testName:      "Invalid Room Action",
+		},
+		{
+			expectedError: true,
+			input:         "ROOM|1234567890",
+			testName:      "Missing Required Fields",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			payload, err := decodeProtocol(false, test.input)
+			if test.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.expected, payload)
+			}
+		})
+	}
+}

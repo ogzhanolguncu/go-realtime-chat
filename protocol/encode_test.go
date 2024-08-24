@@ -188,47 +188,90 @@ func TestEncodeBlockUserMessage(t *testing.T) {
 }
 
 func TestEncodeRoomMessage(t *testing.T) {
-	t.Run("should encode blocker user message successfully", func(t *testing.T) {
-		tests := []struct {
-			roomAction   RoomActionType
-			requester    string
-			roomName     *string
-			roomPassword *string
-			roomSize     *int
-			optionalArgs *OptionalRoomArgs
-			expected     string
-		}{
-			{
-				roomAction:   CreateRoom,
-				requester:    "Oz",
-				roomName:     strPtr("testRoom"),
-				roomPassword: strPtr("testPassword"),
-				roomSize:     intPtr(2),
-				optionalArgs: &OptionalRoomArgs{
-					Visibility: VisibilityPublic,
-				},
-				expected: fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|visibility=public\r\n", time.Now().Unix()),
+	tests := []struct {
+		roomAction   RoomActionType
+		requester    string
+		roomName     string
+		roomPassword string
+		roomSize     int
+		optionalArgs *OptionalRoomArgs
+		expected     string
+		testName     string
+	}{
+		{
+			roomAction:   CreateRoom,
+			requester:    "Oz",
+			roomName:     "testRoom",
+			roomPassword: "testPassword",
+			roomSize:     2,
+			optionalArgs: &OptionalRoomArgs{
+				Visibility: VisibilityPublic,
 			},
-			{
-				roomAction:   CreateRoom,
-				requester:    "Oz",
-				roomName:     strPtr("testRoom"),
-				roomPassword: strPtr("testPassword"),
-				roomSize:     intPtr(2),
-				optionalArgs: &OptionalRoomArgs{
-					Status: StatusSuccess,
-				},
-				expected: fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|status=success\r\n", time.Now().Unix()),
+			expected: fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|visibility=public\r\n", time.Now().Unix()),
+			testName: "Create Room Request",
+		},
+		{
+			roomAction:   CreateRoom,
+			requester:    "Oz",
+			roomName:     "testRoom",
+			roomPassword: "testPassword",
+			roomSize:     2,
+			optionalArgs: &OptionalRoomArgs{
+				Status: StatusSuccess,
 			},
-			{
-				roomAction:   JoinRoom,
-				requester:    "John",
-				roomName:     strPtr("testRoom"),
-				roomPassword: strPtr("testPassword"),
-				expected:     fmt.Sprintf("ROOM|%d|JoinRoom|John|testRoom|testPassword\r\n", time.Now().Unix()),
+			expected: fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|status=success\r\n", time.Now().Unix()),
+			testName: "Create Room Success",
+		},
+		{
+			roomAction:   JoinRoom,
+			requester:    "John",
+			roomName:     "testRoom",
+			roomPassword: "testPassword",
+			expected:     fmt.Sprintf("ROOM|%d|JoinRoom|John|testRoom|testPassword|-\r\n", time.Now().Unix()),
+			testName:     "Join Room Request",
+		},
+		{
+			roomAction: GetRooms,
+			requester:  "John",
+			expected:   fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-\r\n", time.Now().Unix()),
+			testName:   "Get Rooms Request",
+		},
+		{
+			roomAction: GetRooms,
+			requester:  "John",
+			optionalArgs: &OptionalRoomArgs{
+				Status:     StatusSuccess,
+				Rooms:      []string{"golang", "nodejs", "test"},
+				TargetUser: "heheh",
 			},
-		}
-		for _, test := range tests {
+			expected: fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-|status=success;rooms=golang,nodejs,test\r\n", time.Now().Unix()),
+			testName: "Get Rooms Success",
+		},
+		{
+			roomAction: GetRooms,
+			requester:  "John",
+			optionalArgs: &OptionalRoomArgs{
+				Status: StatusFail,
+				Reason: "no_active_rooms",
+			},
+			expected: fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-|status=fail;reason=no_active_rooms\r\n", time.Now().Unix()),
+			testName: "Get Rooms Fail",
+		},
+		{
+			roomAction: LeaveRoom,
+			requester:  "Alice",
+			roomName:   "specialRoom!@#$",
+			optionalArgs: &OptionalRoomArgs{
+				Status:  StatusSuccess,
+				Message: "Left the room successfully",
+				Users:   []string{"Bob", "Charlie"},
+			},
+			expected: fmt.Sprintf("ROOM|%d|LeaveRoom|Alice|specialRoom!@#$|-|-|status=success;message=Left the room successfully;users=Bob,Charlie\r\n", time.Now().Unix()),
+			testName: "Leave Room with Special Characters and Multiple Optional Args",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
 			roomPayload := &RoomPayload{
 				RoomAction:   test.roomAction,
 				Requester:    test.requester,
@@ -240,6 +283,10 @@ func TestEncodeRoomMessage(t *testing.T) {
 				roomPayload.OptionalRoomArgs = &OptionalRoomArgs{
 					Status:     test.optionalArgs.Status,
 					Visibility: test.optionalArgs.Visibility,
+					Rooms:      test.optionalArgs.Rooms,
+					Reason:     test.optionalArgs.Reason,
+					Message:    test.optionalArgs.Message,
+					Users:      test.optionalArgs.Users,
 				}
 			}
 			result := encodeProtocol(true, Payload{
@@ -248,15 +295,8 @@ func TestEncodeRoomMessage(t *testing.T) {
 			})
 			decoded, _ := base64.StdEncoding.DecodeString(result)
 			require.Equal(t, test.expected, string(decoded))
-		}
-	})
+		})
 
-}
+	}
 
-func strPtr(s string) *string {
-	return &s
-}
-
-func intPtr(i int) *int {
-	return &i
 }

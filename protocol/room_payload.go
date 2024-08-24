@@ -1,5 +1,7 @@
 package protocol
 
+import "fmt"
+
 // Chat Room(ROOM): 				ROOM|timestamp|room_action|requester|roomName|roomPassword|roomSize|optional_args
 
 type RoomActionType int
@@ -45,9 +47,9 @@ type OptionalRoomArgs struct {
 type RoomPayload struct {
 	RoomAction       RoomActionType
 	Requester        string
-	RoomName         *string
-	RoomPassword     *string
-	RoomSize         *int
+	RoomName         string
+	RoomPassword     string
+	RoomSize         int
 	OptionalRoomArgs *OptionalRoomArgs
 }
 
@@ -70,4 +72,23 @@ func (rat RoomActionType) String() string {
 	default:
 		return "Unknown"
 	}
+}
+
+var RoomActionMap = map[string]RoomActionType{
+	"CreateRoom": CreateRoom,
+	"JoinRoom":   JoinRoom,
+	"LeaveRoom":  LeaveRoom,
+	"KickUser":   KickUser,
+	"BanUser":    BanUser,
+	"GetUsers":   GetUsers,
+	"GetRooms":   GetRooms,
+}
+
+// ParseRoomAction converts a string to RoomActionType
+func parseRoomAction(s string) (RoomActionType, error) {
+	action, ok := RoomActionMap[s]
+	if !ok {
+		return 0, fmt.Errorf("invalid room action: %s", s)
+	}
+	return action, nil
 }
