@@ -34,18 +34,40 @@ const (
 type OptionalRoomArgs struct {
 	Status     Status
 	Visibility Visibility
+	Message    string
 	Reason     string
-	Rooms      []string
-	Users      []string
-	TargetUser string // For KICK and BAN actions
+	Rooms      []string // For GetRooms
+	Users      []string // For GetUsers
+	TargetUser string   // For KICK and BAN actions
 }
 
 // RoomPayload represents the payload for room-related operations
 type RoomPayload struct {
 	RoomAction       RoomActionType
 	Requester        string
-	RoomName         string
-	RoomPassword     string
-	RoomSize         int
+	RoomName         *string
+	RoomPassword     *string
+	RoomSize         *int
 	OptionalRoomArgs *OptionalRoomArgs
+}
+
+func (rat RoomActionType) String() string {
+	switch rat {
+	case CreateRoom:
+		return "CreateRoom"
+	case JoinRoom:
+		return "JoinRoom"
+	case LeaveRoom:
+		return "LeaveRoom"
+	case KickUser:
+		return "KickUser"
+	case BanUser:
+		return "BanUser"
+	case GetUsers:
+		return "GetUsers"
+	case GetRooms:
+		return "GetRooms"
+	default:
+		return "Unknown"
+	}
 }

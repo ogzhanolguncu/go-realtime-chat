@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEncodeGeneralMessage(t *testing.T) {
@@ -184,4 +185,78 @@ func TestEncodeBlockUserMessage(t *testing.T) {
 		}
 	})
 
+}
+
+func TestEncodeRoomMessage(t *testing.T) {
+	t.Run("should encode blocker user message successfully", func(t *testing.T) {
+		tests := []struct {
+			roomAction   RoomActionType
+			requester    string
+			roomName     *string
+			roomPassword *string
+			roomSize     *int
+			optionalArgs *OptionalRoomArgs
+			expected     string
+		}{
+			{
+				roomAction:   CreateRoom,
+				requester:    "Oz",
+				roomName:     strPtr("testRoom"),
+				roomPassword: strPtr("testPassword"),
+				roomSize:     intPtr(2),
+				optionalArgs: &OptionalRoomArgs{
+					Visibility: VisibilityPublic,
+				},
+				expected: fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|visibility=public\r\n", time.Now().Unix()),
+			},
+			{
+				roomAction:   CreateRoom,
+				requester:    "Oz",
+				roomName:     strPtr("testRoom"),
+				roomPassword: strPtr("testPassword"),
+				roomSize:     intPtr(2),
+				optionalArgs: &OptionalRoomArgs{
+					Status: StatusSuccess,
+				},
+				expected: fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|status=success\r\n", time.Now().Unix()),
+			},
+			{
+				roomAction:   JoinRoom,
+				requester:    "John",
+				roomName:     strPtr("testRoom"),
+				roomPassword: strPtr("testPassword"),
+				expected:     fmt.Sprintf("ROOM|%d|JoinRoom|John|testRoom|testPassword\r\n", time.Now().Unix()),
+			},
+		}
+		for _, test := range tests {
+			roomPayload := &RoomPayload{
+				RoomAction:   test.roomAction,
+				Requester:    test.requester,
+				RoomName:     test.roomName,
+				RoomPassword: test.roomPassword,
+				RoomSize:     test.roomSize,
+			}
+			if test.optionalArgs != nil {
+				roomPayload.OptionalRoomArgs = &OptionalRoomArgs{
+					Status:     test.optionalArgs.Status,
+					Visibility: test.optionalArgs.Visibility,
+				}
+			}
+			result := encodeProtocol(true, Payload{
+				MessageType: MessageTypeROOM,
+				RoomPayload: roomPayload,
+			})
+			decoded, _ := base64.StdEncoding.DecodeString(result)
+			require.Equal(t, test.expected, string(decoded))
+		}
+	})
+
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
 }
