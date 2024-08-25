@@ -51,26 +51,26 @@ func NewChannelManager() *Manager {
 	}
 }
 
-func (m *Manager) Handle(payload protocol.Payload) protocol.RoomPayload {
+func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
 	logger.WithFields(logrus.Fields{
-		"action": payload.RoomPayload.RoomAction,
-		"room":   payload.RoomPayload.RoomName,
-		"user":   payload.RoomPayload.Requester,
+		"action": payload.ChannelPayload.ChannelAction,
+		"room":   payload.ChannelPayload.ChannelName,
+		"user":   payload.ChannelPayload.Requester,
 	}).Info("Handling room action")
 
-	switch payload.RoomPayload.RoomAction {
-	case protocol.CreateRoom:
-		return m.createRoom(*payload.RoomPayload)
-	case protocol.JoinRoom:
-		return m.joinRoom(*payload.RoomPayload)
-	case protocol.LeaveRoom:
-		return m.leaveRoom(*payload.RoomPayload)
-	case protocol.GetRooms:
-		return m.getRooms(*payload.RoomPayload)
+	switch payload.ChannelPayload.ChannelAction {
+	case protocol.CreateChannel:
+		return m.createRoom(*payload.ChannelPayload)
+	case protocol.JoinChannel:
+		return m.joinRoom(*payload.ChannelPayload)
+	case protocol.LeaveChannel:
+		return m.leaveRoom(*payload.ChannelPayload)
+	case protocol.GetChannels:
+		return m.getRooms(*payload.ChannelPayload)
 	default:
-		logger.WithField("action", payload.RoomPayload.RoomAction).Warn("Unknown room action")
-		return protocol.RoomPayload{
-			OptionalRoomArgs: &protocol.OptionalRoomArgs{
+		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown room action")
+		return protocol.ChannelPayload{
+			OptionalChannelArgs: &protocol.OptionalChannelArgs{
 				Status: protocol.StatusFail,
 				Reason: unknownRoomAction,
 			},
@@ -78,70 +78,70 @@ func (m *Manager) Handle(payload protocol.Payload) protocol.RoomPayload {
 	}
 }
 
-func (m *Manager) createRoom(roomPayload protocol.RoomPayload) protocol.RoomPayload {
+func (m *Manager) createRoom(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger.WithFields(logrus.Fields{
-		"room":  roomPayload.RoomName,
+		"room":  roomPayload.ChannelName,
 		"owner": roomPayload.Requester,
 	}).Info("Attempting to create room")
 
-	if _, exists := m.roomMap[roomPayload.RoomName]; exists {
-		logger.WithField("room", roomPayload.RoomName).Warn("Room already exists")
-		roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+	if _, exists := m.roomMap[roomPayload.ChannelName]; exists {
+		logger.WithField("room", roomPayload.ChannelName).Warn("Room already exists")
+		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: roomAlreadyExists,
 		}
 		return roomPayload
 	}
 
-	m.roomMap[roomPayload.RoomName] = &RoomDetails{
-		RoomName:     roomPayload.RoomName,
-		RoomPassword: roomPayload.RoomPassword,
+	m.roomMap[roomPayload.ChannelName] = &RoomDetails{
+		RoomName:     roomPayload.ChannelName,
+		RoomPassword: roomPayload.ChannelPassword,
 		Owner:        roomPayload.Requester,
-		RoomSize:     roomPayload.RoomSize,
+		RoomSize:     roomPayload.ChannelSize,
 		Users:        []string{roomPayload.Requester},
 		LastActivity: time.Now().Unix(),
-		Visibility:   string(roomPayload.OptionalRoomArgs.Visibility),
+		Visibility:   string(roomPayload.OptionalChannelArgs.Visibility),
 	}
 
 	logger.WithFields(logrus.Fields{
-		"room":  roomPayload.RoomName,
+		"room":  roomPayload.ChannelName,
 		"owner": roomPayload.Requester,
 	}).Info("Room created successfully")
 
-	roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
 	return roomPayload
 }
 
-func (m *Manager) joinRoom(roomPayload protocol.RoomPayload) protocol.RoomPayload {
+func (m *Manager) joinRoom(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.RoomName,
+		"room": roomPayload.ChannelName,
 		"user": roomPayload.Requester,
 	}).Info("Attempting to join room")
 
-	room, exists := m.roomMap[roomPayload.RoomName]
+	room, exists := m.roomMap[roomPayload.ChannelName]
 	if !exists {
-		logger.WithField("room", roomPayload.RoomName).Warn("Room does not exist")
-		roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+		logger.WithField("room", roomPayload.ChannelName).Warn("Room does not exist")
+		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: roomDoesNotExist,
 		}
 		return roomPayload
 	}
 
-	if room.RoomPassword != roomPayload.RoomPassword {
+	if room.RoomPassword != roomPayload.ChannelPassword {
 		logger.WithFields(logrus.Fields{
-			"room": roomPayload.RoomName,
+			"room": roomPayload.ChannelName,
 			"user": roomPayload.Requester,
 		}).Warn("Incorrect room password")
-		roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: incorrectRoomPassword,
 		}
@@ -150,10 +150,10 @@ func (m *Manager) joinRoom(roomPayload protocol.RoomPayload) protocol.RoomPayloa
 
 	if len(room.Users) >= room.RoomSize {
 		logger.WithFields(logrus.Fields{
-			"room": roomPayload.RoomName,
+			"room": roomPayload.ChannelName,
 			"user": roomPayload.Requester,
 		}).Warn("Room at capacity")
-		roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: roomAtCapacity,
 		}
@@ -164,29 +164,29 @@ func (m *Manager) joinRoom(roomPayload protocol.RoomPayload) protocol.RoomPayloa
 	room.LastActivity = time.Now().Unix()
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.RoomName,
+		"room": roomPayload.ChannelName,
 		"user": roomPayload.Requester,
 	}).Info("User joined room successfully")
 
-	roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
 	return roomPayload
 }
 
-func (m *Manager) leaveRoom(roomPayload protocol.RoomPayload) protocol.RoomPayload {
+func (m *Manager) leaveRoom(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.RoomName,
+		"room": roomPayload.ChannelName,
 		"user": roomPayload.Requester,
 	}).Info("Attempting to leave room")
 
-	room, exists := m.roomMap[roomPayload.RoomName]
+	room, exists := m.roomMap[roomPayload.ChannelName]
 	if !exists {
-		logger.WithField("room", roomPayload.RoomName).Warn("Room does not exist")
-		roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+		logger.WithField("room", roomPayload.ChannelName).Warn("Room does not exist")
+		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: roomDoesNotExist,
 		}
@@ -196,10 +196,10 @@ func (m *Manager) leaveRoom(roomPayload protocol.RoomPayload) protocol.RoomPaylo
 	userIndex := slices.Index(room.Users, roomPayload.Requester)
 	if userIndex == -1 {
 		logger.WithFields(logrus.Fields{
-			"room": roomPayload.RoomName,
+			"room": roomPayload.ChannelName,
 			"user": roomPayload.Requester,
 		}).Warn("User not in the room")
-		roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: notInTheRoom,
 		}
@@ -210,22 +210,22 @@ func (m *Manager) leaveRoom(roomPayload protocol.RoomPayload) protocol.RoomPaylo
 	room.LastActivity = time.Now().Unix()
 
 	if len(room.Users) == 0 {
-		delete(m.roomMap, roomPayload.RoomName)
-		logger.WithField("room", roomPayload.RoomName).Info("Room deleted as it's empty")
+		delete(m.roomMap, roomPayload.ChannelName)
+		logger.WithField("room", roomPayload.ChannelName).Info("Room deleted as it's empty")
 	}
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.RoomName,
+		"room": roomPayload.ChannelName,
 		"user": roomPayload.Requester,
 	}).Info("User left room successfully")
 
-	roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
+	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
 	return roomPayload
 }
 
-func (m *Manager) getRooms(roomPayload protocol.RoomPayload) protocol.RoomPayload {
+func (m *Manager) getRooms(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -238,9 +238,9 @@ func (m *Manager) getRooms(roomPayload protocol.RoomPayload) protocol.RoomPayloa
 
 	logger.WithField("roomCount", len(rooms)).Info("Room list retrieved")
 
-	roomPayload.OptionalRoomArgs = &protocol.OptionalRoomArgs{
-		Status: protocol.StatusSuccess,
-		Rooms:  rooms,
+	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status:   protocol.StatusSuccess,
+		Channels: rooms,
 	}
 	return roomPayload
 }

@@ -31,7 +31,7 @@ func (mr *MessageRouter) RouteMessage(info *connection.ConnectionInfo, message s
 	}
 
 	switch payload.MessageType {
-	case protocol.MessageTypeROOM:
+	case protocol.MessageTypeCH:
 		mr.handleChannelMessage(payload, info)
 	case protocol.MessageTypeMSG:
 		mr.handleGroupMessage(payload, info)
@@ -53,7 +53,7 @@ func (mr *MessageRouter) RouteMessage(info *connection.ConnectionInfo, message s
 func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *connection.ConnectionInfo) {
 	roomPayload := mr.server.channelManager.Handle(payload)
 	payload.Timestamp = time.Now().Unix()
-	payload.RoomPayload = &roomPayload
+	payload.ChannelPayload = &roomPayload
 	roomMsg := []byte(mr.server.encodeFn(payload))
 	_, err := info.Connection.Write([]byte(roomMsg))
 	if err != nil {

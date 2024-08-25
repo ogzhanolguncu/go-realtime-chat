@@ -6,7 +6,7 @@ package protocol
 // Active Users(ACT_USRS):			ACT_USRS|timestampactive_user_array|status\r\n status = "res" | "req"
 // Username Message(USR): 			USR|timestamp|username|password|status\r\n status = "fail | "success"
 // Chat History(HSTRY): 			HSTRY|timestamp|requester|messages_array|status\r\n status = "res" | "req"
-// Chat ROOM(ROOM): 				ROOM|timestamp|room_action|requester|roomName|roomPassword|roomSize|optional_args
+// Chat Channel(CH): 				CH|timestamp|room_action|requester|roomName|roomPassword|roomSize|optional_args
 
 const Separator = "|"
 
@@ -21,7 +21,7 @@ const (
 	MessageTypeACT_USRS MessageType = "ACT_USRS" //Active users
 	MessageTypeHSTRY    MessageType = "HSTRY"    //Chat history
 	MessageTypeENC      MessageType = "ENC"
-	MessageTypeROOM     MessageType = "ROOM"
+	MessageTypeCH       MessageType = "CH"
 )
 
 type Payload struct {
@@ -42,5 +42,5 @@ type Payload struct {
 
 	EncryptedKey string
 
-	RoomPayload *RoomPayload
+	ChannelPayload *ChannelPayload
 }
