@@ -94,6 +94,28 @@ func decodeProtocol(encoding bool, message string) (Payload, error) {
 			return Payload{}, err
 		}
 		return Payload{MessageType: MessageTypeBLCK_USR, Timestamp: timestamp, Content: content, Sender: sender, Recipient: recipient}, nil
+	case MessageTypeROOM:
+		timestamp, room_action, requester, roomName, roomPassword, roomSize, optionalArgs, err := parseROOM(parts)
+		if err != nil {
+			return Payload{}, err
+		}
+		roomAction, err := parseRoomAction(room_action)
+		if err != nil {
+			return Payload{}, err
+		}
+		return Payload{
+			MessageType: MessageTypeROOM,
+			Timestamp:   timestamp,
+			RoomPayload: &RoomPayload{
+				RoomAction:       roomAction,
+				Requester:        requester,
+				RoomName:         roomName,
+				RoomPassword:     roomPassword,
+				RoomSize:         roomSize,
+				OptionalRoomArgs: optionalArgs,
+			},
+		}, nil
+
 	default:
 		return Payload{}, fmt.Errorf("unsupported message type %s", messageType)
 	}
@@ -251,4 +273,100 @@ func parseBLCK_USR(msg string) (timestamp int64, sender, recipient, content stri
 	}
 
 	return timestamp, sender, recipient, content, nil
+}
+
+// Chat Room(ROOM): ROOM|timestamp|room_action|requester|roomName|roomPassword|roomSize|optional_args
+func parseROOM(msg string) (timestamp int64, room_action, requester, roomName, roomPassword string, roomSize int, optionalArgs *OptionalRoomArgs, err error) {
+	timestampStr, rest, found := strings.Cut(msg, "|")
+	if !found {
+		return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidFormat, "ROOM", errMissingTimestamp)
+	}
+	timestamp, err = strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidTimestamp, err)
+	}
+	room_action, rest, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidFormat, "ROOM", "error missing room_action")
+	}
+	requester, rest, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidFormat, "ROOM", "error missing requester")
+	}
+	roomName, rest, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidFormat, "ROOM", "error missing roomName")
+	}
+	if roomName == emptyRoomField {
+		roomName = ""
+	}
+
+	roomPassword, rest, found = strings.Cut(rest, "|")
+	if !found {
+		return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidFormat, "ROOM", "error missing roomPassword")
+	}
+	if roomPassword == emptyRoomField {
+		roomPassword = ""
+	}
+
+	roomSizeStr, optionalArgsStr, found := strings.Cut(rest, "|")
+	if !found {
+		if optionalArgsStr != "" {
+			optionalArgs = parseRoomOptionalArgs(optionalArgsStr)
+		}
+		return timestamp, room_action, requester, roomName, roomPassword, roomSize, optionalArgs, nil
+	}
+	if roomSizeStr != emptyRoomField {
+		roomSize, err = strconv.Atoi(roomSizeStr)
+		if err != nil {
+			return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidFormat, "ROOM", "error missing roomSizeStr")
+		}
+	}
+
+	if optionalArgsStr != "" {
+		optionalArgs = parseRoomOptionalArgs(optionalArgsStr)
+	}
+
+	return timestamp, room_action, requester, roomName, roomPassword, roomSize, optionalArgs, nil
+}
+
+const (
+	optArgStatus     = "status="
+	optArgVisibility = "visibility="
+	optArgMessage    = "message="
+	optArgReason     = "reason="
+	optArgRooms      = "rooms="
+	optArgUsers      = "users="
+	optArgTargetUser = "target_user="
+)
+
+func parseRoomOptionalArgs(optionalArgs string) *OptionalRoomArgs {
+	finalOptionalArg := &OptionalRoomArgs{}
+	splittedOptionalArgs := strings.Split(optionalArgs, optionalArgsSeparator)
+	for _, optionalArg := range splittedOptionalArgs {
+		switch {
+		case strings.HasPrefix(optionalArg, optArgStatus):
+			status, _ := strings.CutPrefix(optionalArg, optArgStatus)
+			finalOptionalArg.Status = Status(status)
+		case strings.HasPrefix(optionalArg, optArgVisibility):
+			visibility, _ := strings.CutPrefix(optionalArg, optArgVisibility)
+			finalOptionalArg.Visibility = Visibility(visibility)
+		case strings.HasPrefix(optionalArg, optArgMessage):
+			message, _ := strings.CutPrefix(optionalArg, optArgMessage)
+			finalOptionalArg.Message = message
+		case strings.HasPrefix(optionalArg, optArgReason):
+			reason, _ := strings.CutPrefix(optionalArg, optArgReason)
+			finalOptionalArg.Reason = reason
+		case strings.HasPrefix(optionalArg, optArgRooms):
+			rooms, _ := strings.CutPrefix(optionalArg, optArgRooms)
+			finalOptionalArg.Rooms = strings.Split(rooms, optionalUserAndRoomsSeparator)
+		case strings.HasPrefix(optionalArg, optArgUsers):
+			users, _ := strings.CutPrefix(optionalArg, optArgUsers)
+			finalOptionalArg.Users = strings.Split(users, optionalUserAndRoomsSeparator)
+		case strings.HasPrefix(optionalArg, optArgTargetUser):
+			targetUser, _ := strings.CutPrefix(optionalArg, optArgTargetUser)
+			finalOptionalArg.TargetUser = targetUser
+		}
+	}
+	return finalOptionalArg
 }

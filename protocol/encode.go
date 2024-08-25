@@ -13,7 +13,6 @@ func InitEncodeProtocol(isBase64 bool) func(payload Payload) string {
 	}
 }
 
-// TODO: start adding room payload here, then tests
 func encodeProtocol(isBase64 bool, payload Payload) string {
 	var sb strings.Builder
 
@@ -61,6 +60,10 @@ func encodeProtocol(isBase64 bool, payload Payload) string {
 			writeCommonPrefix(payload.MessageType)
 			sb.WriteString(payload.EncryptedKey)
 		},
+
+		MessageTypeROOM: func() {
+			sb.WriteString(encodeROOM(&payload))
+		},
 	}
 
 	if formatter, ok := messageFormatters[payload.MessageType]; ok {
@@ -74,5 +77,4 @@ func encodeProtocol(isBase64 bool, payload Payload) string {
 		return base64.StdEncoding.EncodeToString([]byte(sb.String())) + "\r\n"
 	}
 	return sb.String()
-
 }

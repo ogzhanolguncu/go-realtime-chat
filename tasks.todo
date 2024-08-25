@@ -141,14 +141,14 @@ Chat Application Todo List:
             - [ ] Fail: `ROOM|1629123461|LEAVE|John|testRoom|-|-|status=fail,reason=not_in_room\r\n`
 
             ### Kick User
-            - [ ] Request: `ROOM|1629123462|KICK|Oz|testRoom|John|-\r\n`
-            - [ ] Success: `ROOM|1629123463|KICK|Oz|testRoom|John|-|status=success\r\n`
-            - [ ] Fail: `ROOM|1629123463|KICK|Oz|testRoom|John|-|status=fail,reason=not_owner\r\n`
+            - [ ] Request: `ROOM|1629123462|KICK|Oz|testRoom|target_user=John-\r\n`
+            - [ ] Success: `ROOM|1629123463|KICK|Oz|testRoom|target_user=John;status=success\r\n`
+            - [ ] Fail: `ROOM|1629123463|KICK|Oz|testRoom|target_user=John;status=fail,reason=not_owner\r\n`
 
             ### Ban User
-            - [ ] Request: `ROOM|1629123464|BAN|Oz|testRoom|John|-\r\n`
-            - [ ] Success: `ROOM|1629123465|BAN|Oz|testRoom|John|-|status=success\r\n`
-            - [ ] Fail: `ROOM|1629123465|BAN|Oz|testRoom|John|-|status=fail,reason=user_not_found\r\n`
+            - [ ] Request: `ROOM|1629123464|BAN|Oz|testRoom|target_user=John\r\n`
+            - [ ] Success: `ROOM|1629123465|BAN|Oz|testRoom|target_user=John'status=success\r\n`
+            - [ ] Fail: `ROOM|1629123465|BAN|Oz|testRoom|target_user=John;status=fail;reason=user_not_found\r\n`
 
             ### Get Room Users
             - [ ] Request: `ROOM|1629123466|GET_USERS|John|testRoom|-|-\r\n`

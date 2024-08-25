@@ -21,6 +21,7 @@ const (
 	MessageTypeACT_USRS MessageType = "ACT_USRS" //Active users
 	MessageTypeHSTRY    MessageType = "HSTRY"    //Chat history
 	MessageTypeENC      MessageType = "ENC"
+	MessageTypeROOM     MessageType = "ROOM"
 )
 
 type Payload struct {
