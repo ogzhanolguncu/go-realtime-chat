@@ -7,6 +7,7 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 	"github.com/ogzhanolguncu/go-chat/server/internal/auth"
 	"github.com/ogzhanolguncu/go-chat/server/internal/block_user"
+	"github.com/ogzhanolguncu/go-chat/server/internal/channels"
 	"github.com/ogzhanolguncu/go-chat/server/internal/chat_history"
 	"github.com/ogzhanolguncu/go-chat/server/internal/connection"
 	"github.com/sirupsen/logrus"
@@ -15,14 +16,17 @@ import (
 var logger *logrus.Logger
 
 type TCPServer struct {
-	listener          net.Listener
+	listener net.Listener
+
 	connectionManager *connection.Manager
 	historyManager    *chat_history.ChatHistory
 	authManager       *auth.AuthManager
 	blockUserManager  *block_user.BlockUserManager
-	messageRouter     *MessageRouter
-	encodeFn          func(payload protocol.Payload) string
-	decodeFn          func(message string) (protocol.Payload, error)
+	channelManager    *channels.Manager
+
+	messageRouter *MessageRouter
+	encodeFn      func(payload protocol.Payload) string
+	decodeFn      func(message string) (protocol.Payload, error)
 }
 
 // Server Initialization
@@ -53,15 +57,19 @@ func NewServer(port int, dbPath string, encoding bool) (*TCPServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize block user manager: %w", err)
 	}
+	chanm := channels.NewChannelManager()
 
 	server := &TCPServer{
-		listener:          listener,
+		listener: listener,
+
 		connectionManager: cm,
 		historyManager:    hm,
 		authManager:       am,
 		blockUserManager:  bum,
-		encodeFn:          protocol.InitEncodeProtocol(encoding),
-		decodeFn:          protocol.InitDecodeProtocol(encoding),
+		channelManager:    chanm,
+
+		encodeFn: protocol.InitEncodeProtocol(encoding),
+		decodeFn: protocol.InitDecodeProtocol(encoding),
 	}
 
 	server.messageRouter = NewMessageRouter(server)

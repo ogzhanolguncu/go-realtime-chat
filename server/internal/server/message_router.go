@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/ogzhanolguncu/go-chat/protocol"
 	"github.com/ogzhanolguncu/go-chat/server/internal/connection"
@@ -30,6 +31,8 @@ func (mr *MessageRouter) RouteMessage(info *connection.ConnectionInfo, message s
 	}
 
 	switch payload.MessageType {
+	case protocol.MessageTypeROOM:
+		mr.handleChannelMessage(payload, info)
 	case protocol.MessageTypeMSG:
 		mr.handleGroupMessage(payload, info)
 	case protocol.MessageTypeWSP:
@@ -47,6 +50,16 @@ func (mr *MessageRouter) RouteMessage(info *connection.ConnectionInfo, message s
 
 // Message Handlers
 // -----------------------------
+func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *connection.ConnectionInfo) {
+	roomPayload := mr.server.channelManager.Handle(payload)
+	payload.Timestamp = time.Now().Unix()
+	payload.RoomPayload = &roomPayload
+	roomMsg := []byte(mr.server.encodeFn(payload))
+	_, err := info.Connection.Write([]byte(roomMsg))
+	if err != nil {
+		log.Printf("failed to write history message: %v", err)
+	}
+}
 
 func (mr *MessageRouter) handleGroupMessage(payload protocol.Payload, info *connection.ConnectionInfo) {
 	excludedConns, err := mr.getExcludedConnections(info.Connection)
