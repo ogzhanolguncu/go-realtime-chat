@@ -7,7 +7,7 @@ import "fmt"
 type RoomActionType int
 
 const (
-	CreateRoom RoomActionType = iota
+	CreateRoom RoomActionType = iota + 1
 	JoinRoom
 	LeaveRoom
 	KickUser
