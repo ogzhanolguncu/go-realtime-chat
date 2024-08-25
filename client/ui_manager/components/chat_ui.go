@@ -1,4 +1,4 @@
-package chat_ui
+package ui_manager
 
 import (
 	"fmt"

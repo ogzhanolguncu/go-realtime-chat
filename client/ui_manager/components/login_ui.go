@@ -1,4 +1,4 @@
-package login_ui
+package ui_manager
 
 import (
 	"fmt"
