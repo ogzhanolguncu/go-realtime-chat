@@ -319,7 +319,7 @@ func parseROOM(msg string) (timestamp int64, room_action, requester, roomName, r
 	if roomSizeStr != emptyRoomField {
 		roomSize, err = strconv.Atoi(roomSizeStr)
 		if err != nil {
-			return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidTimestamp, err)
+			return 0, "", "", "", "", 0, &OptionalRoomArgs{}, fmt.Errorf(errInvalidFormat, "ROOM", "error missing roomSizeStr")
 		}
 	}
 
