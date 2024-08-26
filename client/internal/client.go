@@ -92,3 +92,13 @@ func (c *Client) RemoveUserFromMutedList(user string) bool {
 	})
 	return len(c.mutedUsers) < initialLength
 }
+
+func (c *Client) CheckIfSuccessfulChannel(payload protocol.Payload) bool {
+	if (payload.ChannelPayload != nil &&
+		payload.ChannelPayload.OptionalChannelArgs != nil &&
+		payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess) &&
+		(payload.ChannelPayload.ChannelAction == protocol.JoinChannel || payload.ChannelPayload.ChannelAction == protocol.CreateChannel) {
+		return true
+	}
+	return false
+}

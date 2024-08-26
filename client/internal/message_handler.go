@@ -100,14 +100,14 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 	}
 	parts := strings.Fields(userInput)
 	switch parts[0] {
-	case "/channel":
-		partsWithoutCommand, found := strings.CutPrefix(strings.Join(parts, " "), "/channel")
+	case "/ch":
+		partsWithoutCommand, found := strings.CutPrefix(strings.Join(parts, " "), "/ch")
 		if !found {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /channel <join|create> <roomName> [roomPassword] [roomSize]"), nil
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /ch <join|create> <channelName> [channelPassword] [channelSize]"), nil
 		}
 		roomParts := strings.Fields(partsWithoutCommand)
 		if len(roomParts) < 2 {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /channel <join|create> <roomName> [roomPassword] [roomSize]"), nil
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /ch <join|create> <channelName> [channelPassword] [channelSize]"), nil
 		}
 
 		roomAction := roomParts[0]
@@ -129,7 +129,7 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 
 		payload, err := protocol.NewRoomPayloadBuilder().
 			SetRequester(c.name).
-			SetChannelAction(protocol.ChannelActionMap[roomAction]).
+			SetChannelAction(protocol.ClientChannelActionMap[roomAction]).
 			SetChannelName(roomName).
 			SetChannelPassword(roomPassword).
 			SetChannelSize(roomSizeInt).

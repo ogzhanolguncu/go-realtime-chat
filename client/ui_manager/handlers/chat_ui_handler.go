@@ -12,13 +12,15 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func HandleChatUI(client *internal.Client) (bool, error) {
+type ChannelName string
+
+func HandleChatUI(client *internal.Client) (bool, ChannelName, error) {
 	chatUI := ui_manager.NewChatUI(client.GetUsername())
 	defer chatUI.Close()
 
 	header, commandBox, chatBox, inputBox, userList, err := chatUI.InitUI()
 	if err != nil {
-		return false, fmt.Errorf("failed to initialize termui: %v", err)
+		return false, "", fmt.Errorf("failed to initialize termui: %v", err)
 	}
 	chatUI.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the chat!](fg:cyan)", time.Now().Format("01-02 15:04")), chatBox)
 	draw := chatUI.Draw(header, commandBox, chatBox, inputBox, userList)
@@ -48,11 +50,11 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 			case "<MouseWheelDown>":
 				chatUI.ScrollChatBox(chatBox, 1)
 			case "<C-c>":
-				return false, nil
+				return false, "", nil
 			case "<Enter>":
 				if chatUI.IsInputMode() && len(inputBox.Text) > 0 {
 					if inputBox.Text == "/quit" {
-						return false, nil
+						return false, "", nil
 					}
 					if inputBox.Text == "/clear" {
 						chatUI.ClearChatBox(chatBox)
@@ -60,12 +62,9 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 						draw()
 						continue
 					}
-					if inputBox.Text == "Hey" {
-						return true, nil // Signal to switch to alternate UI
-					}
 					message, err := client.HandleSend(inputBox.Text)
 					if err != nil {
-						return false, err
+						return false, "", err
 					}
 					chatUI.UpdateChatBox(message, chatBox)
 					inputBox.Text = ""
@@ -84,15 +83,19 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 				}
 			}
 		case payload := <-incomingChan:
+			// If its a channel message action and success status return true to switch to Channel UI
+			if client.CheckIfSuccessfulChannel(payload) {
+				return true, ChannelName(payload.ChannelPayload.ChannelName), nil
+			}
 			if payload.MessageType == protocol.MessageTypeWSP {
 				notificationMsg := payload.Content
+				// Make notification shorter to fit it into small notification window
 				if len(payload.Content) >= 10 {
 					notificationMsg = payload.Content[0:10] + "..."
 				}
 				go utils.NotifyUser(fmt.Sprintf("Whisper from %s", payload.Sender), notificationMsg, "/System/Library/Sounds/Purr.aiff")
 			}
 			if client.CheckIfUserMuted(payload.Sender) {
-
 				continue
 			}
 			if payload.MessageType == protocol.MessageTypeHSTRY {
@@ -124,7 +127,7 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 			}
 			chatUI.UpdateChatBox(client.HandleReceive(payload), chatBox)
 		case err := <-errorChan:
-			return false, err
+			return false, "", err
 		}
 		draw()
 	}

@@ -83,6 +83,16 @@ var ChannelActionMap = map[string]ChannelActionType{
 	"GetChannels":   GetChannels,
 }
 
+var ClientChannelActionMap = map[string]ChannelActionType{
+	"create": CreateChannel,
+	"join":   JoinChannel,
+	"leave":  LeaveChannel,
+	"kick":   KickUser,
+	"ban":    BanUser,
+	"users":  GetUsers,
+	"list":   GetChannels,
+}
+
 // ParseChannelAction converts a string to ChannelActionType
 func parseChannelAction(s string) (ChannelActionType, error) {
 	action, ok := ChannelActionMap[s]

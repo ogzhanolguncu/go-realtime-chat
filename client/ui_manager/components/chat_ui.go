@@ -55,16 +55,19 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	// Command Box
 	commandBox = widgets.NewParagraph()
 	commandBox.Title = "Commands"
-	commandBox.Text = "/whisper <username> <message> - Send a private message to a specific user\n" +
-		"/reply <message> - Reply to the last private message received\n" +
-		"/clear - Clear all messages from the chat window\n" +
-		"/quit - Exit the chat application\n" +
-		"/mute <username> - Temporarily hide messages from a specific user\n" +
-		"/unmute <username> - Resume showing messages from a previously muted user\n" +
-		"/block <username> - Permanently prevent messages from a specific user\n" +
-		"/unblock <username> - Allow messages from a previously blocked user\n" +
-		"/help - Display this list of commands"
-	commandBox.SetRect(0, 3, termWidth*3/4, 14) // Increased height to 14 (11 lines of text + 3 for borders and title)
+	commandBox.Text = "General:\n" +
+		"  /clear - Clear chat                     |  /quit - Exit app\n\n" +
+		"User Interactions:\n" +
+		"  /whisper <username> <message> - Send PM              |  /reply <message> - Reply to last PM\n" +
+		"  /mute <username> - Hide messages                     |  /unmute <username> - Show messages\n" +
+		"  /block <username> - Block user                       |  /unblock <username> - Unblock user\n\n" +
+		"Channel Commands:\n" +
+		"  /ch create <name> <password> <max_users> <public|private> - Create channel\n" +
+		"  /ch join <name> <password> - Join channel            |  /ch leave - Leave current channel\n" +
+		"  /ch users - List users in current channel            |  /ch list - Show active channels\n" +
+		"Channel Owner Commands:\n" +
+		"  /ch kick <username> - Kick user from channel         |  /ch ban <username> - Ban user from channel"
+	commandBox.SetRect(0, 3, termWidth*3/4, 19)
 	commandBox.Border = true
 	commandBox.TitleStyle.Fg = ui.ColorYellow
 	commandBox.BorderStyle.Fg = ui.ColorCyan
@@ -74,7 +77,7 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	// Chat Box
 	chatBox = widgets.NewParagraph()
 	chatBox.Title = "Chat Messages"
-	chatBox.SetRect(0, 14, termWidth*3/4, termHeight-3) // Adjusted starting position to 14
+	chatBox.SetRect(0, 19, termWidth*3/4, termHeight-3)
 	chatBox.BorderStyle.Fg = ui.ColorCyan
 	chatBox.TitleStyle.Fg = ui.ColorYellow
 	chatBox.WrapText = true
