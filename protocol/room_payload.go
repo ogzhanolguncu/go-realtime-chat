@@ -2,18 +2,17 @@ package protocol
 
 import "fmt"
 
-// Chat Room(ROOM): 				ROOM|timestamp|room_action|requester|roomName|roomPassword|roomSize|optional_args
-
-type RoomActionType int
+// Chat Channel(CH): CH|timestamp|ch_action|requester|chName|chPassword|chSize|optional_args
+type ChannelActionType int
 
 const (
-	CreateRoom RoomActionType = iota
-	JoinRoom
-	LeaveRoom
+	CreateChannel ChannelActionType = iota + 1
+	JoinChannel
+	LeaveChannel
 	KickUser
 	BanUser
 	GetUsers
-	GetRooms
+	GetChannels
 )
 
 // Status represents the result of an action
@@ -32,63 +31,63 @@ const (
 	VisibilityPrivate Visibility = "private"
 )
 
-// OptionalRoomArgs contains optional arguments for room operations
-type OptionalRoomArgs struct {
+// OptionalChannelArgs contains optional arguments for room operations
+type OptionalChannelArgs struct {
 	Status     Status
 	Visibility Visibility
 	Message    string
 	Reason     string
-	Rooms      []string // For GetRooms
+	Channels   []string // For GetRooms
 	Users      []string // For GetUsers
 	TargetUser string   // For KICK and BAN actions
 }
 
-// RoomPayload represents the payload for room-related operations
-type RoomPayload struct {
-	RoomAction       RoomActionType
-	Requester        string
-	RoomName         string
-	RoomPassword     string
-	RoomSize         int
-	OptionalRoomArgs *OptionalRoomArgs
+// ChannelPayload represents the payload for room-related operations
+type ChannelPayload struct {
+	ChannelAction       ChannelActionType
+	Requester           string
+	ChannelName         string
+	ChannelPassword     string
+	ChannelSize         int
+	OptionalChannelArgs *OptionalChannelArgs
 }
 
-func (rat RoomActionType) String() string {
+func (rat ChannelActionType) String() string {
 	switch rat {
-	case CreateRoom:
-		return "CreateRoom"
-	case JoinRoom:
-		return "JoinRoom"
-	case LeaveRoom:
-		return "LeaveRoom"
+	case CreateChannel:
+		return "CreateChannel"
+	case JoinChannel:
+		return "JoinChannel"
+	case LeaveChannel:
+		return "LeaveChannel"
 	case KickUser:
-		return "KickUser"
+		return "KickChannel"
 	case BanUser:
 		return "BanUser"
 	case GetUsers:
 		return "GetUsers"
-	case GetRooms:
-		return "GetRooms"
+	case GetChannels:
+		return "GetChannels"
 	default:
 		return "Unknown"
 	}
 }
 
-var RoomActionMap = map[string]RoomActionType{
-	"CreateRoom": CreateRoom,
-	"JoinRoom":   JoinRoom,
-	"LeaveRoom":  LeaveRoom,
-	"KickUser":   KickUser,
-	"BanUser":    BanUser,
-	"GetUsers":   GetUsers,
-	"GetRooms":   GetRooms,
+var ChannelActionMap = map[string]ChannelActionType{
+	"CreateChannel": CreateChannel,
+	"JoinChannel":   JoinChannel,
+	"LeaveChannel":  LeaveChannel,
+	"KickUser":      KickUser,
+	"BanUser":       BanUser,
+	"GetUsers":      GetUsers,
+	"GetChannels":   GetChannels,
 }
 
-// ParseRoomAction converts a string to RoomActionType
-func parseRoomAction(s string) (RoomActionType, error) {
-	action, ok := RoomActionMap[s]
+// ParseChannelAction converts a string to ChannelActionType
+func parseChannelAction(s string) (ChannelActionType, error) {
+	action, ok := ChannelActionMap[s]
 	if !ok {
-		return 0, fmt.Errorf("invalid room action: %s", s)
+		return 0, fmt.Errorf("invalid channel action: %s", s)
 	}
 	return action, nil
 }

@@ -124,125 +124,125 @@ func TestDecodeRoomMessage(t *testing.T) {
 	}{
 		{
 			expected: Payload{
-				MessageType: MessageTypeROOM,
+				MessageType: MessageTypeCH,
 				Timestamp:   timeNow,
-				RoomPayload: &RoomPayload{
-					RoomAction:   CreateRoom,
-					Requester:    "Oz",
-					RoomName:     "testRoom",
-					RoomPassword: "testPassword",
-					RoomSize:     2,
-					OptionalRoomArgs: &OptionalRoomArgs{
+				ChannelPayload: &ChannelPayload{
+					ChannelAction:   CreateChannel,
+					Requester:       "Oz",
+					ChannelName:     "testRoom",
+					ChannelPassword: "testPassword",
+					ChannelSize:     2,
+					OptionalChannelArgs: &OptionalChannelArgs{
 						Visibility: VisibilityPublic,
 					},
 				},
 			},
-			input:    fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|visibility=public", timeNow),
+			input:    fmt.Sprintf("CH|%d|CreateChannel|Oz|testRoom|testPassword|2|visibility=public", timeNow),
 			testName: "Create Room Request",
 		},
 		{
 			expected: Payload{
-				MessageType: MessageTypeROOM,
+				MessageType: MessageTypeCH,
 				Timestamp:   timeNow,
-				RoomPayload: &RoomPayload{
-					RoomAction:   CreateRoom,
-					Requester:    "Oz",
-					RoomName:     "testRoom",
-					RoomPassword: "testPassword",
-					RoomSize:     2,
-					OptionalRoomArgs: &OptionalRoomArgs{
+				ChannelPayload: &ChannelPayload{
+					ChannelAction:   CreateChannel,
+					Requester:       "Oz",
+					ChannelName:     "testRoom",
+					ChannelPassword: "testPassword",
+					ChannelSize:     2,
+					OptionalChannelArgs: &OptionalChannelArgs{
 						Status: StatusSuccess,
 					},
 				},
 			},
-			input:    fmt.Sprintf("ROOM|%d|CreateRoom|Oz|testRoom|testPassword|2|status=success", timeNow),
+			input:    fmt.Sprintf("CH|%d|CreateChannel|Oz|testRoom|testPassword|2|status=success", timeNow),
 			testName: "Create Room Success",
 		},
 		{
 			expected: Payload{
-				MessageType: MessageTypeROOM,
+				MessageType: MessageTypeCH,
 				Timestamp:   timeNow,
-				RoomPayload: &RoomPayload{
-					RoomAction:   JoinRoom,
-					Requester:    "John",
-					RoomName:     "testRoom",
-					RoomPassword: "testPassword",
+				ChannelPayload: &ChannelPayload{
+					ChannelAction:   JoinChannel,
+					Requester:       "John",
+					ChannelName:     "testRoom",
+					ChannelPassword: "testPassword",
 				},
 			},
-			input:    fmt.Sprintf("ROOM|%d|JoinRoom|John|testRoom|testPassword|-", timeNow),
+			input:    fmt.Sprintf("CH|%d|JoinChannel|John|testRoom|testPassword|-", timeNow),
 			testName: "Join Room Request",
 		},
 		{
 			expected: Payload{
-				MessageType: MessageTypeROOM,
+				MessageType: MessageTypeCH,
 				Timestamp:   timeNow,
-				RoomPayload: &RoomPayload{
-					RoomAction: GetRooms,
-					Requester:  "John",
+				ChannelPayload: &ChannelPayload{
+					ChannelAction: GetChannels,
+					Requester:     "John",
 				},
 			},
-			input:    fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-", timeNow),
+			input:    fmt.Sprintf("CH|%d|GetChannels|John|-|-|-", timeNow),
 			testName: "Get Rooms Request",
 		},
 		{
 			expected: Payload{
-				MessageType: MessageTypeROOM,
+				MessageType: MessageTypeCH,
 				Timestamp:   timeNow,
-				RoomPayload: &RoomPayload{
-					RoomAction: GetRooms,
-					Requester:  "John",
-					OptionalRoomArgs: &OptionalRoomArgs{
-						Status: StatusSuccess,
-						Rooms:  []string{"golang", "nodejs", "test"},
+				ChannelPayload: &ChannelPayload{
+					ChannelAction: GetChannels,
+					Requester:     "John",
+					OptionalChannelArgs: &OptionalChannelArgs{
+						Status:   StatusSuccess,
+						Channels: []string{"golang", "nodejs", "test"},
 					},
 				},
 			},
-			input:    fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-|status=success;rooms=golang,nodejs,test", timeNow),
+			input:    fmt.Sprintf("CH|%d|GetChannels|John|-|-|-|status=success;rooms=golang,nodejs,test", timeNow),
 			testName: "Get Rooms Success",
 		},
 		{
 			expected: Payload{
-				MessageType: MessageTypeROOM,
+				MessageType: MessageTypeCH,
 				Timestamp:   timeNow,
-				RoomPayload: &RoomPayload{
-					RoomAction: GetRooms,
-					Requester:  "John",
-					OptionalRoomArgs: &OptionalRoomArgs{
+				ChannelPayload: &ChannelPayload{
+					ChannelAction: GetChannels,
+					Requester:     "John",
+					OptionalChannelArgs: &OptionalChannelArgs{
 						Status: StatusFail,
 						Reason: "no_active_rooms",
 					},
 				},
 			},
-			input:    fmt.Sprintf("ROOM|%d|GetRooms|John|-|-|-|status=fail;reason=no_active_rooms", timeNow),
+			input:    fmt.Sprintf("CH|%d|GetChannels|John|-|-|-|status=fail;reason=no_active_rooms", timeNow),
 			testName: "Get Rooms Fail",
 		},
 		{
 			expected: Payload{
-				MessageType: MessageTypeROOM,
+				MessageType: MessageTypeCH,
 				Timestamp:   timeNow,
-				RoomPayload: &RoomPayload{
-					RoomAction:   LeaveRoom,
-					Requester:    "Alice",
-					RoomName:     "specialRoom!@#$",
-					RoomPassword: "",
-					OptionalRoomArgs: &OptionalRoomArgs{
+				ChannelPayload: &ChannelPayload{
+					ChannelAction:   LeaveChannel,
+					Requester:       "Alice",
+					ChannelName:     "specialRoom!@#$",
+					ChannelPassword: "",
+					OptionalChannelArgs: &OptionalChannelArgs{
 						Status:  StatusSuccess,
 						Message: "Left the room successfully",
 						Users:   []string{"Bob", "Charlie"},
 					},
 				},
 			},
-			input:    fmt.Sprintf("ROOM|%d|LeaveRoom|Alice|specialRoom!@#$|-|-|status=success;message=Left the room successfully;users=Bob,Charlie", timeNow),
+			input:    fmt.Sprintf("CH|%d|LeaveChannel|Alice|specialRoom!@#$|-|-|status=success;message=Left the room successfully;users=Bob,Charlie", timeNow),
 			testName: "Leave Room with Special Characters and Multiple Optional Args",
 		},
 		{
 			expectedError: true,
-			input:         fmt.Sprintf("ROOM|%d|InvalidAction|John|-|-|-", timeNow),
+			input:         fmt.Sprintf("CH|%d|InvalidAction|John|-|-|-", timeNow),
 			testName:      "Invalid Room Action",
 		},
 		{
 			expectedError: true,
-			input:         "ROOM|1234567890",
+			input:         "CH|1234567890",
 			testName:      "Missing Required Fields",
 		},
 	}

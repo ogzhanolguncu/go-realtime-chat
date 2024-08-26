@@ -61,8 +61,8 @@ func encodeProtocol(isBase64 bool, payload Payload) string {
 			sb.WriteString(payload.EncryptedKey)
 		},
 
-		MessageTypeROOM: func() {
-			sb.WriteString(encodeROOM(&payload))
+		MessageTypeCH: func() {
+			sb.WriteString(encodeCH(&payload))
 		},
 	}
 
