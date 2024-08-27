@@ -13,6 +13,7 @@ const (
 	BanUser
 	GetUsers
 	GetChannels
+	MessageChannel
 )
 
 // Status represents the result of an action
@@ -68,29 +69,33 @@ func (rat ChannelActionType) String() string {
 		return "GetUsers"
 	case GetChannels:
 		return "GetChannels"
+	case MessageChannel:
+		return "MessageChannel"
 	default:
 		return "Unknown"
 	}
 }
 
 var ChannelActionMap = map[string]ChannelActionType{
-	"CreateChannel": CreateChannel,
-	"JoinChannel":   JoinChannel,
-	"LeaveChannel":  LeaveChannel,
-	"KickUser":      KickUser,
-	"BanUser":       BanUser,
-	"GetUsers":      GetUsers,
-	"GetChannels":   GetChannels,
+	"CreateChannel":  CreateChannel,
+	"JoinChannel":    JoinChannel,
+	"LeaveChannel":   LeaveChannel,
+	"KickUser":       KickUser,
+	"BanUser":        BanUser,
+	"GetUsers":       GetUsers,
+	"GetChannels":    GetChannels,
+	"MessageChannel": MessageChannel,
 }
 
 var ClientChannelActionMap = map[string]ChannelActionType{
-	"create": CreateChannel,
-	"join":   JoinChannel,
-	"leave":  LeaveChannel,
-	"kick":   KickUser,
-	"ban":    BanUser,
-	"users":  GetUsers,
-	"list":   GetChannels,
+	"create":  CreateChannel,
+	"join":    JoinChannel,
+	"leave":   LeaveChannel,
+	"kick":    KickUser,
+	"ban":     BanUser,
+	"users":   GetUsers,
+	"list":    GetChannels,
+	"message": MessageChannel,
 }
 
 // ParseChannelAction converts a string to ChannelActionType
