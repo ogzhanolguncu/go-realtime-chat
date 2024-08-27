@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	roomAlreadyExists     = "Room name already exists."
-	roomDoesNotExist      = "Room does not exist."
-	incorrectRoomPassword = "Incorrect room password."
-	roomAtCapacity        = "Room is full. Try again later."
-	notInTheRoom          = "User not in the room."
-	unknownRoomAction     = "Unknown room action."
+	chAlreadyExists     = "Channel name already exists."
+	chDoesNotExist      = "Channel does not exist."
+	incorrectChPassword = "Incorrect channel password."
+	chAtCapacity        = "Channel is full. Try again later."
+	notInTheCh          = "User not in the channel."
+	unknownChAction     = "Unknown channel action."
 )
 
 var logger *logrus.Logger
@@ -28,10 +28,10 @@ func init() {
 	})
 }
 
-type RoomDetails struct {
-	RoomName     string
-	RoomPassword string
-	RoomSize     int
+type ChannelDetails struct {
+	ChName       string
+	ChPass       string
+	ChSize       int
 	Owner        string
 	Users        []string
 	LastActivity int64
@@ -40,207 +40,237 @@ type RoomDetails struct {
 }
 
 type Manager struct {
-	roomMap map[string]*RoomDetails
-	lock    sync.RWMutex
+	chMap map[string]*ChannelDetails
+	lock  sync.RWMutex
 }
 
 func NewChannelManager() *Manager {
 	logger.Info("Initializing new ChannelManager")
 	return &Manager{
-		roomMap: make(map[string]*RoomDetails),
+		chMap: make(map[string]*ChannelDetails),
 	}
 }
 
 func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
 	logger.WithFields(logrus.Fields{
-		"action": payload.ChannelPayload.ChannelAction,
-		"room":   payload.ChannelPayload.ChannelName,
-		"user":   payload.ChannelPayload.Requester,
-	}).Info("Handling room action")
+		"action":  payload.ChannelPayload.ChannelAction,
+		"channel": payload.ChannelPayload.ChannelName,
+		"user":    payload.ChannelPayload.Requester,
+	}).Info("Handling channel action")
 
 	switch payload.ChannelPayload.ChannelAction {
 	case protocol.CreateChannel:
-		return m.createRoom(*payload.ChannelPayload)
+		return m.createChannel(*payload.ChannelPayload)
 	case protocol.JoinChannel:
-		return m.joinRoom(*payload.ChannelPayload)
+		return m.joinChannel(*payload.ChannelPayload)
 	case protocol.LeaveChannel:
-		return m.leaveRoom(*payload.ChannelPayload)
+		return m.leaveChannel(*payload.ChannelPayload)
 	case protocol.GetChannels:
-		return m.getRooms(*payload.ChannelPayload)
+		return m.getChannels(*payload.ChannelPayload)
+	case protocol.GetUsers:
+		return m.getUsers(*payload.ChannelPayload)
 	default:
-		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown room action")
+		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown channel action")
 		return protocol.ChannelPayload{
 			OptionalChannelArgs: &protocol.OptionalChannelArgs{
 				Status: protocol.StatusFail,
-				Reason: unknownRoomAction,
+				Reason: unknownChAction,
 			},
 		}
 	}
 }
 
-func (m *Manager) createRoom(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
+func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger.WithFields(logrus.Fields{
-		"room":  roomPayload.ChannelName,
-		"owner": roomPayload.Requester,
-	}).Info("Attempting to create room")
+		"channel": chPayload.ChannelName,
+		"owner":   chPayload.Requester,
+	}).Info("Attempting to create channel")
 
-	if _, exists := m.roomMap[roomPayload.ChannelName]; exists {
-		logger.WithField("room", roomPayload.ChannelName).Warn("Room already exists")
-		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+	if _, exists := m.chMap[chPayload.ChannelName]; exists {
+		logger.WithField("channel", chPayload.ChannelName).Warn("Channel already exists")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
-			Reason: roomAlreadyExists,
+			Reason: chAlreadyExists,
 		}
-		return roomPayload
+		return chPayload
 	}
 
-	m.roomMap[roomPayload.ChannelName] = &RoomDetails{
-		RoomName:     roomPayload.ChannelName,
-		RoomPassword: roomPayload.ChannelPassword,
-		Owner:        roomPayload.Requester,
-		RoomSize:     roomPayload.ChannelSize,
-		Users:        []string{roomPayload.Requester},
+	m.chMap[chPayload.ChannelName] = &ChannelDetails{
+		ChName:       chPayload.ChannelName,
+		ChPass:       chPayload.ChannelPassword,
+		Owner:        chPayload.Requester,
+		ChSize:       chPayload.ChannelSize,
+		Users:        []string{chPayload.Requester},
 		LastActivity: time.Now().Unix(),
-		Visibility:   string(roomPayload.OptionalChannelArgs.Visibility),
+		Visibility:   string(chPayload.OptionalChannelArgs.Visibility),
 	}
 
 	logger.WithFields(logrus.Fields{
-		"room":  roomPayload.ChannelName,
-		"owner": roomPayload.Requester,
-	}).Info("Room created successfully")
+		"channel": chPayload.ChannelName,
+		"owner":   chPayload.Requester,
+	}).Info("channel created successfully")
 
-	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
-	return roomPayload
+	return chPayload
 }
 
-func (m *Manager) joinRoom(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
+func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.ChannelName,
-		"user": roomPayload.Requester,
-	}).Info("Attempting to join room")
+		"channel": chPayload.ChannelName,
+		"user":    chPayload.Requester,
+	}).Info("Attempting to join channel")
 
-	room, exists := m.roomMap[roomPayload.ChannelName]
+	// Missing channel
+	channel, exists := m.chMap[chPayload.ChannelName]
 	if !exists {
-		logger.WithField("room", roomPayload.ChannelName).Warn("Room does not exist")
-		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		logger.WithField("channel", chPayload.ChannelName).Warn("channel does not exist")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
-			Reason: roomDoesNotExist,
+			Reason: chDoesNotExist,
 		}
-		return roomPayload
+		return chPayload
 	}
 
-	if room.RoomPassword != roomPayload.ChannelPassword {
+	// Wrong password
+	if channel.ChPass != chPayload.ChannelPassword {
 		logger.WithFields(logrus.Fields{
-			"room": roomPayload.ChannelName,
-			"user": roomPayload.Requester,
-		}).Warn("Incorrect room password")
-		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			"channel": chPayload.ChannelName,
+			"user":    chPayload.Requester,
+		}).Warn("Incorrect channel password")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
-			Reason: incorrectRoomPassword,
+			Reason: incorrectChPassword,
 		}
-		return roomPayload
+		return chPayload
 	}
 
-	if len(room.Users) >= room.RoomSize {
+	// Channel is full
+	if len(channel.Users) >= channel.ChSize {
 		logger.WithFields(logrus.Fields{
-			"room": roomPayload.ChannelName,
-			"user": roomPayload.Requester,
-		}).Warn("Room at capacity")
-		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			"channel": chPayload.ChannelName,
+			"user":    chPayload.Requester,
+		}).Warn("Channel at capacity")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
-			Reason: roomAtCapacity,
+			Reason: chAtCapacity,
 		}
-		return roomPayload
+		return chPayload
 	}
 
-	room.Users = append(room.Users, roomPayload.Requester)
-	room.LastActivity = time.Now().Unix()
+	channel.Users = append(channel.Users, chPayload.Requester)
+	channel.LastActivity = time.Now().Unix()
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.ChannelName,
-		"user": roomPayload.Requester,
-	}).Info("User joined room successfully")
+		"channel": chPayload.ChannelName,
+		"user":    chPayload.Requester,
+	}).Info("User joined channel successfully")
 
-	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
-	return roomPayload
+	return chPayload
 }
 
-func (m *Manager) leaveRoom(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
+func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.ChannelName,
-		"user": roomPayload.Requester,
-	}).Info("Attempting to leave room")
+		"channel": chPayload.ChannelName,
+		"user":    chPayload.Requester,
+	}).Info("Attempting to leave channel")
 
-	room, exists := m.roomMap[roomPayload.ChannelName]
+	channel, exists := m.chMap[chPayload.ChannelName]
 	if !exists {
-		logger.WithField("room", roomPayload.ChannelName).Warn("Room does not exist")
-		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
-			Reason: roomDoesNotExist,
+			Reason: chDoesNotExist,
 		}
-		return roomPayload
+		return chPayload
 	}
 
-	userIndex := slices.Index(room.Users, roomPayload.Requester)
+	userIndex := slices.Index(channel.Users, chPayload.Requester)
 	if userIndex == -1 {
 		logger.WithFields(logrus.Fields{
-			"room": roomPayload.ChannelName,
-			"user": roomPayload.Requester,
-		}).Warn("User not in the room")
-		roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			"channel": chPayload.ChannelName,
+			"user":    chPayload.Requester,
+		}).Warn("User not in the channel")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
-			Reason: notInTheRoom,
+			Reason: notInTheCh,
 		}
-		return roomPayload
+		return chPayload
 	}
 
-	room.Users = slices.Delete(room.Users, userIndex, userIndex+1)
-	room.LastActivity = time.Now().Unix()
+	channel.Users = slices.Delete(channel.Users, userIndex, userIndex+1)
+	channel.LastActivity = time.Now().Unix()
 
-	if len(room.Users) == 0 {
-		delete(m.roomMap, roomPayload.ChannelName)
-		logger.WithField("room", roomPayload.ChannelName).Info("Room deleted as it's empty")
+	if len(channel.Users) == 0 {
+		delete(m.chMap, chPayload.ChannelName)
+		logger.WithField("channel", chPayload.ChannelName).Info("Channel deleted as it's empty")
 	}
 
 	logger.WithFields(logrus.Fields{
-		"room": roomPayload.ChannelName,
-		"user": roomPayload.Requester,
-	}).Info("User left room successfully")
+		"channel": chPayload.ChannelName,
+		"user":    chPayload.Requester,
+	}).Info("User left channel successfully")
 
-	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
-	return roomPayload
+	return chPayload
 }
 
-func (m *Manager) getRooms(roomPayload protocol.ChannelPayload) protocol.ChannelPayload {
+func (m *Manager) getChannels(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	logger.Info("Getting list of rooms")
+	logger.Info("Getting list of channels")
 
-	rooms := make([]string, 0, len(m.roomMap))
-	for roomName := range m.roomMap {
-		rooms = append(rooms, roomName)
+	channels := make([]string, 0, len(m.chMap))
+	for channelName := range m.chMap {
+		channels = append(channels, channelName)
 	}
 
-	logger.WithField("roomCount", len(rooms)).Info("Room list retrieved")
+	logger.WithField("channelCount", len(channels)).Info("Channel list retrieved")
 
-	roomPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status:   protocol.StatusSuccess,
-		Channels: rooms,
+		Channels: channels,
 	}
-	return roomPayload
+	return chPayload
+}
+
+func (m *Manager) getUsers(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	logger.Info("Getting list of users")
+	selectedCh, exists := m.chMap[chPayload.ChannelName]
+	//Missing channel check
+	if !exists {
+		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: chDoesNotExist,
+		}
+		return chPayload
+	}
+	users := make([]string, 0, len(selectedCh.Users))
+	logger.WithField("userCount", len(users)).Info("User list retrieved")
+
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status: protocol.StatusSuccess,
+		Users:  users,
+	}
+	return chPayload
 }

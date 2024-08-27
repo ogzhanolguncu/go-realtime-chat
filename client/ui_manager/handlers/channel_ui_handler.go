@@ -1,12 +1,14 @@
 package ui_manager
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/ogzhanolguncu/go-chat/client/internal"
 	ui_manager "github.com/ogzhanolguncu/go-chat/client/ui_manager/components"
+	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
 func HandleChannelUI(client *internal.Client, channelName string) error {
@@ -22,6 +24,13 @@ func HandleChannelUI(client *internal.Client, channelName string) error {
 	draw()
 
 	uiEvents := ui.PollEvents()
+	incomingChan := make(chan protocol.Payload)
+	errorChan := make(chan error, 1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go client.ReadMessages(ctx, incomingChan, errorChan)
 	cursorTicker := time.NewTicker(500 * time.Millisecond)
 	defer cursorTicker.Stop()
 
@@ -61,6 +70,10 @@ func HandleChannelUI(client *internal.Client, channelName string) error {
 			}
 			channelUi.RenderInput(inputBox)
 			draw()
+		case payload := <-incomingChan:
+			channelUi.UpdateChatBox(client.HandleReceive(payload), chatBox)
+		case err := <-errorChan:
+			return err
 		}
 	}
 }
