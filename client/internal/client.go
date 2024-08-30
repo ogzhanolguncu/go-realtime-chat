@@ -10,6 +10,10 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
+type ChannelInfo struct {
+	chName     string
+	chPassword string
+}
 type Client struct {
 	conn                       net.Conn
 	config                     Config
@@ -20,6 +24,8 @@ type Client struct {
 	decodeFn func(message string) (protocol.Payload, error)
 
 	mutedUsers []string
+
+	chInfo *ChannelInfo
 }
 
 func NewClient(config Config) (*Client, error) {

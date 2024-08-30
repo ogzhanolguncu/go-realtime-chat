@@ -54,11 +54,19 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 	roomPayload := mr.server.channelManager.Handle(payload)
 	payload.Timestamp = time.Now().Unix()
 	payload.ChannelPayload = &roomPayload
-	roomMsg := []byte(mr.server.encodeFn(payload))
-	_, err := info.Connection.Write([]byte(roomMsg))
-	if err != nil {
-		log.Printf("failed to write history message: %v", err)
+
+	if payload.ChannelPayload.ChannelAction == protocol.MessageChannel {
+		for _, user := range payload.ChannelPayload.OptionalChannelArgs.Users {
+			userConn, found := mr.server.connectionManager.FindConnectionByOwnerName(user)
+			if !found {
+				continue
+			}
+			writeToAConn(mr, payload, userConn)
+		}
+		return
 	}
+
+	writeToAConn(mr, payload, info.Connection)
 }
 
 func (mr *MessageRouter) handleGroupMessage(payload protocol.Payload, info *connection.ConnectionInfo) {
@@ -207,4 +215,13 @@ func containsConnection(slice []net.Conn, conn net.Conn) bool {
 		}
 	}
 	return false
+}
+
+// Write to a connection mostly used for channel messages
+func writeToAConn(mr *MessageRouter, payload protocol.Payload, userConn net.Conn) {
+	roomMsg := []byte(mr.server.encodeFn(payload))
+	_, err := userConn.Write([]byte(roomMsg))
+	if err != nil {
+		log.Printf("failed to write history message: %v", err)
+	}
 }

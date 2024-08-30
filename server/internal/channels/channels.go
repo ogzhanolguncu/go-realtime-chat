@@ -69,6 +69,8 @@ func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
 		return m.getChannels(*payload.ChannelPayload)
 	case protocol.GetUsers:
 		return m.getUsers(*payload.ChannelPayload)
+	case protocol.MessageChannel:
+		return m.messageChannel(*payload.ChannelPayload)
 	default:
 		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown channel action")
 		return protocol.ChannelPayload{
@@ -253,6 +255,42 @@ func (m *Manager) getChannels(chPayload protocol.ChannelPayload) protocol.Channe
 func (m *Manager) getUsers(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
+
+	logger.Info("Getting list of users")
+	selectedCh, exists := m.chMap[chPayload.ChannelName]
+	//Missing channel check
+	if !exists {
+		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: chDoesNotExist,
+		}
+		return chPayload
+	}
+	users := make([]string, 0, len(selectedCh.Users))
+	logger.WithField("userCount", len(users)).Info("User list retrieved")
+
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status: protocol.StatusSuccess,
+		Users:  users,
+	}
+	return chPayload
+}
+
+func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	//Check if requesting user is in the channel
+	found := slices.Contains(m.chMap[chPayload.ChannelName].Users, chPayload.Requester)
+	if !found {
+		logger.WithField("channel", chPayload.ChannelName).Warn("User not in the channel")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: notInTheCh,
+		}
+		return chPayload
+	}
 
 	logger.Info("Getting list of users")
 	selectedCh, exists := m.chMap[chPayload.ChannelName]

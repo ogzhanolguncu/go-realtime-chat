@@ -101,47 +101,7 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 	parts := strings.Fields(userInput)
 	switch parts[0] {
 	case "/ch":
-		partsWithoutCommand, found := strings.CutPrefix(strings.Join(parts, " "), "/ch")
-		if !found {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /ch <join|create> <channelName> [channelPassword] [channelSize]"), nil
-		}
-		roomParts := strings.Fields(partsWithoutCommand)
-		if len(roomParts) < 2 {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /ch <join|create> <channelName> [channelPassword] [channelSize]"), nil
-		}
-
-		roomAction := roomParts[0]
-		roomName := roomParts[1]
-		roomPassword := ""
-		roomSizeInt := 10 // Default room size
-
-		if len(roomParts) > 2 {
-			roomPassword = roomParts[2]
-		}
-		if len(roomParts) > 3 {
-			roomSize := roomParts[3]
-			var err error
-			roomSizeInt, err = strconv.Atoi(roomSize)
-			if err != nil {
-				return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Please enter a valid room size"), nil
-			}
-		}
-
-		payload, err := protocol.NewRoomPayloadBuilder().
-			SetRequester(c.name).
-			SetChannelAction(protocol.ClientChannelActionMap[roomAction]).
-			SetChannelName(roomName).
-			SetChannelPassword(roomPassword).
-			SetChannelSize(roomSizeInt).
-			AddOptionalArg("visibility", protocol.VisibilityPublic).
-			Build()
-		if err != nil {
-			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), err.Error()), nil
-		}
-		if _, err := c.conn.Write([]byte(c.encodeFn(*payload))); err != nil {
-			return "", fmt.Errorf("error sending channel: %v", err)
-		}
-		return fmt.Sprintf("[%s] [Channel request sent: %s %s](fg:cyan)", time.Now().Format("01-02 15:04"), roomAction, roomName), nil
+		return chMessageHandler(parts, c)
 	case "/whisper":
 		if len(parts) < 3 {
 			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /whisper <recipient> <message>"), nil
@@ -206,11 +166,59 @@ func (c *Client) HandleSend(userInput string) (string, error) {
 	}
 }
 
+func chMessageHandler(parts []string, c *Client) (string, error) {
+	partsWithoutCommand, found := strings.CutPrefix(strings.Join(parts, " "), "/ch")
+	if !found {
+		return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /ch <join|create> <channelName> [channelPassword] [channelSize]"), nil
+	}
+	roomParts := strings.Fields(partsWithoutCommand)
+	if len(roomParts) < 2 {
+		return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Usage: /ch <join|create> <channelName> [channelPassword] [channelSize]"), nil
+	}
+
+	roomAction := roomParts[0]
+	roomName := roomParts[1]
+	roomPassword := ""
+	roomSizeInt := 10
+
+	if len(roomParts) > 2 {
+		roomPassword = roomParts[2]
+	}
+	if len(roomParts) > 3 {
+		roomSize := roomParts[3]
+		var err error
+		roomSizeInt, err = strconv.Atoi(roomSize)
+		if err != nil {
+			return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), "Please enter a valid room size"), nil
+		}
+	}
+
+	payload, err := protocol.NewRoomPayloadBuilder().
+		SetRequester(c.name).
+		SetChannelAction(protocol.ClientChannelActionMap[roomAction]).
+		SetChannelName(roomName).
+		SetChannelPassword(roomPassword).
+		SetChannelSize(roomSizeInt).
+		AddOptionalArg("visibility", protocol.VisibilityPublic).
+		Build()
+	if err != nil {
+		return fmt.Sprintf("[%s] [%s](fg:red)", time.Now().Format("01-02 15:04"), err.Error()), nil
+	}
+	if _, err := c.conn.Write([]byte(c.encodeFn(*payload))); err != nil {
+		return "", fmt.Errorf("error sending channel: %v", err)
+	}
+	return fmt.Sprintf("[%s] [Channel request sent: %s %s](fg:cyan)", time.Now().Format("01-02 15:04"), roomAction, roomName), nil
+}
+
 func (c *Client) HandleReceive(payload protocol.Payload) string {
 	var message string
 
 	unixTimeUTC := time.Unix(payload.Timestamp, 0)
 	switch payload.MessageType {
+	case protocol.MessageTypeCH:
+		if payload.ChannelPayload.ChannelAction == protocol.MessageChannel {
+			return fmt.Sprintf("[%s] [%s: %s](fg:green)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.Requester, payload.ChannelPayload.OptionalChannelArgs.Message)
+		}
 	case protocol.MessageTypeMSG:
 		// If the sender is the current user, display "You" instead of the username
 		if payload.Sender == c.name {
