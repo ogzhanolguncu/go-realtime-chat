@@ -14,6 +14,7 @@ type ChatUI struct {
 	userListScrollOffset int
 	chatScrollOffset     int
 	chatMessages         []string
+	rawChatMessages      []string // Required for input history
 	currentUserName      string
 	cursorVisible        bool
 	inputText            string
@@ -25,6 +26,7 @@ func NewChatUI(username string) *ChatUI {
 		chatScrollOffset:     0,
 		inputMode:            true,
 		chatMessages:         []string{},
+		rawChatMessages:      []string{},
 		currentUserName:      username,
 		cursorVisible:        true,
 		inputText:            "",
@@ -115,6 +117,13 @@ func (cu *ChatUI) UpdateChatBox(input string, chatBox *widgets.Paragraph) {
 	}
 	cu.refreshChatBox(chatBox)
 }
+func (cu *ChatUI) UpdateRawChatBox(input string) {
+	if len(cu.rawChatMessages) > 4 {
+		cu.rawChatMessages = []string{input}
+		return
+	}
+	cu.rawChatMessages = append(cu.rawChatMessages, input)
+}
 
 func (cu *ChatUI) refreshChatBox(chatBox *widgets.Paragraph) {
 	visibleLines := chatBox.Inner.Dy() - 1
@@ -186,8 +195,17 @@ func (cu *ChatUI) GetInputText() string {
 }
 
 func (cu *ChatUI) HandleKeyPress(key string) {
-	if len(key) == 1 {
-		cu.inputText += key
+	switch key {
+	case "<Backspace>":
+		if len(cu.inputText) > 0 {
+			cu.inputText = cu.inputText[:len(cu.inputText)-1]
+		}
+	case "<Space>":
+		cu.inputText += " "
+	default:
+		if len(key) == 1 {
+			cu.inputText += key
+		}
 	}
 }
 
@@ -200,5 +218,28 @@ func (cu *ChatUI) RenderInput(inputBox *widgets.Paragraph) {
 		inputBox.Text = cu.inputText + "|"
 	} else {
 		inputBox.Text = cu.inputText
+	}
+}
+
+// This method keeps rotating raw chat messages when pressed <Up> to type faster.
+func (cu *ChatUI) GetMessageFromHistory() func(reset bool) {
+	position := len(cu.rawChatMessages) // Start from the end
+	return func(reset bool) {
+		if reset {
+			position = len(cu.rawChatMessages) // Start from the end
+		}
+		if len(cu.rawChatMessages) == 0 {
+			return // No messages to retrieve
+		}
+
+		// Move up in history (older messages)
+		if position > 0 {
+			position--
+		} else {
+			// If we've reached the oldest message, wrap around to the newest
+			position = len(cu.rawChatMessages) - 1
+		}
+
+		cu.UpdateInputText(cu.rawChatMessages[position])
 	}
 }

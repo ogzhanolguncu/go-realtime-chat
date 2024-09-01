@@ -48,6 +48,7 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 	cursorTicker := time.NewTicker(500 * time.Millisecond)
 	defer cursorTicker.Stop()
 
+	chatHistory := chatUI.GetMessageFromHistory()
 	for {
 		select {
 		case <-cursorTicker.C:
@@ -57,8 +58,10 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 		case e := <-uiEvents:
 			switch e.ID {
 			case "<Up>":
+				chatHistory(false)
+			case "<C-j>":
 				userList.ScrollUp()
-			case "<Down>":
+			case "<C-k>":
 				userList.ScrollDown()
 			case "<MouseWheelUp>":
 				chatUI.ScrollChatBox(chatBox, -1)
@@ -84,6 +87,8 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 							message = err.Error()
 						}
 						chatUI.UpdateChatBox(message, chatBox)
+						chatUI.UpdateRawChatBox("/ch list -")
+						chatHistory(true)
 						chatUI.UpdateInputText("")
 					} else {
 						message, err := client.HandleSend(inputText)
@@ -91,18 +96,13 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 							return false, err
 						}
 						chatUI.UpdateChatBox(message, chatBox)
+						chatUI.UpdateRawChatBox(inputText)
+						chatHistory(true)
 						chatUI.UpdateInputText("")
 					}
-
-				}
-			case "<Backspace>":
-				if len(inputBox.Text) > 0 {
-					inputBox.Text = inputBox.Text[:len(inputBox.Text)-1]
 				}
 			case "<Resize>":
 				chatUI.ResizeUI(header, commandBox, chatBox, inputBox, userList)
-			case "<Space>":
-				chatUI.UpdateInputText(" ")
 			default:
 				chatUI.HandleKeyPress(e.ID)
 			}
