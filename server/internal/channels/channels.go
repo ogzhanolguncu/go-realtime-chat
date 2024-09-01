@@ -16,6 +16,7 @@ const (
 	chAtCapacity        = "Channel is full. Try again later."
 	notInTheCh          = "User not in the channel."
 	unknownChAction     = "Unknown channel action."
+	noActiveChannels    = "No active channels"
 )
 
 var logger *logrus.Logger
@@ -241,16 +242,26 @@ func (m *Manager) getChannels(chPayload protocol.ChannelPayload) protocol.Channe
 	logger.Info("Getting list of channels")
 
 	channels := make([]string, 0, len(m.chMap))
-	for channelName := range m.chMap {
-		channels = append(channels, channelName)
+	for channelName, channelDetails := range m.chMap {
+		if channelDetails.Visibility == string(protocol.VisibilityPublic) {
+			channels = append(channels, channelName)
+		}
 	}
 
 	logger.WithField("channelCount", len(channels)).Info("Channel list retrieved")
-
-	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-		Status:   protocol.StatusSuccess,
-		Channels: channels,
+	// There is no public channel
+	if len(channels) == 0 {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: noActiveChannels,
+		}
+	} else {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status:   protocol.StatusSuccess,
+			Channels: channels,
+		}
 	}
+
 	return chPayload
 }
 

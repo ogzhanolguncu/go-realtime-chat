@@ -62,12 +62,22 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 						draw()
 						continue
 					}
-					message, err := client.HandleSend(inputBox.Text)
-					if err != nil {
-						return false, err
+					if inputBox.Text == "/list" {
+						message, err := client.HandleSend("/ch list -")
+						if err != nil {
+							message = err.Error()
+						}
+						chatUI.UpdateChatBox(message, chatBox)
+						inputBox.Text = ""
+					} else {
+						message, err := client.HandleSend(inputBox.Text)
+						if err != nil {
+							return false, err
+						}
+						chatUI.UpdateChatBox(message, chatBox)
+						inputBox.Text = ""
 					}
-					chatUI.UpdateChatBox(message, chatBox)
-					inputBox.Text = ""
+
 				}
 			case "<Backspace>":
 				if len(inputBox.Text) > 0 {

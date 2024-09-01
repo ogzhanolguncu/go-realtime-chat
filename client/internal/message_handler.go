@@ -172,6 +172,16 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 	switch payload.MessageType {
 	case protocol.MessageTypeCH:
 		// This is the only ch receive part we need here. Because before joining a channel we have to make sure our join or create request is successful.
+		//Get Users
+		if payload.ChannelPayload.ChannelAction == protocol.GetChannels &&
+			payload.ChannelPayload.OptionalChannelArgs != nil &&
+			payload.ChannelPayload.OptionalChannelArgs.Channels != nil &&
+			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess {
+			return fmt.Sprintf("[%s] [System: %s](fg:cyan)",
+				unixTimeUTC.Format("01-02 15:04"),
+				strings.Join(payload.ChannelPayload.OptionalChannelArgs.Channels, fmt.Sprintf("%s ", protocol.OptionalUserAndChannelsSeparator)))
+		}
+
 		if payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusFail {
 			message = fmt.Sprintf("[%s] [System: %s](fg:red)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.OptionalChannelArgs.Reason)
 		}
@@ -210,7 +220,10 @@ func (c *Client) HandleChReceive(payload protocol.Payload) string {
 	case protocol.MessageTypeCH:
 		//Message Channel
 		if payload.ChannelPayload.ChannelAction == protocol.MessageChannel {
-			return fmt.Sprintf("[%s] [%s: %s](fg:green)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.Requester, payload.ChannelPayload.OptionalChannelArgs.Message)
+			return fmt.Sprintf("[%s] [%s: %s](fg:green)",
+				unixTimeUTC.Format("01-02 15:04"),
+				payload.ChannelPayload.Requester,
+				payload.ChannelPayload.OptionalChannelArgs.Message)
 		}
 
 		//Get Users

@@ -37,6 +37,8 @@ func chMessageHandler(parts []string, c *Client) (string, error) {
 		return handleLeaveChannel(c, channelName)
 	case cmdUsers:
 		return handleGetUsersOfChannel(c, channelName, args)
+	case cmdList:
+		return handleGetChannelList(c)
 	default:
 		return fmt.Sprintf("[%s] [Unknown action: %s](fg:red)", time.Now().Format("01-02 15:04"), action), nil
 	}
@@ -45,6 +47,7 @@ func chMessageHandler(parts []string, c *Client) (string, error) {
 func handleCreateChannel(c *Client, channelName string, args []string) (string, error) {
 	var password string
 	var size int = 2
+	visibility := protocol.VisibilityPublic
 
 	if len(args) > 0 {
 		password = args[0]
@@ -56,8 +59,14 @@ func handleCreateChannel(c *Client, channelName string, args []string) (string, 
 			return fmt.Sprintf("[%s] [Invalid channel size: %s](fg:red)", time.Now().Format("01-02 15:04"), args[1]), nil
 		}
 	}
+	if len(args) > 2 {
+		selectedVisibility := args[2]
+		if selectedVisibility == "private" {
+			visibility = protocol.VisibilityPrivate
+		}
+	}
 
-	payload, err := buildChannelPayload(c, protocol.CreateChannel, channelName, password, size)
+	payload, err := buildChannelPayload(c, protocol.CreateChannel, channelName, password, size, visibility)
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +84,7 @@ func handleJoinChannel(c *Client, channelName string, args []string) (string, er
 		password = args[0]
 	}
 
-	payload, err := buildChannelPayload(c, protocol.JoinChannel, channelName, password, 0)
+	payload, err := buildChannelPayload(c, protocol.JoinChannel, channelName, password, 0, "")
 	if err != nil {
 		return "", err
 	}
@@ -143,8 +152,24 @@ func handleGetUsersOfChannel(c *Client, channelName string, args []string) (stri
 	return fmt.Sprintf("[%s] [Requested channel '%s' users](fg:magenta)", time.Now().Format("01-02 15:04"), channelName), nil
 }
 
+func handleGetChannelList(c *Client) (string, error) {
+	payload, err := protocol.NewChannelPayloadBuilder().
+		SetRequester(c.name).
+		SetChannelAction(protocol.GetChannels).
+		Build()
+	if err != nil {
+		return "", err
+	}
+
+	if err := sendPayload(c, payload); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("[%s] [Requested channel list](fg:magenta)", time.Now().Format("01-02 15:04")), nil
+}
+
 func handleLeaveChannel(c *Client, channelName string) (string, error) {
-	payload, err := buildChannelPayload(c, protocol.LeaveChannel, channelName, "", 0)
+	payload, err := buildChannelPayload(c, protocol.LeaveChannel, channelName, "", 0, "")
 	if err != nil {
 		return "", err
 	}
@@ -156,7 +181,7 @@ func handleLeaveChannel(c *Client, channelName string) (string, error) {
 	return fmt.Sprintf("[%s] [Left channel: %s](fg:cyan)", time.Now().Format("01-02 15:04"), channelName), nil
 }
 
-func buildChannelPayload(c *Client, action protocol.ChannelActionType, channelName, password string, size int) (*protocol.Payload, error) {
+func buildChannelPayload(c *Client, action protocol.ChannelActionType, channelName, password string, size int, visibility protocol.Visibility) (*protocol.Payload, error) {
 	builder := protocol.NewChannelPayloadBuilder().
 		SetRequester(c.name).
 		SetChannelAction(action).
@@ -171,7 +196,7 @@ func buildChannelPayload(c *Client, action protocol.ChannelActionType, channelNa
 	}
 
 	if action == protocol.CreateChannel {
-		builder.AddOptionalArg("visibility", protocol.VisibilityPublic)
+		builder.AddOptionalArg("visibility", visibility)
 	}
 
 	return builder.Build()
