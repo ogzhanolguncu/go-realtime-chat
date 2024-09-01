@@ -31,7 +31,7 @@ func init() {
 type ChannelDetails struct {
 	ChName       string
 	ChPass       string
-	ChSize       int
+	ChCapacity   int
 	Owner        string
 	Users        []string
 	LastActivity int64
@@ -104,7 +104,7 @@ func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.Chan
 		ChName:       chPayload.ChannelName,
 		ChPass:       chPayload.ChannelPassword,
 		Owner:        chPayload.Requester,
-		ChSize:       chPayload.ChannelSize,
+		ChCapacity:   chPayload.ChannelSize,
 		Users:        []string{chPayload.Requester},
 		LastActivity: time.Now().Unix(),
 		Visibility:   string(chPayload.OptionalChannelArgs.Visibility),
@@ -155,7 +155,7 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 	}
 
 	// Channel is full
-	if len(channel.Users) >= channel.ChSize {
+	if len(channel.Users) >= channel.ChCapacity {
 		logger.WithFields(logrus.Fields{
 			"channel": chPayload.ChannelName,
 			"user":    chPayload.Requester,
@@ -169,10 +169,12 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 
 	channel.Users = append(channel.Users, chPayload.Requester)
 	channel.LastActivity = time.Now().Unix()
+	m.chMap[chPayload.ChannelName] = channel
 
 	logger.WithFields(logrus.Fields{
-		"channel": chPayload.ChannelName,
-		"user":    chPayload.Requester,
+		"channel":        chPayload.ChannelName,
+		"user":           chPayload.Requester,
+		"channelDetails": m.chMap[chPayload.ChannelName],
 	}).Info("User joined channel successfully")
 
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
@@ -294,6 +296,7 @@ func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.Cha
 
 	logger.Info("Getting list of users")
 	selectedCh, exists := m.chMap[chPayload.ChannelName]
+
 	//Missing channel check
 	if !exists {
 		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
@@ -303,12 +306,11 @@ func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.Cha
 		}
 		return chPayload
 	}
-	users := make([]string, 0, len(selectedCh.Users))
-	logger.WithField("userCount", len(users)).Info("User list retrieved")
 
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-		Status: protocol.StatusSuccess,
-		Users:  users,
+		Status:  protocol.StatusSuccess,
+		Users:   selectedCh.Users,
+		Message: chPayload.OptionalChannelArgs.Message,
 	}
 	return chPayload
 }

@@ -11,8 +11,8 @@ import (
 )
 
 type ChannelInfo struct {
-	chName     string
-	chPassword string
+	ChName     string
+	ChPassword string
 }
 type Client struct {
 	conn                       net.Conn
@@ -107,4 +107,12 @@ func (c *Client) CheckIfSuccessfulChannel(payload protocol.Payload) bool {
 		return true
 	}
 	return false
+}
+
+func (c *Client) SetChannelInfo(ch ChannelInfo) {
+	c.chInfo = &ch
+}
+
+func (c *Client) GetChannelInfo() ChannelInfo {
+	return *c.chInfo
 }

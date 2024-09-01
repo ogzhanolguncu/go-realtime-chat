@@ -11,15 +11,15 @@ import (
 	"github.com/ogzhanolguncu/go-chat/protocol"
 )
 
-func HandleChannelUI(client *internal.Client, channelName string) error {
-	channelUi := ui_manager.NewChannelUI(client.GetUsername(), channelName)
+func HandleChannelUI(client *internal.Client) error {
+	channelUi := ui_manager.NewChannelUI(client.GetUsername(), client.GetChannelInfo().ChName)
 	defer channelUi.Close()
 
 	header, chatBox, inputBox, err := channelUi.InitUI()
 	if err != nil {
 		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
-	channelUi.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the %s!](fg:cyan)", time.Now().Format("01-02 15:04"), channelName), chatBox)
+	channelUi.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the %s!](fg:cyan)", time.Now().Format("01-02 15:04"), client.GetChannelInfo().ChName), chatBox)
 	draw := channelUi.Draw(header, chatBox, inputBox)
 	draw()
 
@@ -52,14 +52,26 @@ func HandleChannelUI(client *internal.Client, channelName string) error {
 				if len(channelUi.GetInputText()) > 0 {
 					inputText := channelUi.GetInputText()
 					if inputText == "/quit" {
+						chMsgPayload := fmt.Sprintf("/ch leave %s", client.GetChannelInfo().ChName)
+						message, err := client.HandleSend(chMsgPayload)
+						if err != nil {
+							message = err.Error()
+						}
+						channelUi.UpdateChatBox(message, chatBox)
+						channelUi.UpdateInputText("")
 						return nil
 					}
 					if inputText == "/clear" {
 						channelUi.ClearChatBox(chatBox)
 						channelUi.UpdateInputText("")
 					} else {
-						formattedMessage := fmt.Sprintf("[%s] [You: %s](fg:cyan)", time.Now().Format("01-02 15:04"), inputText)
-						channelUi.UpdateChatBox(formattedMessage, chatBox)
+						//TODO: when message received exclude sender from payload and add proper fomrmatting to client.
+						chMsgPayload := fmt.Sprintf("/ch message %s %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, inputText)
+						message, err := client.HandleSend(chMsgPayload)
+						if err != nil {
+							message = err.Error()
+						}
+						channelUi.UpdateChatBox(message, chatBox)
 						channelUi.UpdateInputText("")
 					}
 				}
@@ -71,7 +83,7 @@ func HandleChannelUI(client *internal.Client, channelName string) error {
 			channelUi.RenderInput(inputBox)
 			draw()
 		case payload := <-incomingChan:
-			channelUi.UpdateChatBox(client.HandleReceive(payload), chatBox)
+			channelUi.UpdateChatBox(client.HandleChReceive(payload), chatBox)
 		case err := <-errorChan:
 			return err
 		}

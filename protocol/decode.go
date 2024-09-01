@@ -330,12 +330,13 @@ func parseCH(msg string) (timestamp int64, room_action, requester, roomName, roo
 	return timestamp, room_action, requester, roomName, roomPassword, roomSize, optionalArgs, nil
 }
 
+// TODO: This one has to use optional args from payload, they are not connected atm this will lead to bugs.
 const (
 	optArgStatus     = "status="
 	optArgVisibility = "visibility="
 	optArgMessage    = "message="
 	optArgReason     = "reason="
-	optArgRooms      = "rooms="
+	optArgRooms      = "channels="
 	optArgUsers      = "users="
 	optArgTargetUser = "target_user="
 )
@@ -363,11 +364,11 @@ func parseRoomOptionalArgs(optionalArgs string) *OptionalChannelArgs {
 
 		case strings.HasPrefix(optionalArg, optArgRooms):
 			rooms, _ := strings.CutPrefix(optionalArg, optArgRooms)
-			finalOptionalArg.Channels = strings.Split(rooms, optionalUserAndRoomsSeparator)
+			finalOptionalArg.Channels = strings.Split(rooms, optionalUserAndChannelsSeparator)
 
 		case strings.HasPrefix(optionalArg, optArgUsers):
 			users, _ := strings.CutPrefix(optionalArg, optArgUsers)
-			finalOptionalArg.Users = strings.Split(users, optionalUserAndRoomsSeparator)
+			finalOptionalArg.Users = strings.Split(users, optionalUserAndChannelsSeparator)
 
 		case strings.HasPrefix(optionalArg, optArgTargetUser):
 			targetUser, _ := strings.CutPrefix(optionalArg, optArgTargetUser)

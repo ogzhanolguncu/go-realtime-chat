@@ -58,6 +58,11 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 	if payload.ChannelPayload.ChannelAction == protocol.MessageChannel {
 		for _, user := range payload.ChannelPayload.OptionalChannelArgs.Users {
 			userConn, found := mr.server.connectionManager.FindConnectionByOwnerName(user)
+			//Skip if writer is the owner
+			if userConn == info.Connection {
+				continue
+			}
+			//Skip if connection not found
 			if !found {
 				continue
 			}

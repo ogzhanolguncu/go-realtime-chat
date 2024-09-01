@@ -8,16 +8,16 @@ import (
 
 const (
 	// If args are empty it will return empty string
-	optionalArgsSeparator         = ";"
-	optionalUserAndRoomsSeparator = ","
-	emptyChannelField             = "-"
+	optionalArgsSeparator            = ";"
+	optionalUserAndChannelsSeparator = ","
+	emptyChannelField                = "-"
 )
 
 type ChannelPayloadBuilder struct {
 	payload *Payload
 }
 
-func NewRoomPayloadBuilder() *ChannelPayloadBuilder {
+func NewChannelPayloadBuilder() *ChannelPayloadBuilder {
 	return &ChannelPayloadBuilder{
 		payload: &Payload{
 			MessageType:    MessageTypeCH,
@@ -81,18 +81,10 @@ func (b *ChannelPayloadBuilder) Build() (*Payload, error) {
 		return nil, fmt.Errorf("requester is required")
 	}
 	if b.payload.ChannelPayload.ChannelAction == 0 {
-		return nil, fmt.Errorf("room action is required")
+		return nil, fmt.Errorf("channel action is required")
 	}
 	return b.payload, nil
 }
-
-//Example usage:
-// builder := NewRoomPayloadBuilder().SetRoomAction(CreateRoom).
-//	SetRequester("user123").
-//	SetRoomName("My Room").
-//	SetRoomPassword("secret").
-//	SetRoomSize(10).
-//	AddOptionalArg("visibility", VisibilityPublic)
 
 func encodeCH(payload *Payload) string {
 	var sb strings.Builder
@@ -156,11 +148,11 @@ func serializeChannelOptionalArgs(args *OptionalChannelArgs) string {
 	}
 
 	if args.Channels != nil {
-		optsParts = append(optsParts, "rooms="+strings.Join(args.Channels, optionalUserAndRoomsSeparator))
+		optsParts = append(optsParts, "channels="+strings.Join(args.Channels, optionalUserAndChannelsSeparator))
 	}
 
 	if args.Users != nil {
-		optsParts = append(optsParts, "users="+strings.Join(args.Users, optionalUserAndRoomsSeparator))
+		optsParts = append(optsParts, "users="+strings.Join(args.Users, optionalUserAndChannelsSeparator))
 	}
 
 	if args.TargetUser != "" {
