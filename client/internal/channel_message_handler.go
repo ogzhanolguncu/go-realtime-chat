@@ -13,6 +13,8 @@ const (
 	cmdJoin    = "join"
 	cmdMessage = "message"
 	cmdLeave   = "leave"
+	cmdUsers   = "users"
+	cmdList    = "list" // Useful for getting channel list on group chat
 )
 
 func chMessageHandler(parts []string, c *Client) (string, error) {
@@ -33,6 +35,8 @@ func chMessageHandler(parts []string, c *Client) (string, error) {
 		return handleMessageChannel(c, channelName, args)
 	case cmdLeave:
 		return handleLeaveChannel(c, channelName)
+	case cmdUsers:
+		return handleGetUsersOfChannel(c, channelName, args)
 	default:
 		return fmt.Sprintf("[%s] [Unknown action: %s](fg:red)", time.Now().Format("01-02 15:04"), action), nil
 	}
@@ -62,7 +66,7 @@ func handleCreateChannel(c *Client, channelName string, args []string) (string, 
 		return "", err
 	}
 
-	return fmt.Sprintf("[%s] [Channel create request sent: %s](fg:cyan)", time.Now().Format("01-02 15:04"), channelName), nil
+	return fmt.Sprintf("[%s] [Channel create request sent: %s](fg:magenta)", time.Now().Format("01-02 15:04"), channelName), nil
 }
 
 func handleJoinChannel(c *Client, channelName string, args []string) (string, error) {
@@ -80,7 +84,7 @@ func handleJoinChannel(c *Client, channelName string, args []string) (string, er
 		return "", err
 	}
 
-	return fmt.Sprintf("[%s] [Channel join request sent: %s](fg:cyan)", time.Now().Format("01-02 15:04"), channelName), nil
+	return fmt.Sprintf("[%s] [Channel join request sent: %s](fg:magenta)", time.Now().Format("01-02 15:04"), channelName), nil
 }
 
 func handleMessageChannel(c *Client, channelName string, args []string) (string, error) {
@@ -114,6 +118,29 @@ func handleMessageChannel(c *Client, channelName string, args []string) (string,
 	}
 
 	return fmt.Sprintf("[%s] [You: %s](fg:cyan)", time.Now().Format("01-02 15:04"), message), nil
+}
+
+func handleGetUsersOfChannel(c *Client, channelName string, args []string) (string, error) {
+	var password string
+	if len(args) > 1 {
+		password = args[0]
+	}
+
+	payload, err := protocol.NewChannelPayloadBuilder().
+		SetRequester(c.name).
+		SetChannelAction(protocol.GetUsers).
+		SetChannelName(channelName).
+		SetChannelPassword(password).
+		Build()
+	if err != nil {
+		return "", err
+	}
+
+	if err := sendPayload(c, payload); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("[%s] [Requested channel '%s' users](fg:magenta)", time.Now().Format("01-02 15:04"), channelName), nil
 }
 
 func handleLeaveChannel(c *Client, channelName string) (string, error) {

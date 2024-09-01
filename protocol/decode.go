@@ -364,11 +364,11 @@ func parseRoomOptionalArgs(optionalArgs string) *OptionalChannelArgs {
 
 		case strings.HasPrefix(optionalArg, optArgRooms):
 			rooms, _ := strings.CutPrefix(optionalArg, optArgRooms)
-			finalOptionalArg.Channels = strings.Split(rooms, optionalUserAndChannelsSeparator)
+			finalOptionalArg.Channels = strings.Split(rooms, OptionalUserAndChannelsSeparator)
 
 		case strings.HasPrefix(optionalArg, optArgUsers):
 			users, _ := strings.CutPrefix(optionalArg, optArgUsers)
-			finalOptionalArg.Users = strings.Split(users, optionalUserAndChannelsSeparator)
+			finalOptionalArg.Users = strings.Split(users, OptionalUserAndChannelsSeparator)
 
 		case strings.HasPrefix(optionalArg, optArgTargetUser):
 			targetUser, _ := strings.CutPrefix(optionalArg, optArgTargetUser)

@@ -9,7 +9,7 @@ import (
 const (
 	// If args are empty it will return empty string
 	optionalArgsSeparator            = ";"
-	optionalUserAndChannelsSeparator = ","
+	OptionalUserAndChannelsSeparator = ","
 	emptyChannelField                = "-"
 )
 
@@ -148,11 +148,11 @@ func serializeChannelOptionalArgs(args *OptionalChannelArgs) string {
 	}
 
 	if args.Channels != nil {
-		optsParts = append(optsParts, "channels="+strings.Join(args.Channels, optionalUserAndChannelsSeparator))
+		optsParts = append(optsParts, "channels="+strings.Join(args.Channels, OptionalUserAndChannelsSeparator))
 	}
 
 	if args.Users != nil {
-		optsParts = append(optsParts, "users="+strings.Join(args.Users, optionalUserAndChannelsSeparator))
+		optsParts = append(optsParts, "users="+strings.Join(args.Users, OptionalUserAndChannelsSeparator))
 	}
 
 	if args.TargetUser != "" {

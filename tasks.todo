@@ -151,9 +151,9 @@ Chat Application Todo List:
             - [ ] Fail: `CH|1629123465|BAN|Oz|testRoom|target_user=John;status=fail;reason=user_not_found\r\n`
 
             ### Get Room Users
-            - [ ] Request: `CH|1629123466|GET_USERS|John|testRoom|-|-\r\n`
-            - [ ] Success: `CH|1629123467|GET_USERS|John|testRoom|-|-|status=success,users=Oz,Alice,Bob\r\n`
-            - [ ] Fail: `CH|1629123467|GET_USERS|John|testRoom|-|-|status=fail,reason=room_not_found\r\n`
+            - [ ] Request: `CH|1629123466|GET_USERS|John|testRoom|password123|-\r\n`
+            - [ ] Success: `CH|1629123467|GET_USERS|John|testRoom|password123|-|status=success,users=Oz,Alice,Bob\r\n`
+            - [ ] Fail: `CH|1629123467|GET_USERS|John|testRoom|password123|-|status=fail,reason=room_not_found\r\n`
 
             ### Get Active Rooms
             - [ ] Request: `CH|1629123468|GET_ROOMS|John|-|-|-\r\n`

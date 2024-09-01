@@ -269,12 +269,11 @@ func (m *Manager) getUsers(chPayload protocol.ChannelPayload) protocol.ChannelPa
 		}
 		return chPayload
 	}
-	users := make([]string, 0, len(selectedCh.Users))
-	logger.WithField("userCount", len(users)).Info("User list retrieved")
 
+	logger.WithField("userCount", len(selectedCh.Users)).Info("User list retrieved")
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
-		Users:  users,
+		Users:  selectedCh.Users,
 	}
 	return chPayload
 }

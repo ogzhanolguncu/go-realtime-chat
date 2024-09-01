@@ -208,9 +208,22 @@ func (c *Client) HandleChReceive(payload protocol.Payload) string {
 	unixTimeUTC := time.Unix(payload.Timestamp, 0)
 	switch payload.MessageType {
 	case protocol.MessageTypeCH:
+		//Message Channel
 		if payload.ChannelPayload.ChannelAction == protocol.MessageChannel {
 			return fmt.Sprintf("[%s] [%s: %s](fg:green)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.Requester, payload.ChannelPayload.OptionalChannelArgs.Message)
 		}
+
+		//Get Users
+		if payload.ChannelPayload.ChannelAction == protocol.GetUsers &&
+			payload.ChannelPayload.OptionalChannelArgs != nil &&
+			payload.ChannelPayload.OptionalChannelArgs.Users != nil &&
+			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess {
+			return fmt.Sprintf("[%s] [System: %s](fg:cyan)",
+				unixTimeUTC.Format("01-02 15:04"),
+				strings.Join(payload.ChannelPayload.OptionalChannelArgs.Users, fmt.Sprintf("%s ", protocol.OptionalUserAndChannelsSeparator)))
+		}
+
+		// Any failed message will be catched here
 		if payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusFail {
 			message = fmt.Sprintf("[%s] [System: %s](fg:red)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.OptionalChannelArgs.Reason)
 		}

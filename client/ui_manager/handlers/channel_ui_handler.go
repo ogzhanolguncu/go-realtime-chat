@@ -47,10 +47,21 @@ func HandleChannelUI(client *internal.Client) error {
 			case "<MouseWheelDown>":
 				channelUi.ScrollChatBox(chatBox, 1)
 			case "<C-c>":
+				chMsgPayload := fmt.Sprintf("/ch leave %s", client.GetChannelInfo().ChName)
+				message, err := client.HandleSend(chMsgPayload)
+				if err != nil {
+					message = err.Error()
+				}
+				channelUi.UpdateChatBox(message, chatBox)
+				channelUi.UpdateInputText("")
 				return nil
 			case "<Enter>":
 				if len(channelUi.GetInputText()) > 0 {
 					inputText := channelUi.GetInputText()
+					if inputText == "/clear" {
+						channelUi.ClearChatBox(chatBox)
+						channelUi.UpdateInputText("")
+					}
 					if inputText == "/quit" {
 						chMsgPayload := fmt.Sprintf("/ch leave %s", client.GetChannelInfo().ChName)
 						message, err := client.HandleSend(chMsgPayload)
@@ -61,11 +72,15 @@ func HandleChannelUI(client *internal.Client) error {
 						channelUi.UpdateInputText("")
 						return nil
 					}
-					if inputText == "/clear" {
-						channelUi.ClearChatBox(chatBox)
+					if inputText == "/users" {
+						chMsgPayload := fmt.Sprintf("/ch users %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword)
+						message, err := client.HandleSend(chMsgPayload)
+						if err != nil {
+							message = err.Error()
+						}
+						channelUi.UpdateChatBox(message, chatBox)
 						channelUi.UpdateInputText("")
 					} else {
-						//TODO: when message received exclude sender from payload and add proper fomrmatting to client.
 						chMsgPayload := fmt.Sprintf("/ch message %s %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, inputText)
 						message, err := client.HandleSend(chMsgPayload)
 						if err != nil {
