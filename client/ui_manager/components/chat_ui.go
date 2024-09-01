@@ -15,6 +15,8 @@ type ChatUI struct {
 	chatScrollOffset     int
 	chatMessages         []string
 	currentUserName      string
+	cursorVisible        bool
+	inputText            string
 }
 
 func NewChatUI(username string) *ChatUI {
@@ -24,6 +26,8 @@ func NewChatUI(username string) *ChatUI {
 		inputMode:            true,
 		chatMessages:         []string{},
 		currentUserName:      username,
+		cursorVisible:        true,
+		inputText:            "",
 	}
 }
 
@@ -171,4 +175,30 @@ func (cu *ChatUI) IsInputMode() bool {
 
 func (cu *ChatUI) Close() {
 	ui.Close()
+}
+
+func (cu *ChatUI) UpdateInputText(text string) {
+	cu.inputText = text
+}
+
+func (cu *ChatUI) GetInputText() string {
+	return cu.inputText
+}
+
+func (cu *ChatUI) HandleKeyPress(key string) {
+	if len(key) == 1 {
+		cu.inputText += key
+	}
+}
+
+func (cu *ChatUI) ToggleCursor() {
+	cu.cursorVisible = !cu.cursorVisible
+}
+
+func (cu *ChatUI) RenderInput(inputBox *widgets.Paragraph) {
+	if cu.cursorVisible {
+		inputBox.Text = cu.inputText + "|"
+	} else {
+		inputBox.Text = cu.inputText
+	}
 }

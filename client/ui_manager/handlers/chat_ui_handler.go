@@ -14,6 +14,14 @@ import (
 
 type ChannelName string
 
+var fakeNames = []string{
+	"Alice", "Bob", "Charlie", "David", "Eve",
+	"Frank", "Grace", "Henry", "Ivy", "Jack",
+	"Kate", "Liam", "Mia", "Noah", "Olivia",
+	"Peter", "Quinn", "Rachel", "Sam", "Tina",
+	"Ursula", "Victor", "Wendy", "Xander", "Yara",
+}
+
 func HandleChatUI(client *internal.Client) (bool, error) {
 	chatUI := ui_manager.NewChatUI(client.GetUsername())
 	defer chatUI.Close()
@@ -37,8 +45,15 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 	go client.FetchActiveUserList()
 	go client.ReadMessages(ctx, incomingChan, errorChan)
 
+	cursorTicker := time.NewTicker(500 * time.Millisecond)
+	defer cursorTicker.Stop()
+
 	for {
 		select {
+		case <-cursorTicker.C:
+			chatUI.ToggleCursor()
+			chatUI.RenderInput(inputBox)
+			draw()
 		case e := <-uiEvents:
 			switch e.ID {
 			case "<Up>":
@@ -53,29 +68,30 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 				return false, nil
 			case "<Enter>":
 				if chatUI.IsInputMode() && len(inputBox.Text) > 0 {
-					if inputBox.Text == "/quit" {
+					inputText := chatUI.GetInputText()
+					if inputText == "/quit" {
 						return false, nil
 					}
-					if inputBox.Text == "/clear" {
+					if inputText == "/clear" {
 						chatUI.ClearChatBox(chatBox)
-						inputBox.Text = ""
+						chatUI.UpdateInputText("")
 						draw()
 						continue
 					}
-					if inputBox.Text == "/list" {
+					if inputText == "/list" {
 						message, err := client.HandleSend("/ch list -")
 						if err != nil {
 							message = err.Error()
 						}
 						chatUI.UpdateChatBox(message, chatBox)
-						inputBox.Text = ""
+						chatUI.UpdateInputText("")
 					} else {
-						message, err := client.HandleSend(inputBox.Text)
+						message, err := client.HandleSend(inputText)
 						if err != nil {
 							return false, err
 						}
 						chatUI.UpdateChatBox(message, chatBox)
-						inputBox.Text = ""
+						chatUI.UpdateInputText("")
 					}
 
 				}
@@ -86,12 +102,12 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 			case "<Resize>":
 				chatUI.ResizeUI(header, commandBox, chatBox, inputBox, userList)
 			case "<Space>":
-				inputBox.Text += " "
+				chatUI.UpdateInputText(" ")
 			default:
-				if len(e.ID) == 1 {
-					inputBox.Text += e.ID
-				}
+				chatUI.HandleKeyPress(e.ID)
 			}
+			chatUI.RenderInput(inputBox)
+			draw()
 		case payload := <-incomingChan:
 			// If its a channel message action and success status return true to switch to Channel UI
 			if client.CheckIfSuccessfulChannel(payload) {
@@ -123,14 +139,7 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 				continue
 			}
 			if payload.MessageType == protocol.MessageTypeACT_USRS {
-				//Fake names to test user list feature in dev
-				fakeNames := []string{
-					"Alice", "Bob", "Charlie", "David", "Eve",
-					"Frank", "Grace", "Henry", "Ivy", "Jack",
-					"Kate", "Liam", "Mia", "Noah", "Olivia",
-					"Peter", "Quinn", "Rachel", "Sam", "Tina",
-					"Ursula", "Victor", "Wendy", "Xander", "Yara",
-				}
+
 				payload.ActiveUsers = append(payload.ActiveUsers, fakeNames...)
 				chatUI.UpdateUserList(userList, payload.ActiveUsers)
 				draw()
@@ -140,6 +149,5 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 		case err := <-errorChan:
 			return false, err
 		}
-		draw()
 	}
 }
