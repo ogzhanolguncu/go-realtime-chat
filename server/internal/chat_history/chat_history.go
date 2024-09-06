@@ -62,6 +62,10 @@ func createSchema(db *sqlx.DB) error {
 }
 
 func (ch *ChatHistory) AddMessage(message string) error {
+	// Skip storing message if its a channel message
+	if strings.HasPrefix(message, "CH") {
+		return nil
+	}
 	decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(message)
 	if err != nil {
 		return fmt.Errorf("failed to decode message: %w", err)

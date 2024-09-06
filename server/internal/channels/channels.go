@@ -1,7 +1,6 @@
 package channels
 
 import (
-	"slices"
 	"sync"
 	"time"
 
@@ -34,22 +33,82 @@ type ChannelDetails struct {
 	ChPass       string
 	ChCapacity   int
 	Owner        string
-	Users        []string
+	Users        map[string]struct{}
 	LastActivity int64
-	BannedUsers  []string
+	BannedUsers  map[string]struct{}
 	Visibility   string
 }
 
 type Manager struct {
-	chMap map[string]*ChannelDetails
-	lock  sync.RWMutex
+	chMap   map[string]*ChannelDetails
+	chLocks map[string]*sync.RWMutex
+	lock    sync.RWMutex
 }
 
-func NewChannelManager() *Manager {
+type ManagerConfig struct {
+	CleanupInterval     time.Duration
+	InactivityThreshold time.Duration
+}
+
+func NewChannelManager(config ManagerConfig) *Manager {
 	logger.Info("Initializing new ChannelManager")
-	return &Manager{
-		chMap: make(map[string]*ChannelDetails),
+
+	if config.CleanupInterval == 0 {
+		config.CleanupInterval = 5 * time.Minute // default cleanup interval
 	}
+	if config.InactivityThreshold == 0 {
+		config.InactivityThreshold = 24 * time.Hour // default inactivity threshold
+	}
+
+	manager := &Manager{
+		chMap:   make(map[string]*ChannelDetails),
+		chLocks: make(map[string]*sync.RWMutex),
+	}
+
+	go manager.startCleanupRoutine(config.CleanupInterval, config.InactivityThreshold)
+
+	return manager
+}
+
+func (m *Manager) startCleanupRoutine(cleanupInterval, inactivityThreshold time.Duration) {
+	logger.WithFields(logrus.Fields{
+		"cleanupInterval":     cleanupInterval,
+		"inactivityThreshold": inactivityThreshold,
+	}).Info("Starting cleanup routine")
+
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		m.cleanupInactiveChannels(inactivityThreshold)
+	}
+}
+
+func (m *Manager) cleanupInactiveChannels(inactivityThreshold time.Duration) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	now := time.Now().Unix()
+	for channelName, channel := range m.chMap {
+		if now-channel.LastActivity > int64(inactivityThreshold.Seconds()) {
+			delete(m.chMap, channelName)
+			delete(m.chLocks, channelName)
+			logger.WithField("channel", channelName).Info("Removed inactive channel")
+		}
+	}
+}
+
+func (m *Manager) getChannelLock(channelName string) *sync.RWMutex {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if lock, exists := m.chLocks[channelName]; exists {
+		return lock
+	}
+
+	lock := &sync.RWMutex{}
+	m.chLocks[channelName] = lock
+	return lock
 }
 
 func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
@@ -106,10 +165,13 @@ func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.Chan
 		ChPass:       chPayload.ChannelPassword,
 		Owner:        chPayload.Requester,
 		ChCapacity:   chPayload.ChannelSize,
-		Users:        []string{chPayload.Requester},
+		Users:        map[string]struct{}{chPayload.Requester: {}},
 		LastActivity: time.Now().Unix(),
+		BannedUsers:  make(map[string]struct{}),
 		Visibility:   string(chPayload.OptionalChannelArgs.Visibility),
 	}
+
+	m.chLocks[chPayload.ChannelName] = &sync.RWMutex{}
 
 	logger.WithFields(logrus.Fields{
 		"channel": chPayload.ChannelName,
@@ -123,15 +185,15 @@ func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.Chan
 }
 
 func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	chLock := m.getChannelLock(chPayload.ChannelName)
+	chLock.Lock()
+	defer chLock.Unlock()
 
 	logger.WithFields(logrus.Fields{
 		"channel": chPayload.ChannelName,
 		"user":    chPayload.Requester,
 	}).Info("Attempting to join channel")
 
-	// Missing channel
 	channel, exists := m.chMap[chPayload.ChannelName]
 	if !exists {
 		logger.WithField("channel", chPayload.ChannelName).Warn("channel does not exist")
@@ -142,7 +204,6 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 		return chPayload
 	}
 
-	// Wrong password
 	if channel.ChPass != chPayload.ChannelPassword {
 		logger.WithFields(logrus.Fields{
 			"channel": chPayload.ChannelName,
@@ -155,7 +216,6 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 		return chPayload
 	}
 
-	// Channel is full
 	if len(channel.Users) >= channel.ChCapacity {
 		logger.WithFields(logrus.Fields{
 			"channel": chPayload.ChannelName,
@@ -168,14 +228,13 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 		return chPayload
 	}
 
-	channel.Users = append(channel.Users, chPayload.Requester)
+	channel.Users[chPayload.Requester] = struct{}{}
 	channel.LastActivity = time.Now().Unix()
-	m.chMap[chPayload.ChannelName] = channel
 
 	logger.WithFields(logrus.Fields{
 		"channel":        chPayload.ChannelName,
 		"user":           chPayload.Requester,
-		"channelDetails": m.chMap[chPayload.ChannelName],
+		"channelDetails": channel,
 	}).Info("User joined channel successfully")
 
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
@@ -185,8 +244,9 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 }
 
 func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	chLock := m.getChannelLock(chPayload.ChannelName)
+	chLock.Lock()
+	defer chLock.Unlock()
 
 	logger.WithFields(logrus.Fields{
 		"channel": chPayload.ChannelName,
@@ -203,8 +263,7 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.Chann
 		return chPayload
 	}
 
-	userIndex := slices.Index(channel.Users, chPayload.Requester)
-	if userIndex == -1 {
+	if _, exists := channel.Users[chPayload.Requester]; !exists {
 		logger.WithFields(logrus.Fields{
 			"channel": chPayload.ChannelName,
 			"user":    chPayload.Requester,
@@ -216,11 +275,14 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.Chann
 		return chPayload
 	}
 
-	channel.Users = slices.Delete(channel.Users, userIndex, userIndex+1)
+	delete(channel.Users, chPayload.Requester)
 	channel.LastActivity = time.Now().Unix()
 
 	if len(channel.Users) == 0 {
+		m.lock.Lock()
 		delete(m.chMap, chPayload.ChannelName)
+		delete(m.chLocks, chPayload.ChannelName)
+		m.lock.Unlock()
 		logger.WithField("channel", chPayload.ChannelName).Info("Channel deleted as it's empty")
 	}
 
@@ -249,7 +311,6 @@ func (m *Manager) getChannels(chPayload protocol.ChannelPayload) protocol.Channe
 	}
 
 	logger.WithField("channelCount", len(channels)).Info("Channel list retrieved")
-	// There is no public channel
 	if len(channels) == 0 {
 		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
@@ -266,12 +327,12 @@ func (m *Manager) getChannels(chPayload protocol.ChannelPayload) protocol.Channe
 }
 
 func (m *Manager) getUsers(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	chLock := m.getChannelLock(chPayload.ChannelName)
+	chLock.RLock()
+	defer chLock.RUnlock()
 
 	logger.Info("Getting list of users")
 	selectedCh, exists := m.chMap[chPayload.ChannelName]
-	//Missing channel check
 	if !exists {
 		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
 		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
@@ -281,46 +342,64 @@ func (m *Manager) getUsers(chPayload protocol.ChannelPayload) protocol.ChannelPa
 		return chPayload
 	}
 
-	logger.WithField("userCount", len(selectedCh.Users)).Info("User list retrieved")
+	users := make([]string, 0, len(selectedCh.Users))
+	for user := range selectedCh.Users {
+		users = append(users, user)
+	}
+
+	logger.WithField("userCount", len(users)).Info("User list retrieved")
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
-		Users:  selectedCh.Users,
+		Users:  users,
 	}
 	return chPayload
 }
 
 func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	chLock := m.getChannelLock(chPayload.ChannelName)
+	chLock.RLock()
+	defer chLock.RUnlock()
 
-	//Check if requesting user is in the channel
-	found := slices.Contains(m.chMap[chPayload.ChannelName].Users, chPayload.Requester)
-	if !found {
-		logger.WithField("channel", chPayload.ChannelName).Warn("User not in the channel")
-		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-			Status: protocol.StatusFail,
-			Reason: notInTheCh,
-		}
-		return chPayload
-	}
-
-	logger.Info("Getting list of users")
 	selectedCh, exists := m.chMap[chPayload.ChannelName]
-
-	//Missing channel check
 	if !exists {
 		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
-		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-			Status: protocol.StatusFail,
-			Reason: chDoesNotExist,
+		return protocol.ChannelPayload{
+			OptionalChannelArgs: &protocol.OptionalChannelArgs{
+				Status: protocol.StatusFail,
+				Reason: chDoesNotExist,
+			},
 		}
-		return chPayload
 	}
 
-	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-		Status:  protocol.StatusSuccess,
-		Users:   selectedCh.Users,
-		Message: chPayload.OptionalChannelArgs.Message,
+	if _, found := selectedCh.Users[chPayload.Requester]; !found {
+		logger.WithFields(logrus.Fields{
+			"channel": chPayload.ChannelName,
+			"user":    chPayload.Requester,
+		}).Warn("User not in the channel")
+		return protocol.ChannelPayload{
+			OptionalChannelArgs: &protocol.OptionalChannelArgs{
+				Status: protocol.StatusFail,
+				Reason: notInTheCh,
+			},
+		}
 	}
-	return chPayload
+
+	go func() {
+		chLock := m.getChannelLock(chPayload.ChannelName)
+		chLock.Lock()
+		defer chLock.Unlock()
+		selectedCh.LastActivity = time.Now().Unix()
+	}()
+
+	logger.WithFields(logrus.Fields{
+		"channel": chPayload.ChannelName,
+		"user":    chPayload.Requester,
+	}).Debug("Message sent in channel")
+
+	return protocol.ChannelPayload{
+		OptionalChannelArgs: &protocol.OptionalChannelArgs{
+			Status:  protocol.StatusSuccess,
+			Message: chPayload.OptionalChannelArgs.Message,
+		},
+	}
 }
