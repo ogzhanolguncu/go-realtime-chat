@@ -1,7 +1,6 @@
 package channels
 
 import (
-	"slices"
 	"sync"
 	"time"
 
@@ -34,9 +33,9 @@ type ChannelDetails struct {
 	ChPass       string
 	ChCapacity   int
 	Owner        string
-	Users        []string
+	Users        map[string]bool
 	LastActivity int64
-	BannedUsers  []string
+	BannedUsers  map[string]bool
 	Visibility   string
 }
 
@@ -106,7 +105,8 @@ func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.Chan
 		ChPass:       chPayload.ChannelPassword,
 		Owner:        chPayload.Requester,
 		ChCapacity:   chPayload.ChannelSize,
-		Users:        []string{chPayload.Requester},
+		Users:        map[string]bool{chPayload.Requester: true},
+		BannedUsers:  map[string]bool{},
 		LastActivity: time.Now().Unix(),
 		Visibility:   string(chPayload.OptionalChannelArgs.Visibility),
 	}
@@ -168,7 +168,7 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 		return chPayload
 	}
 
-	channel.Users = append(channel.Users, chPayload.Requester)
+	channel.Users[chPayload.Requester] = true
 	channel.LastActivity = time.Now().Unix()
 	m.chMap[chPayload.ChannelName] = channel
 
@@ -203,8 +203,7 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.Chann
 		return chPayload
 	}
 
-	userIndex := slices.Index(channel.Users, chPayload.Requester)
-	if userIndex == -1 {
+	if _, found := channel.Users[chPayload.Requester]; !found {
 		logger.WithFields(logrus.Fields{
 			"channel": chPayload.ChannelName,
 			"user":    chPayload.Requester,
@@ -216,7 +215,7 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.Chann
 		return chPayload
 	}
 
-	channel.Users = slices.Delete(channel.Users, userIndex, userIndex+1)
+	delete(channel.Users, chPayload.Requester)
 	channel.LastActivity = time.Now().Unix()
 
 	if len(channel.Users) == 0 {
@@ -281,10 +280,15 @@ func (m *Manager) getUsers(chPayload protocol.ChannelPayload) protocol.ChannelPa
 		return chPayload
 	}
 
+	users := make([]string, 0, len(selectedCh.Users))
+	for user := range selectedCh.Users {
+		users = append(users, user)
+	}
+
 	logger.WithField("userCount", len(selectedCh.Users)).Info("User list retrieved")
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
-		Users:  selectedCh.Users,
+		Users:  users,
 	}
 	return chPayload
 }
@@ -293,20 +297,7 @@ func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.Cha
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	//Check if requesting user is in the channel
-	found := slices.Contains(m.chMap[chPayload.ChannelName].Users, chPayload.Requester)
-	if !found {
-		logger.WithField("channel", chPayload.ChannelName).Warn("User not in the channel")
-		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-			Status: protocol.StatusFail,
-			Reason: notInTheCh,
-		}
-		return chPayload
-	}
-
-	logger.Info("Getting list of users")
 	selectedCh, exists := m.chMap[chPayload.ChannelName]
-
 	//Missing channel check
 	if !exists {
 		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
@@ -317,9 +308,24 @@ func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.Cha
 		return chPayload
 	}
 
+	//Check if requesting user is in the channel
+	if _, found := m.chMap[chPayload.ChannelName].Users[chPayload.Requester]; !found {
+		logger.WithField("channel", chPayload.ChannelName).Warn("User not in the channel")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: notInTheCh,
+		}
+		return chPayload
+	}
+
+	users := make([]string, 0, len(selectedCh.Users))
+	for user := range selectedCh.Users {
+		users = append(users, user)
+	}
+
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status:  protocol.StatusSuccess,
-		Users:   selectedCh.Users,
+		Users:   users,
 		Message: chPayload.OptionalChannelArgs.Message,
 	}
 	return chPayload
