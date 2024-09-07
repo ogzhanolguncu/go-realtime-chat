@@ -3,9 +3,11 @@ package ui_manager
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	ui "github.com/gizak/termui/v3"
+	"github.com/gizak/termui/v3/widgets"
 	"github.com/ogzhanolguncu/go-chat/client/internal"
 	ui_manager "github.com/ogzhanolguncu/go-chat/client/ui_manager/components"
 	"github.com/ogzhanolguncu/go-chat/protocol"
@@ -24,8 +26,10 @@ func HandleChannelUI(client *internal.Client) error {
 	draw()
 
 	uiEvents := ui.PollEvents()
+
 	incomingChan := make(chan protocol.Payload)
 	errorChan := make(chan error, 1)
+	exitChan := make(chan struct{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -47,48 +51,10 @@ func HandleChannelUI(client *internal.Client) error {
 			case "<MouseWheelDown>":
 				channelUi.ScrollChatBox(chatBox, 1)
 			case "<C-c>":
-				chMsgPayload := fmt.Sprintf("/ch leave %s", client.GetChannelInfo().ChName)
-				message, err := client.HandleSend(chMsgPayload)
-				if err != nil {
-					message = err.Error()
-				}
-				channelUi.UpdateChatBox(message, chatBox)
-				channelUi.UpdateInputText("")
-				return nil
+				handleExit(client, channelUi, chatBox, exitChan)
 			case "<Enter>":
 				if len(channelUi.GetInputText()) > 0 {
-					inputText := channelUi.GetInputText()
-					if inputText == "/clear" {
-						channelUi.ClearChatBox(chatBox)
-						channelUi.UpdateInputText("")
-					}
-					if inputText == "/quit" {
-						chMsgPayload := fmt.Sprintf("/ch leave %s", client.GetChannelInfo().ChName)
-						message, err := client.HandleSend(chMsgPayload)
-						if err != nil {
-							message = err.Error()
-						}
-						channelUi.UpdateChatBox(message, chatBox)
-						channelUi.UpdateInputText("")
-						return nil
-					}
-					if inputText == "/users" {
-						chMsgPayload := fmt.Sprintf("/ch users %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword)
-						message, err := client.HandleSend(chMsgPayload)
-						if err != nil {
-							message = err.Error()
-						}
-						channelUi.UpdateChatBox(message, chatBox)
-						channelUi.UpdateInputText("")
-					} else {
-						chMsgPayload := fmt.Sprintf("/ch message %s %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, inputText)
-						message, err := client.HandleSend(chMsgPayload)
-						if err != nil {
-							message = err.Error()
-						}
-						channelUi.UpdateChatBox(message, chatBox)
-						channelUi.UpdateInputText("")
-					}
+					handleEnterKey(client, channelUi, chatBox, exitChan)
 				}
 			case "<Space>":
 				channelUi.HandleKeyPress("<Space>")
@@ -98,9 +64,68 @@ func HandleChannelUI(client *internal.Client) error {
 			channelUi.RenderInput(inputBox)
 			draw()
 		case payload := <-incomingChan:
-			channelUi.UpdateChatBox(client.HandleChReceive(payload), chatBox)
+			msg, shouldExit := client.HandleChReceive(payload)
+			if msg != "" {
+				channelUi.UpdateChatBox(msg, chatBox)
+				draw()
+			}
+			//Required for displaying message first otherwise function just quits
+			if shouldExit {
+				go func() {
+					time.Sleep(2 * time.Second)
+					exitChan <- struct{}{}
+				}()
+			}
 		case err := <-errorChan:
 			return err
+		case <-exitChan:
+			return nil
 		}
 	}
+}
+
+func handleExit(client *internal.Client, channelUi *ui_manager.ChannelUI, chatBox *widgets.Paragraph, exitChan chan struct{}) {
+	chMsgPayload := fmt.Sprintf("/ch leave %s", client.GetChannelInfo().ChName)
+	message, err := client.HandleSend(chMsgPayload)
+	if err != nil {
+		message = err.Error()
+	}
+	channelUi.UpdateChatBox(message, chatBox)
+	channelUi.UpdateInputText("")
+	go func() {
+		time.Sleep(2 * time.Second)
+		exitChan <- struct{}{}
+	}()
+}
+
+func handleEnterKey(client *internal.Client, channelUi *ui_manager.ChannelUI, chatBox *widgets.Paragraph, exitChan chan struct{}) {
+	inputText := channelUi.GetInputText()
+	var message string
+	var err error
+
+	switch {
+	case inputText == "/clear":
+		channelUi.ClearChatBox(chatBox)
+	case inputText == "/quit":
+		handleExit(client, channelUi, chatBox, exitChan)
+	case strings.HasPrefix(inputText, "/kick "):
+		parts := strings.Fields(inputText)
+		chMsgPayload := fmt.Sprintf("/ch kick %s %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, strings.TrimSpace(parts[1]))
+		message, err = client.HandleSend(chMsgPayload)
+	case inputText == "/users":
+		chMsgPayload := fmt.Sprintf("/ch users %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword)
+		message, err = client.HandleSend(chMsgPayload)
+	default:
+		//TODO: start from here fix messages
+		chMsgPayload := fmt.Sprintf("/ch message %s %s|%s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, inputText)
+		message, err = client.HandleSend(chMsgPayload)
+	}
+
+	if err != nil {
+		message = err.Error()
+	}
+	if message != "" {
+		channelUi.UpdateChatBox(message, chatBox)
+	}
+	channelUi.UpdateInputText("")
 }

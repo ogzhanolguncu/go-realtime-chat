@@ -2,7 +2,9 @@ package internal
 
 import (
 	"fmt"
+	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ogzhanolguncu/go-chat/protocol"
@@ -14,6 +16,8 @@ const (
 	cmdMessage = "message"
 	cmdLeave   = "leave"
 	cmdUsers   = "users"
+	cmdKick    = "kick"
+	cmdBan     = "ban"
 	cmdList    = "list" // Useful for getting channel list on group chat
 )
 
@@ -39,6 +43,8 @@ func chMessageHandler(parts []string, c *Client) (string, error) {
 		return handleGetUsersOfChannel(c, channelName, args)
 	case cmdList:
 		return handleGetChannelList(c)
+	case cmdKick:
+		return handleKickUser(c, channelName, args)
 	default:
 		return fmt.Sprintf("[%s] [Unknown action: %s](fg:red)", time.Now().Format("01-02 15:04"), action), nil
 	}
@@ -97,6 +103,8 @@ func handleJoinChannel(c *Client, channelName string, args []string) (string, er
 }
 
 func handleMessageChannel(c *Client, channelName string, args []string) (string, error) {
+	//TODO: start from here fix messages
+	log.Printf("%s", args)
 	if len(args) == 0 {
 		return fmt.Sprintf("[%s] [Message content is required](fg:red)", time.Now().Format("01-02 15:04")), nil
 	}
@@ -104,10 +112,10 @@ func handleMessageChannel(c *Client, channelName string, args []string) (string,
 	var password, message string
 	if len(args) > 1 {
 		password = args[0]
-		message = args[1]
+		message = strings.Join(args[1:], " ")
 	}
 	if len(args) == 1 {
-		message = args[0]
+		message = strings.Join(args, " ")
 	}
 
 	payload, err := protocol.NewChannelPayloadBuilder().
@@ -178,7 +186,7 @@ func handleLeaveChannel(c *Client, channelName string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("[%s] [Left channel: %s](fg:cyan)", time.Now().Format("01-02 15:04"), channelName), nil
+	return fmt.Sprintf("[%s] [Requested leave channel: '%s'](fg:magenta)", time.Now().Format("01-02 15:04"), channelName), nil
 }
 
 func buildChannelPayload(c *Client, action protocol.ChannelActionType, channelName, password string, size int, visibility protocol.Visibility) (*protocol.Payload, error) {
@@ -208,4 +216,80 @@ func sendPayload(c *Client, payload *protocol.Payload) error {
 		return fmt.Errorf("error sending payload: %v", err)
 	}
 	return nil
+}
+
+func handleKickUser(c *Client, channelName string, args []string) (string, error) {
+	var password, target_user string
+	if len(args) > 1 {
+		password = args[0]
+		target_user = args[1]
+	}
+	if len(args) == 1 {
+		target_user = args[0]
+	}
+
+	payload, err := protocol.NewChannelPayloadBuilder().
+		SetRequester(c.name).
+		SetChannelAction(protocol.KickUser).
+		SetChannelName(channelName).
+		SetChannelPassword(password).
+		AddOptionalArg("target_user", target_user).
+		Build()
+	if err != nil {
+		return "", err
+	}
+
+	if err := sendPayload(c, payload); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("[%s] [User '%s' has requested to kick '%s' from the channel](fg:magenta)",
+		time.Now().Format("01-02 15:04"), c.name, target_user), nil
+}
+
+func (c *Client) HandleChReceive(payload protocol.Payload) (msg string, shouldExit bool) {
+	//If received message is not a channel payload skip the rest
+	if payload.ChannelPayload == nil {
+		return "", false
+	}
+	var message string
+	unixTimeUTC := time.Unix(payload.Timestamp, 0)
+	switch payload.MessageType {
+	case protocol.MessageTypeCH:
+		switch {
+		case payload.ChannelPayload.ChannelAction == protocol.LeaveChannel && payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
+			return "", true
+		case payload.ChannelPayload.ChannelAction == protocol.KickUser && payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
+			return fmt.Sprintf("[%s] [System: You have been kicked by '%s'](fg:cyan)",
+				unixTimeUTC.Format("01-02 15:04"),
+				payload.ChannelPayload.Requester), true
+		case payload.ChannelPayload.ChannelAction == protocol.MessageChannel:
+			//Message Channel
+			message = fmt.Sprintf("[%s] [%s: %s](fg:green)",
+				unixTimeUTC.Format("01-02 15:04"),
+				payload.ChannelPayload.Requester,
+				strings.Trim(payload.ChannelPayload.OptionalChannelArgs.Message, "\r\n"))
+		case payload.ChannelPayload.ChannelAction == protocol.GetUsers &&
+			payload.ChannelPayload.OptionalChannelArgs != nil &&
+			payload.ChannelPayload.OptionalChannelArgs.Users != nil &&
+			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
+			//Get Users
+			message = fmt.Sprintf("[%s] [System: %s](fg:cyan)",
+				unixTimeUTC.Format("01-02 15:04"),
+				strings.Join(payload.ChannelPayload.OptionalChannelArgs.Users, fmt.Sprintf("%s ", protocol.OptionalUserAndChannelsSeparator)))
+		case payload.ChannelPayload.OptionalChannelArgs != nil &&
+			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusFail:
+			// Any failed message will be caught here
+			message = fmt.Sprintf("[%s] [System: %s](fg:red)",
+				unixTimeUTC.Format("01-02 15:04"),
+				payload.ChannelPayload.OptionalChannelArgs.Reason)
+		default:
+			// Handle any other cases for MessageTypeCH
+			message = fmt.Sprintf("[%s] [System: Unhandled channel action](fg:yellow)",
+				unixTimeUTC.Format("01-02 15:04"))
+		}
+	default:
+		message = fmt.Sprintf("[%s] [Unknown message type](fg:red)", unixTimeUTC.Format("01-02 15:04"))
+	}
+	return message, false
 }

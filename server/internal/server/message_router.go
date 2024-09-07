@@ -70,6 +70,15 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 		}
 		return
 	}
+	if payload.ChannelPayload.ChannelAction == protocol.KickUser {
+		userConn, found := mr.server.connectionManager.FindConnectionByOwnerName(payload.ChannelPayload.OptionalChannelArgs.TargetUser)
+		//Skip if connection not found
+		if !found {
+			return
+		}
+		writeToAConn(mr, payload, userConn)
+		return
+	}
 
 	writeToAConn(mr, payload, info.Connection)
 }

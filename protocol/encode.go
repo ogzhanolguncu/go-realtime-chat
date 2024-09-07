@@ -56,11 +56,6 @@ func encodeProtocol(isBase64 bool, payload Payload) string {
 			writeCommonPrefix(payload.MessageType)
 			sb.WriteString(fmt.Sprintf("%s|%s|%s", payload.Sender, strings.Join(payload.EncodedChatHistory, ","), payload.Status))
 		},
-		MessageTypeENC: func() {
-			writeCommonPrefix(payload.MessageType)
-			sb.WriteString(payload.EncryptedKey)
-		},
-
 		MessageTypeCH: func() {
 			sb.WriteString(encodeCH(&payload))
 		},

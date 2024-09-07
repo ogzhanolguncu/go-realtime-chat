@@ -20,7 +20,6 @@ const (
 	MessageTypeBLCK_USR MessageType = "BLCK_USR"
 	MessageTypeACT_USRS MessageType = "ACT_USRS" //Active users
 	MessageTypeHSTRY    MessageType = "HSTRY"    //Chat history
-	MessageTypeENC      MessageType = "ENC"
 	MessageTypeCH       MessageType = "CH"
 )
 

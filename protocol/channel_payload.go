@@ -62,7 +62,7 @@ func (rat ChannelActionType) String() string {
 	case LeaveChannel:
 		return "LeaveChannel"
 	case KickUser:
-		return "KickChannel"
+		return "KickUser"
 	case BanUser:
 		return "BanUser"
 	case GetUsers:

@@ -16,6 +16,9 @@ const (
 	notInTheCh          = "User not in the channel."
 	unknownChAction     = "Unknown channel action."
 	noActiveChannels    = "No active channels"
+	notChannelOwner     = "Not a channel owner"
+	emptyTargetUser     = "Target user cannot be empty"
+	ownerCannotBeKicked = "Owner cannot be kicked"
 )
 
 var logger *logrus.Logger
@@ -71,6 +74,8 @@ func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
 		return m.getUsers(*payload.ChannelPayload)
 	case protocol.MessageChannel:
 		return m.messageChannel(*payload.ChannelPayload)
+	case protocol.KickUser:
+		return m.kickUser(*payload.ChannelPayload)
 	default:
 		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown channel action")
 		return protocol.ChannelPayload{
@@ -328,5 +333,55 @@ func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.Cha
 		Users:   users,
 		Message: chPayload.OptionalChannelArgs.Message,
 	}
+	return chPayload
+}
+
+func (m *Manager) kickUser(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	//Channel has to exist
+	selectedCh, exists := m.chMap[chPayload.ChannelName]
+	if !exists {
+		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: chDoesNotExist,
+		}
+		return chPayload
+	}
+
+	//Requester has to be the owner
+	if selectedCh.Owner != chPayload.Requester {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: notChannelOwner,
+		}
+	}
+
+	//Payload has to have target user
+	if chPayload.OptionalChannelArgs != nil &&
+		chPayload.OptionalChannelArgs.TargetUser == "" {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: emptyTargetUser,
+		}
+	}
+
+	//Payload has to have target user
+	if chPayload.OptionalChannelArgs.TargetUser == selectedCh.Owner {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: ownerCannotBeKicked,
+		}
+	}
+	//Delete user from user list
+	delete(selectedCh.Users, chPayload.OptionalChannelArgs.TargetUser)
+
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status:     protocol.StatusSuccess,
+		TargetUser: chPayload.OptionalChannelArgs.TargetUser,
+	}
+
 	return chPayload
 }

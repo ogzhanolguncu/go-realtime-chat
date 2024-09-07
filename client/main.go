@@ -64,14 +64,14 @@ func manageUIs(client *internal.Client) error {
 		return err
 	}
 	for {
-		switchToAlternate, err := ui_manager.HandleChatUI(client)
+		switchToChannel, err := ui_manager.HandleChatUI(client)
 		if err != nil {
 			return fmt.Errorf("error in chat UI: %v", err)
 		}
 
-		if switchToAlternate {
+		if switchToChannel {
 			if err := ui_manager.HandleChannelUI(client); err != nil {
-				return fmt.Errorf("error in alternate UI: %v", err)
+				return fmt.Errorf("error in channel UI: %v", err)
 			}
 		} else {
 			// User wants to quit the application

@@ -40,9 +40,11 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	go client.FetchChatHistory()
-	go client.FetchActiveUserList()
+	//TODO: still can't fetch both of them when kicked or banned or leave the room
+	go func() {
+		client.FetchChatHistory()
+		client.FetchActiveUserList()
+	}()
 	go client.ReadMessages(ctx, incomingChan, errorChan)
 
 	cursorTicker := time.NewTicker(500 * time.Millisecond)
@@ -81,7 +83,7 @@ func HandleChatUI(client *internal.Client) (bool, error) {
 						draw()
 						continue
 					}
-					if inputText == "/list" {
+					if inputText == "/ch list" {
 						message, err := client.HandleSend("/ch list -")
 						if err != nil {
 							message = err.Error()
