@@ -357,15 +357,17 @@ func (m *Manager) kickUser(chPayload protocol.ChannelPayload) protocol.ChannelPa
 			Status: protocol.StatusFail,
 			Reason: notChannelOwner,
 		}
+		return chPayload
 	}
 
 	//Payload has to have target user
 	if chPayload.OptionalChannelArgs != nil &&
-		chPayload.OptionalChannelArgs.TargetUser == "" {
+		chPayload.OptionalChannelArgs.TargetUser == protocol.EmptyChannelField {
 		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: emptyTargetUser,
 		}
+		return chPayload
 	}
 
 	//Payload has to have target user
@@ -374,6 +376,7 @@ func (m *Manager) kickUser(chPayload protocol.ChannelPayload) protocol.ChannelPa
 			Status: protocol.StatusFail,
 			Reason: ownerCannotBeKicked,
 		}
+		return chPayload
 	}
 	//Delete user from user list
 	delete(selectedCh.Users, chPayload.OptionalChannelArgs.TargetUser)

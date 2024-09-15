@@ -3,6 +3,7 @@ package chat_history
 import (
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -61,10 +62,18 @@ func createSchema(db *sqlx.DB) error {
 	return nil
 }
 
-func (ch *ChatHistory) AddMessage(message string) error {
+func (ch *ChatHistory) AddMessage(message string, messageTypes ...protocol.MessageType) error {
 	decodedMsg, err := protocol.InitDecodeProtocol(ch.encoding)(message)
 	if err != nil {
 		return fmt.Errorf("failed to decode message: %w", err)
+	}
+	// Default message types if none provided
+	if len(messageTypes) == 0 {
+		messageTypes = []protocol.MessageType{"WSP", "MSG"}
+	}
+
+	if !slices.Contains(messageTypes, decodedMsg.MessageType) {
+		return nil
 	}
 
 	entry := MessageEntry{

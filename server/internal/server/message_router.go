@@ -71,7 +71,12 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 		return
 	}
 	if payload.ChannelPayload.ChannelAction == protocol.KickUser {
-		userConn, found := mr.server.connectionManager.FindConnectionByOwnerName(payload.ChannelPayload.OptionalChannelArgs.TargetUser)
+		// Fail cases in kickUser should be recieved by requester
+		user := roomPayload.OptionalChannelArgs.TargetUser
+		if payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusFail {
+			user = payload.ChannelPayload.Requester
+		}
+		userConn, found := mr.server.connectionManager.FindConnectionByOwnerName(user)
 		//Skip if connection not found
 		if !found {
 			return

@@ -72,7 +72,7 @@ func HandleChannelUI(client *internal.Client) error {
 			//Required for displaying message first otherwise function just quits
 			if shouldExit {
 				go func() {
-					time.Sleep(2 * time.Second)
+					time.Sleep(1 * time.Second)
 					exitChan <- struct{}{}
 				}()
 			}
@@ -93,7 +93,7 @@ func handleExit(client *internal.Client, channelUi *ui_manager.ChannelUI, chatBo
 	channelUi.UpdateChatBox(message, chatBox)
 	channelUi.UpdateInputText("")
 	go func() {
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 		exitChan <- struct{}{}
 	}()
 }

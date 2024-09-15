@@ -330,7 +330,6 @@ func parseCH(msg string) (timestamp int64, room_action, requester, roomName, roo
 	return timestamp, room_action, requester, roomName, roomPassword, roomSize, optionalArgs, nil
 }
 
-// TODO: This one has to use optional args from payload, they are not connected atm this will lead to bugs.
 const (
 	optArgStatus     = "status="
 	optArgVisibility = "visibility="

@@ -177,13 +177,13 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 			payload.ChannelPayload.OptionalChannelArgs != nil &&
 			payload.ChannelPayload.OptionalChannelArgs.Channels != nil &&
 			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess {
-			return fmt.Sprintf("[%s] [System: %s](fg:cyan)",
+			return fmt.Sprintf("[%s] [%s](fg:magenta)",
 				unixTimeUTC.Format("01-02 15:04"),
 				strings.Join(payload.ChannelPayload.OptionalChannelArgs.Channels, fmt.Sprintf("%s ", protocol.OptionalUserAndChannelsSeparator)))
 		}
 
 		if payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusFail {
-			message = fmt.Sprintf("[%s] [System: %s](fg:red)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.OptionalChannelArgs.Reason)
+			message = fmt.Sprintf("[%s] [%s](fg:red)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.OptionalChannelArgs.Reason)
 		}
 	case protocol.MessageTypeMSG:
 		// If the sender is the current user, display "You" instead of the username
@@ -197,9 +197,9 @@ func (c *Client) HandleReceive(payload protocol.Payload) string {
 		message = fmt.Sprintf("[%s] [Whisper from %s: %s](fg:magenta)", unixTimeUTC.Format("01-02 15:04"), payload.Sender, payload.Content)
 	case protocol.MessageTypeSYS:
 		if payload.Status == "fail" {
-			message = fmt.Sprintf("[%s] [System: %s](fg:red)", unixTimeUTC.Format("01-02 15:04"), payload.Content)
+			message = fmt.Sprintf("[%s] [%s](fg:red)", unixTimeUTC.Format("01-02 15:04"), payload.Content)
 		} else {
-			message = fmt.Sprintf("[%s] [System: %s](fg:cyan)", unixTimeUTC.Format("01-02 15:04"), payload.Content)
+			message = fmt.Sprintf("[%s] [%s](fg:magenta)", unixTimeUTC.Format("01-02 15:04"), payload.Content)
 		}
 	default:
 		return fmt.Sprintf("[%s] [Unknown message](fg:red)", unixTimeUTC.Format("01-02 15:04"))

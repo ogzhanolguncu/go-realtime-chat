@@ -62,7 +62,7 @@ func (cu *ChatUI) prepareUIItems() (header *widgets.Paragraph, commandBox *widge
 	commandBox = widgets.NewParagraph()
 	commandBox.Title = "Commands"
 	commandBox.Text = "General:\n" +
-		"  /clear - Clear chat                     |  /quit - Exit app\n\n" +
+		"  /clear - Clear chat                                  |  /quit - Exit app\n\n" +
 		"User Interactions:\n" +
 		"  /whisper <username> <message> - Send PM              |  /reply <message> - Reply to last PM\n" +
 		"  /mute <username> - Hide messages                     |  /unmute <username> - Show messages\n" +
