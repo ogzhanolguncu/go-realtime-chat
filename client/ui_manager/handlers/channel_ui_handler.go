@@ -116,8 +116,7 @@ func handleEnterKey(client *internal.Client, channelUi *ui_manager.ChannelUI, ch
 		chMsgPayload := fmt.Sprintf("/ch users %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword)
 		message, err = client.HandleSend(chMsgPayload)
 	default:
-		//TODO: start from here fix messages
-		chMsgPayload := fmt.Sprintf("/ch message %s %s|%s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, inputText)
+		chMsgPayload := fmt.Sprintf("/ch message %s %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, inputText)
 		message, err = client.HandleSend(chMsgPayload)
 	}
 

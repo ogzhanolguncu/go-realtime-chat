@@ -10,7 +10,7 @@ const (
 	// If args are empty it will return empty string
 	optionalArgsSeparator            = ";"
 	OptionalUserAndChannelsSeparator = ","
-	emptyChannelField                = "-"
+	EmptyChannelField                = "-"
 )
 
 type ChannelPayloadBuilder struct {
@@ -100,21 +100,21 @@ func encodeCH(payload *Payload) string {
 	if rp.ChannelName != "" {
 		sb.WriteString(rp.ChannelName)
 	} else {
-		sb.WriteString(emptyChannelField)
+		sb.WriteString(EmptyChannelField)
 	}
 	sb.WriteString("|")
 
 	if rp.ChannelPassword != "" {
 		sb.WriteString(rp.ChannelPassword)
 	} else {
-		sb.WriteString(emptyChannelField)
+		sb.WriteString(EmptyChannelField)
 	}
 	sb.WriteString("|")
 
 	if rp.ChannelSize != 0 {
 		sb.WriteString(fmt.Sprintf("%d", rp.ChannelSize))
 	} else {
-		sb.WriteString(emptyChannelField)
+		sb.WriteString(EmptyChannelField)
 	}
 
 	if rp.OptionalChannelArgs != nil {

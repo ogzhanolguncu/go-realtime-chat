@@ -297,7 +297,7 @@ func parseCH(msg string) (timestamp int64, room_action, requester, roomName, roo
 	if !found {
 		return 0, "", "", "", "", 0, &OptionalChannelArgs{}, fmt.Errorf(errInvalidFormat, "CH", "error missing channelName")
 	}
-	if roomName == emptyChannelField {
+	if roomName == EmptyChannelField {
 		roomName = ""
 	}
 
@@ -305,7 +305,7 @@ func parseCH(msg string) (timestamp int64, room_action, requester, roomName, roo
 	if !found {
 		return 0, "", "", "", "", 0, &OptionalChannelArgs{}, fmt.Errorf(errInvalidFormat, "CH", "error missing channelPassword")
 	}
-	if roomPassword == emptyChannelField {
+	if roomPassword == EmptyChannelField {
 		roomPassword = ""
 	}
 
@@ -316,7 +316,7 @@ func parseCH(msg string) (timestamp int64, room_action, requester, roomName, roo
 		}
 		return timestamp, room_action, requester, roomName, roomPassword, roomSize, optionalArgs, nil
 	}
-	if roomSizeStr != emptyChannelField {
+	if roomSizeStr != EmptyChannelField {
 		roomSize, err = strconv.Atoi(roomSizeStr)
 		if err != nil {
 			return 0, "", "", "", "", 0, &OptionalChannelArgs{}, fmt.Errorf(errInvalidFormat, "CH", "error missing channelSizeStr")

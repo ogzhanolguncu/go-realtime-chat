@@ -38,7 +38,6 @@ func NewClient(config Config) (*Client, error) {
 	} else {
 		encodingType = "PLAIN-TEXT"
 	}
-
 	log.Printf("------ ENCODING SET TO %s ------", encodingType)
 
 	return &Client{
@@ -110,6 +109,10 @@ func (c *Client) CheckIfSuccessfulChannel(payload protocol.Payload) bool {
 }
 
 func (c *Client) SetChannelInfo(ch ChannelInfo) {
+	// If room is passwordless we use placeholder instead to simplify request payload parsing
+	if ch.ChPassword == "" {
+		ch.ChPassword = protocol.EmptyChannelField
+	}
 	c.chInfo = &ch
 }
 

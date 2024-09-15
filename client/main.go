@@ -7,18 +7,12 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/joho/godotenv"
 	"github.com/ogzhanolguncu/go-chat/client/internal"
 	ui_manager "github.com/ogzhanolguncu/go-chat/client/ui_manager/handlers"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	err = retry.Do(
+	retry.Do(
 		func() error {
 			return runClient()
 		},
@@ -32,10 +26,6 @@ func main() {
 			fmt.Printf("Trying to reconnect, but %v\n", err)
 		}),
 	)
-
-	if err != nil {
-		log.Fatalf(fmt.Sprintf("Failed after max retries: %v", err))
-	}
 }
 
 func runClient() error {
