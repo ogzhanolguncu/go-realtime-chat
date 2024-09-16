@@ -112,6 +112,10 @@ func handleEnterKey(client *internal.Client, channelUi *ui_manager.ChannelUI, ch
 		parts := strings.Fields(inputText)
 		chMsgPayload := fmt.Sprintf("/ch kick %s %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, strings.TrimSpace(parts[1]))
 		message, err = client.HandleSend(chMsgPayload)
+	case strings.HasPrefix(inputText, "/ban "):
+		parts := strings.Fields(inputText)
+		chMsgPayload := fmt.Sprintf("/ch ban %s %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword, strings.TrimSpace(parts[1]))
+		message, err = client.HandleSend(chMsgPayload)
 	case inputText == "/users":
 		chMsgPayload := fmt.Sprintf("/ch users %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword)
 		message, err = client.HandleSend(chMsgPayload)

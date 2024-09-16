@@ -10,16 +10,17 @@ import (
 )
 
 const (
-	chAlreadyExists     = "Channel name already exists."
-	chDoesNotExist      = "Channel does not exist."
-	incorrectChPassword = "Incorrect channel password."
-	chAtCapacity        = "Channel is full. Try again later."
-	notInTheCh          = "User not in the channel."
-	unknownChAction     = "Unknown channel action."
-	noActiveChannels    = "No active channels"
-	notChannelOwner     = "Not a channel owner"
-	emptyTargetUser     = "Target user cannot be empty"
-	ownerCannotBeKicked = "Owner cannot be kicked"
+	chAlreadyExists      = "Channel name already exists."
+	chDoesNotExist       = "Channel does not exist."
+	incorrectChPassword  = "Incorrect channel password."
+	chAtCapacity         = "Channel is full. Try again later."
+	notInTheCh           = "User not in the channel."
+	unknownChAction      = "Unknown channel action."
+	noActiveChannels     = "No active channels."
+	notChannelOwner      = "Not a channel owner."
+	emptyTargetUser      = "Target user cannot be empty."
+	ownerCannotBeKicked  = "Owner cannot be kicked."
+	bannedUserCannotJoin = "You have been banned from '%s'."
 )
 
 var logger *logrus.Logger
@@ -77,6 +78,8 @@ func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, pro
 		return m.messageChannel(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.KickUser:
 		return m.kickUser(*payload.ChannelPayload)
+	case protocol.BanUser:
+		return m.banUser(*payload.ChannelPayload)
 	default:
 		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown channel action")
 		return protocol.ChannelPayload{
@@ -129,7 +132,7 @@ func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.Chan
 	return chPayload
 }
 
-func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) (joinPayload, noticePayload protocol.ChannelPayload) {
+func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) (protocol.ChannelPayload, protocol.ChannelPayload) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -145,6 +148,16 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) (joinPayload, n
 		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: chDoesNotExist,
+		}
+		return chPayload, protocol.ChannelPayload{}
+	}
+
+	_, bannedUserDetected := channel.BannedUsers[chPayload.Requester]
+	if bannedUserDetected {
+		logger.Warn("Banned user is trying to join")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: fmt.Sprintf(bannedUserCannotJoin, channel.ChName),
 		}
 		return chPayload, protocol.ChannelPayload{}
 	}
@@ -345,42 +358,10 @@ func (m *Manager) kickUser(chPayload protocol.ChannelPayload) (protocol.ChannelP
 	defer m.lock.Unlock()
 
 	//Channel has to exist
-	channel, exists := m.chMap[chPayload.ChannelName]
-	if !exists {
-		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
-		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-			Status: protocol.StatusFail,
-			Reason: chDoesNotExist,
-		}
-		return chPayload, protocol.ChannelPayload{}
-	}
-
-	//Requester has to be the owner
-	if channel.Owner != chPayload.Requester {
-		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-			Status: protocol.StatusFail,
-			Reason: notChannelOwner,
-		}
-		return chPayload, protocol.ChannelPayload{}
-	}
-
-	//Payload has to have target user
-	if chPayload.OptionalChannelArgs != nil &&
-		chPayload.OptionalChannelArgs.TargetUser == protocol.EmptyChannelField {
-		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-			Status: protocol.StatusFail,
-			Reason: emptyTargetUser,
-		}
-		return chPayload, protocol.ChannelPayload{}
-	}
-
-	//Payload has to have target user
-	if chPayload.OptionalChannelArgs.TargetUser == channel.Owner {
-		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-			Status: protocol.StatusFail,
-			Reason: ownerCannotBeKicked,
-		}
-		return chPayload, protocol.ChannelPayload{}
+	channel := m.chMap[chPayload.ChannelName]
+	checkPayload := m.kickAndBanChecks(channel, chPayload)
+	if checkPayload != nil {
+		return *checkPayload, protocol.ChannelPayload{}
 	}
 	//Delete user from user list
 	delete(channel.Users, chPayload.OptionalChannelArgs.TargetUser)
@@ -391,6 +372,31 @@ func (m *Manager) kickUser(chPayload protocol.ChannelPayload) (protocol.ChannelP
 	}
 
 	chNoticePayload := m.prepareNoticePayload(chPayload, channel, fmt.Sprintf("'%s' has been kicked from the channel", chPayload.Requester))
+	return chPayload, chNoticePayload
+}
+
+func (m *Manager) banUser(chPayload protocol.ChannelPayload) (protocol.ChannelPayload, protocol.ChannelPayload) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	//Channel has to exist
+	channel := m.chMap[chPayload.ChannelName]
+	checkPayload := m.kickAndBanChecks(channel, chPayload)
+	if checkPayload != nil {
+		return *checkPayload, protocol.ChannelPayload{}
+	}
+
+	//Delete user from user list
+	delete(channel.Users, chPayload.OptionalChannelArgs.TargetUser)
+	//Add user to banned list
+	channel.BannedUsers[chPayload.OptionalChannelArgs.TargetUser] = true
+
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status:     protocol.StatusSuccess,
+		TargetUser: chPayload.OptionalChannelArgs.TargetUser,
+	}
+
+	chNoticePayload := m.prepareNoticePayload(chPayload, channel, fmt.Sprintf("'%s' has been banned from the channel", chPayload.Requester))
 	return chPayload, chNoticePayload
 }
 
@@ -414,4 +420,45 @@ func getUsersInChannnel(channel *ChannelDetails) []string {
 		users = append(users, user)
 	}
 	return users
+}
+
+func (m *Manager) kickAndBanChecks(channel *ChannelDetails, chPayload protocol.ChannelPayload) *protocol.ChannelPayload {
+	//Channel has to exist
+	if channel == nil {
+		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: chDoesNotExist,
+		}
+		return &chPayload
+	}
+
+	//Requester has to be the owner
+	if channel.Owner != chPayload.Requester {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: notChannelOwner,
+		}
+		return &chPayload
+	}
+
+	//Payload has to have target user
+	if chPayload.OptionalChannelArgs != nil &&
+		chPayload.OptionalChannelArgs.TargetUser == protocol.EmptyChannelField {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: emptyTargetUser,
+		}
+		return &chPayload
+	}
+
+	//Payload has to have target user
+	if chPayload.OptionalChannelArgs.TargetUser == channel.Owner {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+			Reason: ownerCannotBeKicked,
+		}
+		return &chPayload
+	}
+	return nil
 }

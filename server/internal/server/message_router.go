@@ -82,7 +82,7 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 		return
 	}
 
-	if payload.ChannelPayload.ChannelAction == protocol.KickUser {
+	if payload.ChannelPayload.ChannelAction == protocol.KickUser || payload.ChannelPayload.ChannelAction == protocol.BanUser {
 		// Fail cases in kickUser should be recieved by requester
 		user := roomPayload.OptionalChannelArgs.TargetUser
 		if payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusFail {

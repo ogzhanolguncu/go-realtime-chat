@@ -44,6 +44,8 @@ func chMessageHandler(parts []string, c *Client) (string, error) {
 		return handleGetChannelList(c)
 	case cmdKick:
 		return handleKickUser(c, channelName, args)
+	case cmdBan:
+		return handleBanUser(c, channelName, args)
 	default:
 		return fmt.Sprintf("[%s] [Unknown action: %s](fg:red)", time.Now().Format("01-02 15:04"), action), nil
 	}
@@ -244,6 +246,35 @@ func handleKickUser(c *Client, channelName string, args []string) (string, error
 		time.Now().Format("01-02 15:04"), c.name, target_user), nil
 }
 
+func handleBanUser(c *Client, channelName string, args []string) (string, error) {
+	var password, target_user string
+	if len(args) > 1 {
+		password = args[0]
+		target_user = args[1]
+	}
+	if len(args) == 1 {
+		target_user = args[0]
+	}
+
+	payload, err := protocol.NewChannelPayloadBuilder().
+		SetRequester(c.name).
+		SetChannelAction(protocol.BanUser).
+		SetChannelName(channelName).
+		SetChannelPassword(password).
+		AddOptionalArg("target_user", target_user).
+		Build()
+	if err != nil {
+		return "", err
+	}
+
+	if err := sendPayload(c, payload); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("[%s] [User '%s' has requested to ban '%s' from the channel](fg:magenta)",
+		time.Now().Format("01-02 15:04"), c.name, target_user), nil
+}
+
 func (c *Client) HandleChReceive(payload protocol.Payload) (msg string, shouldExit bool) {
 	//If received message is not a channel payload skip the rest
 	if payload.ChannelPayload == nil {
@@ -267,6 +298,12 @@ func (c *Client) HandleChReceive(payload protocol.Payload) (msg string, shouldEx
 		case payload.ChannelPayload.ChannelAction == protocol.KickUser &&
 			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
 			return fmt.Sprintf("[%s] [You have been kicked by '%s'](fg:magenta)",
+				unixTimeUTC.Format("01-02 15:04"),
+				payload.ChannelPayload.Requester), true
+
+		case payload.ChannelPayload.ChannelAction == protocol.BanUser &&
+			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
+			return fmt.Sprintf("[%s] [You have been banned by '%s'](fg:magenta)",
 				unixTimeUTC.Format("01-02 15:04"),
 				payload.ChannelPayload.Requester), true
 
