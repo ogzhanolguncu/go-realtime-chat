@@ -295,6 +295,12 @@ func (c *Client) HandleChReceive(payload protocol.Payload) (msg string, shouldEx
 			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
 			return "", true
 
+		case payload.ChannelPayload.ChannelAction == protocol.CloseChannel &&
+			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
+			return fmt.Sprintf("[%s] [%s](fg:magenta)",
+				unixTimeUTC.Format("01-02 15:04"),
+				payload.ChannelPayload.OptionalChannelArgs.Reason), true
+
 		case payload.ChannelPayload.ChannelAction == protocol.KickUser &&
 			payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess:
 			return fmt.Sprintf("[%s] [You have been kicked by '%s'](fg:magenta)",

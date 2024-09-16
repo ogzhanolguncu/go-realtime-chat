@@ -2,10 +2,12 @@ package channels
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
 	"github.com/ogzhanolguncu/go-chat/protocol"
+	"github.com/ogzhanolguncu/go-chat/server/internal/connection"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,6 +23,7 @@ const (
 	emptyTargetUser      = "Target user cannot be empty."
 	ownerCannotBeKicked  = "Owner cannot be kicked."
 	bannedUserCannotJoin = "You have been banned from '%s'."
+	closeInactiveCh      = "Channel '%s' closed due to inactivity."
 )
 
 var logger *logrus.Logger
@@ -49,11 +52,14 @@ type Manager struct {
 	lock  sync.RWMutex
 }
 
-func NewChannelManager() *Manager {
+// Use this connnection manager and encodeFn ONLY for close channel dispatch
+func NewChannelManager(cm *connection.Manager, encodeFn func(payload protocol.Payload) string) *Manager {
 	logger.Info("Initializing new ChannelManager")
-	return &Manager{
+	m := &Manager{
 		chMap: make(map[string]*ChannelDetails),
 	}
+	go m.startInactiveChannelChecker(cm, encodeFn)
+	return m
 }
 
 func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, protocol.ChannelPayload) {
@@ -461,4 +467,62 @@ func (m *Manager) kickAndBanChecks(channel *ChannelDetails, chPayload protocol.C
 		return &chPayload
 	}
 	return nil
+}
+
+// Channel Inactivity Checks
+// -------------------------
+
+// Runs every minute and check for inactive channels
+func (m *Manager) startInactiveChannelChecker(cm *connection.Manager, encodeFn func(payload protocol.Payload) string) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		m.checkInactiveChannel(cm, encodeFn)
+
+	}
+}
+
+// This function is an exception among others. Only this function is exposed to the connection manager and encodeFn because in this scenario, the invoker is this function.
+func (m *Manager) checkInactiveChannel(cm *connection.Manager, encodeFn func(payload protocol.Payload) string) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for chName, ch := range m.chMap {
+		if time.Now().Unix() > ch.LastActivity+10 {
+			logger.WithFields(logrus.Fields{
+				"channel": ch.ChName,
+			}).Info("Channel is inactive")
+
+			for user := range ch.Users {
+				conn, found := cm.FindConnectionByOwnerName(user)
+				if !found {
+					continue
+				}
+				encodedMsg := encodeFn(protocol.Payload{
+					MessageType: protocol.MessageTypeCH,
+					ChannelPayload: &protocol.ChannelPayload{
+						ChannelAction: protocol.CloseChannel,
+						OptionalChannelArgs: &protocol.OptionalChannelArgs{
+							Reason: fmt.Sprintf(closeInactiveCh, chName),
+							Status: protocol.StatusSuccess,
+						},
+					},
+				})
+				conn.Write([]byte(encodedMsg))
+			}
+			cm.RangeConnections(func(conn net.Conn, info *connection.ConnectionInfo) bool {
+				payload := protocol.Payload{
+					MessageType: protocol.MessageTypeSYS,
+					Content:     fmt.Sprintf("Channel '%s' has been closed due to inactivity", chName),
+					Status:      "success",
+				}
+				encodedMsg := []byte(encodeFn(payload))
+				conn.Write([]byte(encodedMsg))
+				return true
+			})
+
+			delete(m.chMap, chName)
+		}
+	}
 }

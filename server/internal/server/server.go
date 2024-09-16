@@ -57,7 +57,7 @@ func NewServer(port int, dbPath string, encoding bool) (*TCPServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize block user manager: %w", err)
 	}
-	chanm := channels.NewChannelManager()
+	chanm := channels.NewChannelManager(cm, protocol.InitEncodeProtocol(encoding))
 
 	server := &TCPServer{
 		listener: listener,

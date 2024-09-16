@@ -67,7 +67,7 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 		}
 	}()
 
-	// Broadcast newly created channel to users if visibility is public
+	// Broadcast newly created channel to users if visibility is public or closed channel
 	go func() {
 		isSuccess := payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess
 		if payload.ChannelPayload.ChannelAction == protocol.CreateChannel && isSuccess &&
