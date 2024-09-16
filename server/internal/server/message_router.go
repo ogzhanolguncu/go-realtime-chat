@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"slices"
 	"time"
 
 	"github.com/ogzhanolguncu/go-chat/protocol"
@@ -51,25 +52,16 @@ func (mr *MessageRouter) RouteMessage(info *connection.ConnectionInfo, message s
 // Message Handlers
 // -----------------------------
 func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *connection.ConnectionInfo) {
-	roomPayload := mr.server.channelManager.Handle(payload)
+	roomPayload, noticePayload := mr.server.channelManager.Handle(payload)
 	payload.Timestamp = time.Now().Unix()
 	payload.ChannelPayload = &roomPayload
 
 	if payload.ChannelPayload.ChannelAction == protocol.MessageChannel {
-		for _, user := range payload.ChannelPayload.OptionalChannelArgs.Users {
-			userConn, found := mr.server.connectionManager.FindConnectionByOwnerName(user)
-			//Skip if writer is the owner
-			if userConn == info.Connection {
-				continue
-			}
-			//Skip if connection not found
-			if !found {
-				continue
-			}
-			writeToAConn(mr, payload, userConn)
-		}
+		roomMsg := []byte(mr.server.encodeFn(payload))
+		mr.broadcastToUsers(roomMsg, payload.ChannelPayload.OptionalChannelArgs.Users, info.Connection)
 		return
 	}
+
 	if payload.ChannelPayload.ChannelAction == protocol.KickUser {
 		// Fail cases in kickUser should be recieved by requester
 		user := roomPayload.OptionalChannelArgs.TargetUser
@@ -84,6 +76,26 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 		writeToAConn(mr, payload, userConn)
 		return
 	}
+
+	// Broadcast when kick, join, ban and close room happens
+	go func() {
+		noticePayloadCopy := payload
+		noticePayloadCopy.ChannelPayload = &noticePayload
+
+		if noticePayloadCopy.ChannelPayload.ChannelAction == protocol.NoticeChannel {
+			roomMsg := []byte(mr.server.encodeFn(noticePayloadCopy))
+			mr.broadcastToUsers(roomMsg, noticePayloadCopy.ChannelPayload.OptionalChannelArgs.Users, info.Connection)
+		}
+	}()
+
+	// Broadcast newly created channel to users if visibility is public
+	go func() {
+		isSuccess := payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess
+		if payload.ChannelPayload.ChannelAction == protocol.CreateChannel && isSuccess &&
+			payload.ChannelPayload.OptionalChannelArgs.Visibility == protocol.VisibilityPublic {
+			mr.server.broadcastSystemNotice(fmt.Sprintf("Channel '%s' has been created by '%s'", payload.ChannelPayload.ChannelName, info.OwnerName), info.Connection)
+		}
+	}()
 
 	writeToAConn(mr, payload, info.Connection)
 }
@@ -208,6 +220,19 @@ func (mr *MessageRouter) broadcastToAll(b []byte, errLog string, excludeConn ...
 			_, err := conn.Write(b)
 			if err != nil {
 				log.Printf("%s %s\n", errLog, err)
+			}
+		}
+		return true
+	})
+}
+
+func (mr *MessageRouter) broadcastToUsers(b []byte, users []string, excludeConn ...net.Conn) {
+	mr.server.connectionManager.RangeConnections(func(conn net.Conn, details *connection.ConnectionInfo) bool {
+		// Exclude initator from broadcast and make sure user is in connection list
+		if !containsConnection(excludeConn, conn) && slices.Contains(users, details.OwnerName) {
+			_, err := conn.Write(b)
+			if err != nil {
+				log.Printf("%s %s\n", "Couldn't send broadcast message", err)
 			}
 		}
 		return true

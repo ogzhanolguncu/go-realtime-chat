@@ -1,6 +1,7 @@
 package channels
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -54,7 +55,7 @@ func NewChannelManager() *Manager {
 	}
 }
 
-func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
+func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, protocol.ChannelPayload) {
 	logger.WithFields(logrus.Fields{
 		"action":  payload.ChannelPayload.ChannelAction,
 		"channel": payload.ChannelPayload.ChannelName,
@@ -63,19 +64,19 @@ func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
 
 	switch payload.ChannelPayload.ChannelAction {
 	case protocol.CreateChannel:
-		return m.createChannel(*payload.ChannelPayload)
+		return m.createChannel(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.JoinChannel:
 		return m.joinChannel(*payload.ChannelPayload)
 	case protocol.LeaveChannel:
-		return m.leaveChannel(*payload.ChannelPayload)
+		return m.leaveChannel(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.GetChannels:
-		return m.getChannels(*payload.ChannelPayload)
+		return m.getChannels(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.GetUsers:
-		return m.getUsers(*payload.ChannelPayload)
+		return m.getUsers(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.MessageChannel:
-		return m.messageChannel(*payload.ChannelPayload)
+		return m.messageChannel(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.KickUser:
-		return m.kickUser(*payload.ChannelPayload)
+		return m.kickUser(*payload.ChannelPayload), protocol.ChannelPayload{}
 	default:
 		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown channel action")
 		return protocol.ChannelPayload{
@@ -83,7 +84,7 @@ func (m *Manager) Handle(payload protocol.Payload) protocol.ChannelPayload {
 				Status: protocol.StatusFail,
 				Reason: unknownChAction,
 			},
-		}
+		}, protocol.ChannelPayload{}
 	}
 }
 
@@ -122,12 +123,13 @@ func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.Chan
 	}).Info("channel created successfully")
 
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-		Status: protocol.StatusSuccess,
+		Status:     protocol.StatusSuccess,
+		Visibility: chPayload.OptionalChannelArgs.Visibility,
 	}
 	return chPayload
 }
 
-func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
+func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) (joinPayload, noticePayload protocol.ChannelPayload) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -144,7 +146,7 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 			Status: protocol.StatusFail,
 			Reason: chDoesNotExist,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	// Wrong password
@@ -157,7 +159,7 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 			Status: protocol.StatusFail,
 			Reason: incorrectChPassword,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	// Channel is full
@@ -170,7 +172,7 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 			Status: protocol.StatusFail,
 			Reason: chAtCapacity,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	channel.Users[chPayload.Requester] = true
@@ -178,15 +180,31 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) protocol.Channe
 	m.chMap[chPayload.ChannelName] = channel
 
 	logger.WithFields(logrus.Fields{
-		"channel":        chPayload.ChannelName,
-		"user":           chPayload.Requester,
-		"channelDetails": m.chMap[chPayload.ChannelName],
+		"channel": chPayload.ChannelName,
+		"user":    chPayload.Requester,
 	}).Info("User joined channel successfully")
 
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
-	return chPayload
+
+	chNoticePayload := m.prepareNoticePayload(chPayload, channel, fmt.Sprintf("'%s' has joined the channel", chPayload.Requester))
+	return chPayload, chNoticePayload
+}
+
+func (*Manager) prepareNoticePayload(chPayload protocol.ChannelPayload, channel *ChannelDetails, message string) protocol.ChannelPayload {
+	chNoticeResp := chPayload
+	chNoticeResp.ChannelAction = protocol.NoticeChannel
+	users := make([]string, 0, len(channel.Users))
+	for user := range channel.Users {
+		users = append(users, user)
+	}
+	chNoticeResp.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status: protocol.StatusSuccess,
+		Notice: message,
+		Users:  users,
+	}
+	return chNoticeResp
 }
 
 func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {

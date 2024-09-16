@@ -72,6 +72,8 @@ func (b *ChannelPayloadBuilder) AddOptionalArg(key string, value interface{}) *C
 		b.payload.ChannelPayload.OptionalChannelArgs.Users = value.([]string)
 	case "target_user":
 		b.payload.ChannelPayload.OptionalChannelArgs.TargetUser = value.(string)
+	case "notice":
+		b.payload.ChannelPayload.OptionalChannelArgs.Notice = value.(string)
 	}
 	return b
 }
@@ -145,6 +147,10 @@ func serializeChannelOptionalArgs(args *OptionalChannelArgs) string {
 
 	if args.Reason != "" {
 		optsParts = append(optsParts, "reason="+string(args.Reason))
+	}
+
+	if args.Notice != "" {
+		optsParts = append(optsParts, "notice="+string(args.Notice))
 	}
 
 	if args.Channels != nil {

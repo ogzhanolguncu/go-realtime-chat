@@ -277,6 +277,10 @@ func (c *Client) HandleChReceive(payload protocol.Payload) (msg string, shouldEx
 				payload.ChannelPayload.Requester,
 				strings.Trim(payload.ChannelPayload.OptionalChannelArgs.Message, "\r\n"))
 
+		case payload.ChannelPayload.ChannelAction == protocol.NoticeChannel &&
+			payload.ChannelPayload.OptionalChannelArgs.Notice != "":
+			message = fmt.Sprintf("[%s] [%s](fg:magenta)", unixTimeUTC.Format("01-02 15:04"), payload.ChannelPayload.OptionalChannelArgs.Notice)
+
 		case payload.ChannelPayload.ChannelAction == protocol.GetUsers &&
 			payload.ChannelPayload.OptionalChannelArgs != nil &&
 			payload.ChannelPayload.OptionalChannelArgs.Users != nil &&

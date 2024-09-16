@@ -14,6 +14,7 @@ const (
 	GetUsers
 	GetChannels
 	MessageChannel
+	NoticeChannel
 )
 
 // Status represents the result of an action
@@ -41,6 +42,7 @@ type OptionalChannelArgs struct {
 	Channels   []string // For GetRooms
 	Users      []string // For GetUsers
 	TargetUser string   // For KICK and BAN actions
+	Notice     string
 }
 
 // ChannelPayload represents the payload for room-related operations
@@ -71,6 +73,8 @@ func (rat ChannelActionType) String() string {
 		return "GetChannels"
 	case MessageChannel:
 		return "MessageChannel"
+	case NoticeChannel:
+		return "NoticeChannel"
 	default:
 		return "Unknown"
 	}
@@ -85,6 +89,7 @@ var ChannelActionMap = map[string]ChannelActionType{
 	"GetUsers":       GetUsers,
 	"GetChannels":    GetChannels,
 	"MessageChannel": MessageChannel,
+	"NoticeChannel":  NoticeChannel,
 }
 
 var ClientChannelActionMap = map[string]ChannelActionType{

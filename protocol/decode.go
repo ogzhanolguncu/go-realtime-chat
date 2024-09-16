@@ -338,6 +338,7 @@ const (
 	optArgRooms      = "channels="
 	optArgUsers      = "users="
 	optArgTargetUser = "target_user="
+	optArgNotice     = "notice="
 )
 
 func parseRoomOptionalArgs(optionalArgs string) *OptionalChannelArgs {
@@ -372,6 +373,10 @@ func parseRoomOptionalArgs(optionalArgs string) *OptionalChannelArgs {
 		case strings.HasPrefix(optionalArg, optArgTargetUser):
 			targetUser, _ := strings.CutPrefix(optionalArg, optArgTargetUser)
 			finalOptionalArg.TargetUser = targetUser
+
+		case strings.HasPrefix(optionalArg, optArgNotice):
+			notice, _ := strings.CutPrefix(optionalArg, optArgNotice)
+			finalOptionalArg.Notice = notice
 		}
 	}
 	return finalOptionalArg
