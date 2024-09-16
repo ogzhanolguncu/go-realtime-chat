@@ -56,6 +56,26 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 	payload.Timestamp = time.Now().Unix()
 	payload.ChannelPayload = &roomPayload
 
+	// Broadcast when kick, join, ban and close room happens
+	go func() {
+		noticePayloadCopy := payload
+		noticePayloadCopy.ChannelPayload = &noticePayload
+
+		if noticePayloadCopy.ChannelPayload.ChannelAction == protocol.NoticeChannel {
+			roomMsg := []byte(mr.server.encodeFn(noticePayloadCopy))
+			mr.broadcastToUsers(roomMsg, noticePayloadCopy.ChannelPayload.OptionalChannelArgs.Users, info.Connection)
+		}
+	}()
+
+	// Broadcast newly created channel to users if visibility is public
+	go func() {
+		isSuccess := payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess
+		if payload.ChannelPayload.ChannelAction == protocol.CreateChannel && isSuccess &&
+			payload.ChannelPayload.OptionalChannelArgs.Visibility == protocol.VisibilityPublic {
+			mr.server.broadcastSystemNotice(fmt.Sprintf("Channel '%s' has been created by '%s'", payload.ChannelPayload.ChannelName, info.OwnerName), info.Connection)
+		}
+	}()
+
 	if payload.ChannelPayload.ChannelAction == protocol.MessageChannel {
 		roomMsg := []byte(mr.server.encodeFn(payload))
 		mr.broadcastToUsers(roomMsg, payload.ChannelPayload.OptionalChannelArgs.Users, info.Connection)
@@ -76,26 +96,6 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 		writeToAConn(mr, payload, userConn)
 		return
 	}
-
-	// Broadcast when kick, join, ban and close room happens
-	go func() {
-		noticePayloadCopy := payload
-		noticePayloadCopy.ChannelPayload = &noticePayload
-
-		if noticePayloadCopy.ChannelPayload.ChannelAction == protocol.NoticeChannel {
-			roomMsg := []byte(mr.server.encodeFn(noticePayloadCopy))
-			mr.broadcastToUsers(roomMsg, noticePayloadCopy.ChannelPayload.OptionalChannelArgs.Users, info.Connection)
-		}
-	}()
-
-	// Broadcast newly created channel to users if visibility is public
-	go func() {
-		isSuccess := payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess
-		if payload.ChannelPayload.ChannelAction == protocol.CreateChannel && isSuccess &&
-			payload.ChannelPayload.OptionalChannelArgs.Visibility == protocol.VisibilityPublic {
-			mr.server.broadcastSystemNotice(fmt.Sprintf("Channel '%s' has been created by '%s'", payload.ChannelPayload.ChannelName, info.OwnerName), info.Connection)
-		}
-	}()
 
 	writeToAConn(mr, payload, info.Connection)
 }

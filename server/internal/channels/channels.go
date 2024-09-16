@@ -68,7 +68,7 @@ func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, pro
 	case protocol.JoinChannel:
 		return m.joinChannel(*payload.ChannelPayload)
 	case protocol.LeaveChannel:
-		return m.leaveChannel(*payload.ChannelPayload), protocol.ChannelPayload{}
+		return m.leaveChannel(*payload.ChannelPayload)
 	case protocol.GetChannels:
 		return m.getChannels(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.GetUsers:
@@ -76,7 +76,7 @@ func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, pro
 	case protocol.MessageChannel:
 		return m.messageChannel(*payload.ChannelPayload), protocol.ChannelPayload{}
 	case protocol.KickUser:
-		return m.kickUser(*payload.ChannelPayload), protocol.ChannelPayload{}
+		return m.kickUser(*payload.ChannelPayload)
 	default:
 		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown channel action")
 		return protocol.ChannelPayload{
@@ -192,22 +192,7 @@ func (m *Manager) joinChannel(chPayload protocol.ChannelPayload) (joinPayload, n
 	return chPayload, chNoticePayload
 }
 
-func (*Manager) prepareNoticePayload(chPayload protocol.ChannelPayload, channel *ChannelDetails, message string) protocol.ChannelPayload {
-	chNoticeResp := chPayload
-	chNoticeResp.ChannelAction = protocol.NoticeChannel
-	users := make([]string, 0, len(channel.Users))
-	for user := range channel.Users {
-		users = append(users, user)
-	}
-	chNoticeResp.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-		Status: protocol.StatusSuccess,
-		Notice: message,
-		Users:  users,
-	}
-	return chNoticeResp
-}
-
-func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
+func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) (protocol.ChannelPayload, protocol.ChannelPayload) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -223,7 +208,7 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.Chann
 			Status: protocol.StatusFail,
 			Reason: chDoesNotExist,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	if _, found := channel.Users[chPayload.Requester]; !found {
@@ -235,7 +220,7 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.Chann
 			Status: protocol.StatusFail,
 			Reason: notInTheCh,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	delete(channel.Users, chPayload.Requester)
@@ -254,7 +239,8 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) protocol.Chann
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status: protocol.StatusSuccess,
 	}
-	return chPayload
+	chNoticePayload := m.prepareNoticePayload(chPayload, channel, fmt.Sprintf("'%s' has left the channel", chPayload.Requester))
+	return chPayload, chNoticePayload
 }
 
 func (m *Manager) getChannels(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
@@ -354,28 +340,28 @@ func (m *Manager) messageChannel(chPayload protocol.ChannelPayload) protocol.Cha
 	return chPayload
 }
 
-func (m *Manager) kickUser(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
+func (m *Manager) kickUser(chPayload protocol.ChannelPayload) (protocol.ChannelPayload, protocol.ChannelPayload) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	//Channel has to exist
-	selectedCh, exists := m.chMap[chPayload.ChannelName]
+	channel, exists := m.chMap[chPayload.ChannelName]
 	if !exists {
 		logger.WithField("channel", chPayload.ChannelName).Warn("Channel does not exist")
 		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: chDoesNotExist,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	//Requester has to be the owner
-	if selectedCh.Owner != chPayload.Requester {
+	if channel.Owner != chPayload.Requester {
 		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: notChannelOwner,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	//Payload has to have target user
@@ -385,24 +371,47 @@ func (m *Manager) kickUser(chPayload protocol.ChannelPayload) protocol.ChannelPa
 			Status: protocol.StatusFail,
 			Reason: emptyTargetUser,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 
 	//Payload has to have target user
-	if chPayload.OptionalChannelArgs.TargetUser == selectedCh.Owner {
+	if chPayload.OptionalChannelArgs.TargetUser == channel.Owner {
 		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 			Status: protocol.StatusFail,
 			Reason: ownerCannotBeKicked,
 		}
-		return chPayload
+		return chPayload, protocol.ChannelPayload{}
 	}
 	//Delete user from user list
-	delete(selectedCh.Users, chPayload.OptionalChannelArgs.TargetUser)
+	delete(channel.Users, chPayload.OptionalChannelArgs.TargetUser)
 
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status:     protocol.StatusSuccess,
 		TargetUser: chPayload.OptionalChannelArgs.TargetUser,
 	}
 
-	return chPayload
+	chNoticePayload := m.prepareNoticePayload(chPayload, channel, fmt.Sprintf("'%s' has been kicked from the channel", chPayload.Requester))
+	return chPayload, chNoticePayload
+}
+
+// Helper Methods
+// -----------------------------
+func (*Manager) prepareNoticePayload(chPayload protocol.ChannelPayload, channel *ChannelDetails, message string) protocol.ChannelPayload {
+	chNoticeResp := chPayload
+	chNoticeResp.ChannelAction = protocol.NoticeChannel
+	users := getUsersInChannnel(channel)
+	chNoticeResp.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status: protocol.StatusSuccess,
+		Notice: message,
+		Users:  users,
+	}
+	return chNoticeResp
+}
+
+func getUsersInChannnel(channel *ChannelDetails) []string {
+	users := make([]string, 0, len(channel.Users))
+	for user := range channel.Users {
+		users = append(users, user)
+	}
+	return users
 }
