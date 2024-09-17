@@ -510,13 +510,15 @@ func (m *Manager) startInactiveChannelChecker() {
 	}
 }
 
+const minuteInMs = 60
+
 // This function is an exception among others. Only this function is exposed to the connection manager and encodeFn because in this scenario, the invoker is this function.
 func (m *Manager) checkInactiveChannel() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	for chName, ch := range m.chMap {
-		if time.Now().Unix() > ch.LastActivity+10 {
+		if time.Now().Unix() > ch.LastActivity+minuteInMs {
 			logger.WithFields(logrus.Fields{
 				"channel": ch.ChName,
 			}).Info("Channel is inactive")

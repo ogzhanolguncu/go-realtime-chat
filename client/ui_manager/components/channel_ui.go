@@ -3,6 +3,7 @@ package ui_manager
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
@@ -16,7 +17,11 @@ type ChannelUI struct {
 	showCursor       bool
 	cursorChar       string
 	inputText        string
+	typingUsers      map[string]time.Time
+	typingTimeout    time.Duration
 }
+
+const typingTimeout = 2 * time.Second
 
 func NewChannelUI(username, channelName string) *ChannelUI {
 	return &ChannelUI{
@@ -27,6 +32,8 @@ func NewChannelUI(username, channelName string) *ChannelUI {
 		showCursor:       true,
 		cursorChar:       "|",
 		inputText:        "",
+		typingUsers:      make(map[string]time.Time),
+		typingTimeout:    typingTimeout,
 	}
 }
 
@@ -35,6 +42,7 @@ func (cu *ChannelUI) InitUI() (header *widgets.Paragraph, chatBox *widgets.Parag
 		return nil, nil, nil, fmt.Errorf("failed to initialize termui: %v", err)
 	}
 	h, c, i := cu.prepareUIItems()
+	go cu.periodicTypingUserCleanup(h)
 	return h, c, i, nil
 }
 
@@ -48,7 +56,6 @@ func (cu *ChannelUI) prepareUIItems() (header *widgets.Paragraph, chatBox *widge
 	termWidth, termHeight := ui.TerminalDimensions()
 
 	header = widgets.NewParagraph()
-	header.Text = fmt.Sprintf("Channel: %s | User: %s", cu.channelName, cu.currentUserName)
 	header.SetRect(0, 0, termWidth, 3)
 	header.Border = true
 	header.TextStyle.Fg = ui.ColorYellow
@@ -69,6 +76,62 @@ func (cu *ChannelUI) prepareUIItems() (header *widgets.Paragraph, chatBox *widge
 	inputBox.TitleStyle.Fg = ui.ColorYellow
 
 	return header, chatBox, inputBox
+}
+
+func (cu *ChannelUI) SetUserTyping(username string) {
+	cu.typingUsers[username] = time.Now()
+}
+
+func (cu *ChannelUI) periodicTypingUserCleanup(h *widgets.Paragraph) {
+	ticker := time.NewTicker(typingTimeout)
+
+	for range ticker.C {
+		cu.cleanupTypingUsers(h)
+	}
+
+}
+
+func (cu *ChannelUI) cleanupTypingUsers(h *widgets.Paragraph) {
+	if len(cu.typingUsers) == 0 {
+		return
+	}
+
+	now := time.Now()
+	for username, lastTyped := range cu.typingUsers {
+		if now.Sub(lastTyped) > cu.typingTimeout {
+			delete(cu.typingUsers, username)
+			cu.UpdateHeader(h)
+		}
+	}
+}
+
+func (cu *ChannelUI) UpdateHeader(header *widgets.Paragraph) {
+	headerText := fmt.Sprintf("Channel: %s | User: %s", cu.channelName, cu.currentUserName)
+
+	var typingUsers []string
+	for username := range cu.typingUsers {
+		if username != cu.currentUserName {
+			typingUsers = append(typingUsers, username)
+		}
+	}
+
+	var typingText string
+	switch len(typingUsers) {
+	case 0:
+		// No typing text
+	case 1:
+		typingText = fmt.Sprintf("%s is typing...", typingUsers[0])
+	case 2:
+		typingText = fmt.Sprintf("%s and %s are typing...", typingUsers[0], typingUsers[1])
+	default:
+		typingText = "Several people are typing..."
+	}
+
+	if typingText != "" {
+		header.Text = fmt.Sprintf("%s | [%s](fg:yellow,mod:bold)", headerText, typingText)
+	} else {
+		header.Text = headerText
+	}
 }
 
 func (cu *ChannelUI) UpdateChatBox(input string, chatBox *widgets.Paragraph) {

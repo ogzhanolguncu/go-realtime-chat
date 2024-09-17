@@ -348,7 +348,7 @@ func (c *Client) HandleChReceive(payload protocol.Payload) (msg string, shouldEx
 
 		case payload.ChannelPayload.ChannelAction == protocol.TypingChannel:
 			//Message Channel
-			message = "----"
+			message = fmt.Sprintf("%s%s", "T-", payload.ChannelPayload.Requester)
 
 		case payload.ChannelPayload.ChannelAction == protocol.NoticeChannel &&
 			payload.ChannelPayload.OptionalChannelArgs.Notice != "":

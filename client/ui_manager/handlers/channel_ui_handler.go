@@ -22,6 +22,7 @@ func HandleChannelUI(client *internal.Client) error {
 		return fmt.Errorf("failed to initialize termui: %v", err)
 	}
 	channelUi.UpdateChatBox(fmt.Sprintf("[%s] [Welcome to the %s!](fg:cyan)", time.Now().Format("01-02 15:04"), client.GetChannelInfo().ChName), chatBox)
+	channelUi.UpdateHeader(header)
 	draw := channelUi.Draw(header, chatBox, inputBox)
 	draw()
 
@@ -66,6 +67,13 @@ func HandleChannelUI(client *internal.Client) error {
 			draw()
 		case payload := <-incomingChan:
 			msg, shouldExit := client.HandleChReceive(payload)
+			if strings.HasPrefix(msg, "T-") {
+				username := strings.TrimPrefix(msg, "T-")
+				channelUi.SetUserTyping(username)
+				channelUi.UpdateHeader(header)
+				draw()
+				continue
+			}
 			if msg != "" {
 				channelUi.UpdateChatBox(msg, chatBox)
 				draw()

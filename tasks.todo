@@ -130,10 +130,10 @@ Chat Application Todo List:
                 ☐ Allow users to set custom status message`
             Typing Indicators (for private chats):
                 ☐ Implement client-side typing detection
-                    - Send "typing" signal when user starts typing in a private chat
+                    ✔ Send "typing" signal when user starts typing in a private chat @done(24-09-17 15:34)
                     - Send "stopped typing" signal after user pauses (e.g., 2 seconds of inactivity)
-                ☐ Implement server-side handling of typing signals
-                    - Forward typing status only to the relevant chat partner
+                ✔ Implement server-side handling of typing signals @done(24-09-17 15:34)
+                    ✔ Forward typing status only to the relevant chat partner @done(24-09-17 15:34)
                 ☐ Add UI element for displaying typing status in private chats
                     - Show "[User] is typing..." below the last message in the chat
                     - Ensure it updates smoothly without disrupting the chat view
