@@ -48,17 +48,21 @@ type ChannelDetails struct {
 }
 
 type Manager struct {
-	chMap map[string]*ChannelDetails
-	lock  sync.RWMutex
+	chMap    map[string]*ChannelDetails
+	cm       *connection.Manager
+	encodeFn func(payload protocol.Payload) string
+	lock     sync.RWMutex
 }
 
-// Use this connnection manager and encodeFn ONLY for close channel dispatch
+// Use this connnection manager and encodeFn ONLY for close channel message dispatch
 func NewChannelManager(cm *connection.Manager, encodeFn func(payload protocol.Payload) string) *Manager {
 	logger.Info("Initializing new ChannelManager")
 	m := &Manager{
-		chMap: make(map[string]*ChannelDetails),
+		chMap:    make(map[string]*ChannelDetails),
+		cm:       cm,
+		encodeFn: encodeFn,
 	}
-	go m.startInactiveChannelChecker(cm, encodeFn)
+	go m.startInactiveChannelChecker()
 	return m
 }
 
@@ -245,9 +249,11 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) (protocol.Chan
 	delete(channel.Users, chPayload.Requester)
 	channel.LastActivity = time.Now().Unix()
 
+	//TODO: send another dispatch to group chat about recent channel close
 	if len(channel.Users) == 0 {
-		delete(m.chMap, chPayload.ChannelName)
 		logger.WithField("channel", chPayload.ChannelName).Info("Channel deleted as it's empty")
+		m.channelCloseNoticeToGroupChat(channel.ChName)
+		delete(m.chMap, chPayload.ChannelName)
 	}
 
 	logger.WithFields(logrus.Fields{
@@ -473,18 +479,17 @@ func (m *Manager) kickAndBanChecks(channel *ChannelDetails, chPayload protocol.C
 // -------------------------
 
 // Runs every minute and check for inactive channels
-func (m *Manager) startInactiveChannelChecker(cm *connection.Manager, encodeFn func(payload protocol.Payload) string) {
+func (m *Manager) startInactiveChannelChecker() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		m.checkInactiveChannel(cm, encodeFn)
-
+		m.checkInactiveChannel()
 	}
 }
 
 // This function is an exception among others. Only this function is exposed to the connection manager and encodeFn because in this scenario, the invoker is this function.
-func (m *Manager) checkInactiveChannel(cm *connection.Manager, encodeFn func(payload protocol.Payload) string) {
+func (m *Manager) checkInactiveChannel() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -495,11 +500,11 @@ func (m *Manager) checkInactiveChannel(cm *connection.Manager, encodeFn func(pay
 			}).Info("Channel is inactive")
 
 			for user := range ch.Users {
-				conn, found := cm.FindConnectionByOwnerName(user)
+				conn, found := m.cm.FindConnectionByOwnerName(user)
 				if !found {
 					continue
 				}
-				encodedMsg := encodeFn(protocol.Payload{
+				encodedMsg := m.encodeFn(protocol.Payload{
 					MessageType: protocol.MessageTypeCH,
 					ChannelPayload: &protocol.ChannelPayload{
 						ChannelAction: protocol.CloseChannel,
@@ -511,18 +516,21 @@ func (m *Manager) checkInactiveChannel(cm *connection.Manager, encodeFn func(pay
 				})
 				conn.Write([]byte(encodedMsg))
 			}
-			cm.RangeConnections(func(conn net.Conn, info *connection.ConnectionInfo) bool {
-				payload := protocol.Payload{
-					MessageType: protocol.MessageTypeSYS,
-					Content:     fmt.Sprintf("Channel '%s' has been closed due to inactivity", chName),
-					Status:      "success",
-				}
-				encodedMsg := []byte(encodeFn(payload))
-				conn.Write([]byte(encodedMsg))
-				return true
-			})
-
+			m.channelCloseNoticeToGroupChat(chName)
 			delete(m.chMap, chName)
 		}
 	}
+}
+
+func (m *Manager) channelCloseNoticeToGroupChat(chName string) {
+	m.cm.RangeConnections(func(conn net.Conn, info *connection.ConnectionInfo) bool {
+		payload := protocol.Payload{
+			MessageType: protocol.MessageTypeSYS,
+			Content:     fmt.Sprintf("Channel '%s' has been closed due to inactivity", chName),
+			Status:      "success",
+		}
+		encodedMsg := []byte(m.encodeFn(payload))
+		conn.Write([]byte(encodedMsg))
+		return true
+	})
 }
