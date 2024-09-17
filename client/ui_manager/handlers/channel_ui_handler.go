@@ -59,6 +59,7 @@ func HandleChannelUI(client *internal.Client) error {
 			case "<Space>":
 				channelUi.HandleKeyPress("<Space>")
 			default:
+				go client.HandleSend(fmt.Sprintf("/ch typing %s %s", client.GetChannelInfo().ChName, client.GetChannelInfo().ChPassword))
 				channelUi.HandleKeyPress(e.ID)
 			}
 			channelUi.RenderInput(inputBox)

@@ -90,6 +90,8 @@ func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, pro
 		return m.kickUser(*payload.ChannelPayload)
 	case protocol.BanUser:
 		return m.banUser(*payload.ChannelPayload)
+	case protocol.TypingChannel:
+		return m.typingIndicator(*payload.ChannelPayload), protocol.ChannelPayload{}
 	default:
 		logger.WithField("action", payload.ChannelPayload.ChannelAction).Warn("Unknown channel action")
 		return protocol.ChannelPayload{
@@ -99,6 +101,26 @@ func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, pro
 			},
 		}, protocol.ChannelPayload{}
 	}
+}
+
+func (m *Manager) typingIndicator(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	channel, exists := m.chMap[chPayload.ChannelName]
+	if !exists {
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusFail,
+		}
+		return chPayload
+	}
+
+	users := getUsersInChannnel(channel)
+	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+		Status: protocol.StatusSuccess,
+		Users:  users,
+	}
+	return chPayload
 }
 
 func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
@@ -499,26 +521,30 @@ func (m *Manager) checkInactiveChannel() {
 				"channel": ch.ChName,
 			}).Info("Channel is inactive")
 
-			for user := range ch.Users {
-				conn, found := m.cm.FindConnectionByOwnerName(user)
-				if !found {
-					continue
-				}
-				encodedMsg := m.encodeFn(protocol.Payload{
-					MessageType: protocol.MessageTypeCH,
-					ChannelPayload: &protocol.ChannelPayload{
-						ChannelAction: protocol.CloseChannel,
-						OptionalChannelArgs: &protocol.OptionalChannelArgs{
-							Reason: fmt.Sprintf(closeInactiveCh, chName),
-							Status: protocol.StatusSuccess,
-						},
-					},
-				})
-				conn.Write([]byte(encodedMsg))
-			}
+			m.sendCloseNoticeToChannelUsers(ch)
 			m.channelCloseNoticeToGroupChat(chName)
 			delete(m.chMap, chName)
 		}
+	}
+}
+
+func (m *Manager) sendCloseNoticeToChannelUsers(ch *ChannelDetails) {
+	for user := range ch.Users {
+		conn, found := m.cm.FindConnectionByOwnerName(user)
+		if !found {
+			continue
+		}
+		encodedMsg := m.encodeFn(protocol.Payload{
+			MessageType: protocol.MessageTypeCH,
+			ChannelPayload: &protocol.ChannelPayload{
+				ChannelAction: protocol.CloseChannel,
+				OptionalChannelArgs: &protocol.OptionalChannelArgs{
+					Reason: fmt.Sprintf(closeInactiveCh, ch.ChName),
+					Status: protocol.StatusSuccess,
+				},
+			},
+		})
+		conn.Write([]byte(encodedMsg))
 	}
 }
 

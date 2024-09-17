@@ -16,6 +16,7 @@ const (
 	MessageChannel
 	NoticeChannel
 	CloseChannel
+	TypingChannel
 )
 
 // Status represents the result of an action
@@ -78,6 +79,8 @@ func (rat ChannelActionType) String() string {
 		return "NoticeChannel"
 	case CloseChannel:
 		return "CloseChannel"
+	case TypingChannel:
+		return "TypingChannel"
 	default:
 		return "Unknown"
 	}
@@ -94,6 +97,7 @@ var ChannelActionMap = map[string]ChannelActionType{
 	"MessageChannel": MessageChannel,
 	"NoticeChannel":  NoticeChannel,
 	"CloseChannel":   CloseChannel,
+	"TypingChannel":  TypingChannel,
 }
 
 var ClientChannelActionMap = map[string]ChannelActionType{
@@ -105,6 +109,7 @@ var ClientChannelActionMap = map[string]ChannelActionType{
 	"users":   GetUsers,
 	"list":    GetChannels,
 	"message": MessageChannel,
+	"typing":  TypingChannel,
 }
 
 // ParseChannelAction converts a string to ChannelActionType

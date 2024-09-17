@@ -18,6 +18,7 @@ const (
 	cmdKick    = "kick"
 	cmdBan     = "ban"
 	cmdList    = "list" // Useful for getting channel list on group chat
+	cmdTyping  = "typing"
 )
 
 func chMessageHandler(parts []string, c *Client) (string, error) {
@@ -46,9 +47,34 @@ func chMessageHandler(parts []string, c *Client) (string, error) {
 		return handleKickUser(c, channelName, args)
 	case cmdBan:
 		return handleBanUser(c, channelName, args)
+	case cmdTyping:
+		return handleTypingIndicator(c, channelName, args)
 	default:
 		return fmt.Sprintf("[%s] [Unknown action: %s](fg:red)", time.Now().Format("01-02 15:04"), action), nil
 	}
+}
+
+func handleTypingIndicator(c *Client, channelName string, args []string) (string, error) {
+	var password string
+	if len(args) > 1 {
+		password = args[0]
+	}
+
+	payload, err := protocol.NewChannelPayloadBuilder().
+		SetRequester(c.name).
+		SetChannelAction(protocol.TypingChannel).
+		SetChannelName(channelName).
+		SetChannelPassword(password).
+		Build()
+	if err != nil {
+		return "", err
+	}
+
+	if err := sendPayload(c, payload); err != nil {
+		return "", err
+	}
+
+	return "", nil
 }
 
 func handleCreateChannel(c *Client, channelName string, args []string) (string, error) {
@@ -319,6 +345,10 @@ func (c *Client) HandleChReceive(payload protocol.Payload) (msg string, shouldEx
 				unixTimeUTC.Format("01-02 15:04"),
 				payload.ChannelPayload.Requester,
 				strings.Trim(payload.ChannelPayload.OptionalChannelArgs.Message, "\r\n"))
+
+		case payload.ChannelPayload.ChannelAction == protocol.TypingChannel:
+			//Message Channel
+			message = "----"
 
 		case payload.ChannelPayload.ChannelAction == protocol.NoticeChannel &&
 			payload.ChannelPayload.OptionalChannelArgs.Notice != "":
