@@ -12,18 +12,19 @@ import (
 )
 
 const (
-	chAlreadyExists      = "Channel name already exists."
-	chDoesNotExist       = "Channel does not exist."
-	incorrectChPassword  = "Incorrect channel password."
-	chAtCapacity         = "Channel is full. Try again later."
-	notInTheCh           = "User not in the channel."
-	unknownChAction      = "Unknown channel action."
-	noActiveChannels     = "No active channels."
-	notChannelOwner      = "Not a channel owner."
-	emptyTargetUser      = "Target user cannot be empty."
-	ownerCannotBeKicked  = "Owner cannot be kicked."
-	bannedUserCannotJoin = "You have been banned from '%s'."
-	closeInactiveCh      = "Channel '%s' closed due to inactivity."
+	chAlreadyExists         = "Channel name already exists."
+	chDoesNotExist          = "Channel does not exist."
+	incorrectChPassword     = "Incorrect channel password."
+	chAtCapacity            = "Channel is full. Try again later."
+	notInTheCh              = "User not in the channel."
+	unknownChAction         = "Unknown channel action."
+	noActiveChannels        = "No active channels."
+	notChannelOwner         = "Not a channel owner."
+	emptyTargetUser         = "Target user cannot be empty."
+	ownerCannotBeKicked     = "Owner cannot be kicked."
+	bannedUserCannotJoin    = "You have been banned from '%s'."
+	closeInactiveCh         = "Channel '%s' closed due to inactivity."
+	typingIndicatorDebounce = 750 * time.Millisecond
 )
 
 var logger *logrus.Logger
@@ -37,14 +38,15 @@ func init() {
 }
 
 type ChannelDetails struct {
-	ChName       string
-	ChPass       string
-	ChCapacity   int
-	Owner        string
-	Users        map[string]bool
-	LastActivity int64
-	BannedUsers  map[string]bool
-	Visibility   string
+	ChName           string
+	ChPass           string
+	ChCapacity       int
+	Owner            string
+	Users            map[string]bool
+	LastActivity     int64
+	BannedUsers      map[string]bool
+	Visibility       string
+	typingIndicators map[string]time.Time
 }
 
 type Manager struct {
@@ -54,7 +56,7 @@ type Manager struct {
 	lock     sync.RWMutex
 }
 
-// Use this connnection manager and encodeFn ONLY for close channel message dispatch
+// Use this connnection manager and encodeFn -ONLY- for close channel message dispatch
 func NewChannelManager(cm *connection.Manager, encodeFn func(payload protocol.Payload) string) *Manager {
 	logger.Info("Initializing new ChannelManager")
 	m := &Manager{
@@ -63,6 +65,7 @@ func NewChannelManager(cm *connection.Manager, encodeFn func(payload protocol.Pa
 		encodeFn: encodeFn,
 	}
 	go m.startInactiveChannelChecker()
+	go m.cleanUpTypingIndicators()
 	return m
 }
 
@@ -104,8 +107,8 @@ func (m *Manager) Handle(payload protocol.Payload) (protocol.ChannelPayload, pro
 }
 
 func (m *Manager) typingIndicator(chPayload protocol.ChannelPayload) protocol.ChannelPayload {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	channel, exists := m.chMap[chPayload.ChannelName]
 	if !exists {
@@ -115,10 +118,22 @@ func (m *Manager) typingIndicator(chPayload protocol.ChannelPayload) protocol.Ch
 		return chPayload
 	}
 
-	users := getUsersInChannnel(channel)
+	lastTime, exists := channel.typingIndicators[chPayload.Requester]
+	if !exists {
+		channel.typingIndicators[chPayload.Requester] = time.Now()
+	}
+	if time.Since(lastTime) > typingIndicatorDebounce {
+		logger.WithField("user", chPayload.Requester).Warn("Sending typing indicator")
+		channel.typingIndicators[chPayload.Requester] = time.Now()
+		users := getUsersInChannnel(channel)
+		chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
+			Status: protocol.StatusSuccess,
+			Users:  users,
+		}
+		return chPayload
+	}
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
-		Status: protocol.StatusSuccess,
-		Users:  users,
+		Status: protocol.StatusFail,
 	}
 	return chPayload
 }
@@ -142,14 +157,15 @@ func (m *Manager) createChannel(chPayload protocol.ChannelPayload) protocol.Chan
 	}
 
 	m.chMap[chPayload.ChannelName] = &ChannelDetails{
-		ChName:       chPayload.ChannelName,
-		ChPass:       chPayload.ChannelPassword,
-		Owner:        chPayload.Requester,
-		ChCapacity:   chPayload.ChannelSize,
-		Users:        map[string]bool{chPayload.Requester: true},
-		BannedUsers:  map[string]bool{},
-		LastActivity: time.Now().Unix(),
-		Visibility:   string(chPayload.OptionalChannelArgs.Visibility),
+		ChName:           chPayload.ChannelName,
+		ChPass:           chPayload.ChannelPassword,
+		Owner:            chPayload.Requester,
+		ChCapacity:       chPayload.ChannelSize,
+		Users:            map[string]bool{chPayload.Requester: true},
+		BannedUsers:      map[string]bool{},
+		LastActivity:     time.Now().Unix(),
+		Visibility:       string(chPayload.OptionalChannelArgs.Visibility),
+		typingIndicators: make(map[string]time.Time),
 	}
 
 	logger.WithFields(logrus.Fields{
@@ -271,7 +287,6 @@ func (m *Manager) leaveChannel(chPayload protocol.ChannelPayload) (protocol.Chan
 	delete(channel.Users, chPayload.Requester)
 	channel.LastActivity = time.Now().Unix()
 
-	//TODO: send another dispatch to group chat about recent channel close
 	if len(channel.Users) == 0 {
 		logger.WithField("channel", chPayload.ChannelName).Info("Channel deleted as it's empty")
 		m.channelCloseNoticeToGroupChat(channel.ChName)
@@ -399,7 +414,7 @@ func (m *Manager) kickUser(chPayload protocol.ChannelPayload) (protocol.ChannelP
 	}
 	//Delete user from user list
 	delete(channel.Users, chPayload.OptionalChannelArgs.TargetUser)
-
+	channel.LastActivity = time.Now().Unix()
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status:     protocol.StatusSuccess,
 		TargetUser: chPayload.OptionalChannelArgs.TargetUser,
@@ -424,7 +439,7 @@ func (m *Manager) banUser(chPayload protocol.ChannelPayload) (protocol.ChannelPa
 	delete(channel.Users, chPayload.OptionalChannelArgs.TargetUser)
 	//Add user to banned list
 	channel.BannedUsers[chPayload.OptionalChannelArgs.TargetUser] = true
-
+	channel.LastActivity = time.Now().Unix()
 	chPayload.OptionalChannelArgs = &protocol.OptionalChannelArgs{
 		Status:     protocol.StatusSuccess,
 		TargetUser: chPayload.OptionalChannelArgs.TargetUser,
@@ -510,18 +525,16 @@ func (m *Manager) startInactiveChannelChecker() {
 	}
 }
 
-const minuteInMs = 60
-
 // This function is an exception among others. Only this function is exposed to the connection manager and encodeFn because in this scenario, the invoker is this function.
 func (m *Manager) checkInactiveChannel() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	for chName, ch := range m.chMap {
-		if time.Now().Unix() > ch.LastActivity+minuteInMs {
+		if time.Since(time.Unix(ch.LastActivity, 0)) > time.Minute {
 			logger.WithFields(logrus.Fields{
 				"channel": ch.ChName,
-			}).Info("Channel is inactive")
+			}).Info("Channel is inactive removing it")
 
 			m.sendCloseNoticeToChannelUsers(ch)
 			m.channelCloseNoticeToGroupChat(chName)
@@ -561,4 +574,24 @@ func (m *Manager) channelCloseNoticeToGroupChat(chName string) {
 		conn.Write([]byte(encodedMsg))
 		return true
 	})
+}
+
+// Cleanup for typingIndicator map
+// -------------------------------
+func (m *Manager) cleanUpTypingIndicators() {
+	ticker := time.NewTicker(10 * time.Second)
+	for range ticker.C {
+		m.lock.Lock()
+		for _, ch := range m.chMap {
+			for user, lastTyped := range ch.typingIndicators {
+				if time.Since(lastTyped) > 30*time.Second {
+					logger.WithFields(logrus.Fields{
+						"user": user,
+					}).Info("User is inactive for some time, removing it from typingIndicators map")
+					delete(ch.typingIndicators, user)
+				}
+			}
+		}
+		m.lock.Unlock()
+	}
 }

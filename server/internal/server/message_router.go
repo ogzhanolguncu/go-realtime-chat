@@ -56,9 +56,12 @@ func (mr *MessageRouter) handleChannelMessage(payload protocol.Payload, info *co
 	payload.Timestamp = time.Now().Unix()
 	payload.ChannelPayload = &roomPayload
 
-	if payload.ChannelPayload.ChannelAction == protocol.TypingChannel {
+	if payload.ChannelPayload.ChannelAction == protocol.TypingChannel && payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusSuccess {
 		roomMsg := []byte(mr.server.encodeFn(payload))
 		mr.broadcastToUsers(roomMsg, payload.ChannelPayload.OptionalChannelArgs.Users, info.Connection)
+		return
+	}
+	if payload.ChannelPayload.ChannelAction == protocol.TypingChannel && payload.ChannelPayload.OptionalChannelArgs.Status == protocol.StatusFail {
 		return
 	}
 
