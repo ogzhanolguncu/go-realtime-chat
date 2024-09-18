@@ -63,7 +63,10 @@ func (r *Ratelimit) refillRoutine() {
 func (r *Ratelimit) Add(conn net.Conn) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.userRatelimitMap[conn] = AvailableToken(r.config.BucketLimit)
+	_, exists := r.userRatelimitMap[conn]
+	if !exists {
+		r.userRatelimitMap[conn] = AvailableToken(r.config.BucketLimit)
+	}
 }
 
 // Remove removes a connection from the rate limiter

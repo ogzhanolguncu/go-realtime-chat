@@ -3,8 +3,10 @@ package server
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/ogzhanolguncu/go-chat/protocol"
+	chat_ratelimit "github.com/ogzhanolguncu/go-chat/ratelimit"
 	"github.com/ogzhanolguncu/go-chat/server/internal/auth"
 	"github.com/ogzhanolguncu/go-chat/server/internal/block_user"
 	"github.com/ogzhanolguncu/go-chat/server/internal/channels"
@@ -27,6 +29,8 @@ type TCPServer struct {
 	messageRouter *MessageRouter
 	encodeFn      func(payload protocol.Payload) string
 	decodeFn      func(message string) (protocol.Payload, error)
+
+	ratelimiter *chat_ratelimit.Ratelimit
 }
 
 // Server Initialization
@@ -70,6 +74,13 @@ func NewServer(port int, dbPath string, encoding bool) (*TCPServer, error) {
 
 		encodeFn: protocol.InitEncodeProtocol(encoding),
 		decodeFn: protocol.InitDecodeProtocol(encoding),
+
+		ratelimiter: chat_ratelimit.NewRatelimit(
+			chat_ratelimit.TokenBucket{
+				RefillInterval: time.Second * 3,
+				RefillRate:     1,
+				BucketLimit:    10,
+			}),
 	}
 
 	server.messageRouter = NewMessageRouter(server)
@@ -81,6 +92,7 @@ func (s *TCPServer) Start() {
 	logger.Info("Server started. Listening for connections...")
 	for {
 		conn, err := s.listener.Accept()
+		s.ratelimiter.Add(conn)
 		if err != nil {
 			logger.WithError(err).Error("Error accepting connection")
 			continue
@@ -110,6 +122,7 @@ func (s *TCPServer) Close() error {
 // -----------------------------
 
 func (s *TCPServer) handleNewConnection(conn net.Conn) {
+	// This function mainly handles auth then forwards users to message router
 	handler := NewConnectionHandler(conn, s)
 	handler.Handle()
 }
@@ -128,6 +141,7 @@ func (s *TCPServer) OnClientLeave(info *connection.ConnectionInfo) {
 	logger.WithField("user", info.OwnerName).Info("Client left the chat")
 	s.broadcastSystemNotice(fmt.Sprintf("%s has left the chat.", info.OwnerName), info.Connection)
 	s.connectionManager.DeleteConnection(info.Connection)
+	s.ratelimiter.Remove(info.Connection)
 	s.broadcastActiveUsers()
 }
 
@@ -136,6 +150,13 @@ func (s *TCPServer) OnMessageReceived(info *connection.ConnectionInfo, message s
 		"user":    info.OwnerName,
 		"message": message,
 	}).Info("Message received")
+
+	allowed := s.ratelimiter.Check(info.Connection)
+	if !allowed {
+		s.messageRouter.sendSysResponse(info.Connection, "Please wait a moment before sending your next message", "fail")
+		return
+	}
+
 	s.historyManager.AddMessage(message)
 	s.messageRouter.RouteMessage(info, message)
 }
