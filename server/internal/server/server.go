@@ -12,6 +12,7 @@ import (
 	"github.com/ogzhanolguncu/go-chat/server/internal/channels"
 	"github.com/ogzhanolguncu/go-chat/server/internal/chat_history"
 	"github.com/ogzhanolguncu/go-chat/server/internal/connection"
+	"github.com/ogzhanolguncu/go-chat/threadpool"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,6 +32,7 @@ type TCPServer struct {
 	decodeFn      func(message string) (protocol.Payload, error)
 
 	ratelimiter *chat_ratelimit.Ratelimit
+	threadpool  *threadpool.Threadpool
 }
 
 // Server Initialization
@@ -81,6 +83,8 @@ func NewServer(port int, dbPath string, encoding bool) (*TCPServer, error) {
 				RefillRate:     1,
 				BucketLimit:    10,
 			}),
+
+		threadpool: threadpool.NewThreadpool(5),
 	}
 
 	server.messageRouter = NewMessageRouter(server)
@@ -97,7 +101,9 @@ func (s *TCPServer) Start() {
 			logger.WithError(err).Error("Error accepting connection")
 			continue
 		}
-		go s.handleNewConnection(conn)
+		s.threadpool.Submit(func() {
+			s.handleNewConnection(conn)
+		})
 	}
 }
 
@@ -114,7 +120,9 @@ func (s *TCPServer) Close() error {
 	if err := s.blockUserManager.Close(); err != nil {
 		return fmt.Errorf("failed to close block user manager: %w", err)
 	}
+	s.threadpool.Stop()
 	logger.Info("Server closed successfully")
+
 	return nil
 }
 
