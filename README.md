@@ -1,4 +1,4 @@
-# Go Chat Application
+# Go Real-time Chat Client and Server
 
 A feature-rich, real-time chat application implemented in Go, supporting both group and private messaging, with an intuitive terminal-based user interface.
 
