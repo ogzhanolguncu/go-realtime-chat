@@ -67,7 +67,7 @@ func HandleLoginUI(client *internal.Client) (bool, error) {
 					showLoader = true
 					client.SendUsernameReq(username, password)
 				}
-			case "<Backspace>":
+			case "<Backspace>", "<C-<Backspace>>":
 				lu.DeleteLastChar()
 				lu.ResetErrorBox(errorBox)
 

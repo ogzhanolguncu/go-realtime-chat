@@ -109,10 +109,8 @@ func (ch *ConnectionHandler) sendAuthResponse(message, status string) {
 func (ch *ConnectionHandler) handleAuthError(err error) {
 	var message string
 	switch err {
-	case auth.ErrWeakPassword:
-		message = "Password does not meet strength requirements"
-	case auth.ErrInvalidUsername:
-		message = "Username must be at least 2 characters long"
+	case auth.ErrWeakPassword, auth.ErrInvalidUsername, auth.ErrAuthenticationFailed:
+		message = err.Error()
 	default:
 		message = "Authentication failed"
 	}

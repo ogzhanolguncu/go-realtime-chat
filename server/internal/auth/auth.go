@@ -17,9 +17,9 @@ const (
 )
 
 var (
-	ErrInvalidUsername      = errors.New("username must be at least 2 characters long")
-	ErrWeakPassword         = errors.New("password does not meet strength requirements")
-	ErrAuthenticationFailed = errors.New("invalid username or password")
+	ErrInvalidUsername      = errors.New("Username must be at least 2 characters long")
+	ErrWeakPassword         = errors.New("Password must be 8+ characters with upper/lowercase letters, digits, and special characters")
+	ErrAuthenticationFailed = errors.New("Invalid username or password")
 )
 
 type AuthManager struct {
