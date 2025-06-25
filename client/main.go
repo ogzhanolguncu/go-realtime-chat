@@ -12,9 +12,15 @@ import (
 )
 
 func main() {
+	client, err := internal.NewClient(internal.NewConfig())
+	if err != nil {
+		fmt.Printf("failed to create client: %v", err)
+		return
+	}
+	defer client.Close()
 	retry.Do(
 		func() error {
-			return runClient()
+			return runClient(client)
 		},
 		retry.Attempts(5),
 		retry.Delay(time.Second),
@@ -28,13 +34,7 @@ func main() {
 	)
 }
 
-func runClient() error {
-	client, err := internal.NewClient(internal.NewConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create client: %v", err)
-	}
-	defer client.Close()
-
+func runClient(client *internal.Client) error {
 	if err := client.Connect(); err != nil {
 		return fmt.Errorf("failed to connect server: %v", err)
 	}
